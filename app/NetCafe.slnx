@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="NetCafe.App/NetCafe.App.csproj" />
+  <Project Path="NetCafe.Data.Tests/NetCafe.Data.Tests.csproj" />
+  <Project Path="NetCafe.Data/NetCafe.Data.csproj" />
+</Solution>

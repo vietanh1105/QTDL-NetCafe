@@ -1,0 +1,166 @@
+================================================================================
+BÁO CÁO ĐO LƯỜNG VÀ TỐI ƯU HÓA HIỆU NĂNG CSDL (EXPLAIN ANALYZE BEFORE & AFTER)
+Môn: Quản trị Cơ sở Dữ liệu (QTDL)
+Hệ thống Quản lý Phòng Game/Net (netcafe_db) - PostgreSQL 17
+Môi trường: Đo lường thực tế trên máy chủ PostgreSQL 17 cục bộ
+================================================================================
+
+--------------------------------------------------------------------------------
+MỤC TIÊU: Truy vấn các phiên chơi đang hoạt động (Partial Index)
+CÂU LỆNH: SELECT session_id, customer_id, computer_id, start_time FROM core.gaming_session WHERE status = 'active';
+--------------------------------------------------------------------------------
+[1. TRƯỚC KHI TẠO INDEX (BEFORE - CHƯA TỐI ƯU)]:
+Seq Scan on gaming_session  (cost=0.00..6.60 rows=1 width=24) (actual time=0.032..0.032 rows=0 loops=1)
+  Filter: ((status)::text = 'active'::text)
+  Rows Removed by Filter: 208
+  Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=144
+Planning Time: 2.243 ms
+Execution Time: 0.091 ms
+
+[2. SAU KHI TẠO INDEX (AFTER - CHIẾN LƯỢC TỐI ƯU CỦA PLANNER)]:
+Seq Scan on gaming_session  (cost=0.00..6.60 rows=1 width=24) (actual time=0.016..0.017 rows=0 loops=1)
+  Filter: ((status)::text = 'active'::text)
+  Rows Removed by Filter: 208
+  Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=18
+Planning Time: 0.078 ms
+Execution Time: 0.022 ms
+
+[3. MINH HỌA CÂY THỰC THI TRUY VẤN INDEX (INDEX SCAN PLAN)]:
+Index Scan using idx_session_active on gaming_session  (cost=0.12..8.11 rows=1 width=24) (actual time=0.002..0.002 rows=0 loops=1)
+  Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.038 ms
+Execution Time: 0.010 ms
+
+================================================================================
+
+--------------------------------------------------------------------------------
+MỤC TIÊU: Tìm kiếm khách hàng theo họ tên có ký tự đại diện '%Thành%' (GIN Trigram Index)
+CÂU LỆNH: SELECT customer_id, full_name, phone FROM core.customer WHERE full_name ILIKE '%Thành%';
+--------------------------------------------------------------------------------
+[1. TRƯỚC KHI TẠO INDEX (BEFORE - CHƯA TỐI ƯU)]:
+Seq Scan on customer  (cost=0.00..16.96 rows=21 width=30) (actual time=0.014..0.129 rows=23 loops=1)
+  Filter: ((full_name)::text ~~* '%Thành%'::text)
+  Rows Removed by Filter: 454
+  Buffers: shared hit=11
+Planning:
+  Buffers: shared hit=96
+Planning Time: 2.231 ms
+Execution Time: 0.136 ms
+
+[2. SAU KHI TẠO INDEX (AFTER - CHIẾN LƯỢC TỐI ƯU CỦA PLANNER)]:
+Seq Scan on customer  (cost=0.00..16.96 rows=21 width=30) (actual time=0.009..0.103 rows=23 loops=1)
+  Filter: ((full_name)::text ~~* '%Thành%'::text)
+  Rows Removed by Filter: 454
+  Buffers: shared hit=11
+Planning:
+  Buffers: shared hit=10
+Planning Time: 0.081 ms
+Execution Time: 0.107 ms
+
+[3. MINH HỌA CÂY THỰC THI TRUY VẤN INDEX (INDEX SCAN PLAN)]:
+Bitmap Heap Scan on customer  (cost=17.47..28.74 rows=21 width=30) (actual time=0.181..0.192 rows=23 loops=1)
+  Recheck Cond: ((full_name)::text ~~* '%Thành%'::text)
+  Rows Removed by Index Recheck: 4
+  Heap Blocks: exact=9
+  Buffers: shared hit=16
+  ->  Bitmap Index Scan on idx_customer_fullname_trgm  (cost=0.00..17.47 rows=21 width=0) (actual time=0.169..0.170 rows=27 loops=1)
+        Index Cond: ((full_name)::text ~~* '%Thành%'::text)
+        Buffers: shared hit=7
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.071 ms
+Execution Time: 0.361 ms
+
+================================================================================
+
+--------------------------------------------------------------------------------
+MỤC TIÊU: Tìm máy trạm có GPU RTX 4070 trong JSONB specs (GIN jsonb_path_ops)
+CÂU LỆNH: SELECT computer_code, specs FROM core.computer WHERE specs @> '{"gpu": "RTX 4070"}'::jsonb;
+--------------------------------------------------------------------------------
+[1. TRƯỚC KHI TẠO INDEX (BEFORE - CHƯA TỐI ƯU)]:
+Seq Scan on computer  (cost=0.00..1.25 rows=5 width=70) (actual time=0.010..0.011 rows=5 loops=1)
+  Filter: (specs @> '{"gpu": "RTX 4070"}'::jsonb)
+  Rows Removed by Filter: 15
+  Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=107
+Planning Time: 2.014 ms
+Execution Time: 0.017 ms
+
+[2. SAU KHI TẠO INDEX (AFTER - CHIẾN LƯỢC TỐI ƯU CỦA PLANNER)]:
+Seq Scan on computer  (cost=0.00..1.25 rows=5 width=70) (actual time=0.006..0.008 rows=5 loops=1)
+  Filter: (specs @> '{"gpu": "RTX 4070"}'::jsonb)
+  Rows Removed by Filter: 15
+  Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=13
+Planning Time: 0.064 ms
+Execution Time: 0.012 ms
+
+[3. MINH HỌA CÂY THỰC THI TRUY VẤN INDEX (INDEX SCAN PLAN)]:
+Bitmap Heap Scan on computer  (cost=8.55..12.61 rows=5 width=70) (actual time=0.009..0.010 rows=5 loops=1)
+  Recheck Cond: (specs @> '{"gpu": "RTX 4070"}'::jsonb)
+  Heap Blocks: exact=1
+  Buffers: shared hit=3
+  ->  Bitmap Index Scan on idx_computer_specs_gin  (cost=0.00..8.55 rows=5 width=0) (actual time=0.006..0.006 rows=5 loops=1)
+        Index Cond: (specs @> '{"gpu": "RTX 4070"}'::jsonb)
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.028 ms
+Execution Time: 0.020 ms
+
+================================================================================
+
+--------------------------------------------------------------------------------
+MỤC TIÊU: Truy vấn lịch sử hóa đơn theo customer_id (B-Tree FK Index)
+CÂU LỆNH: SELECT invoice_id, customer_id, total_amount, issued_at FROM billing.invoice WHERE customer_id = 5 ORDER BY issued_at DESC;
+--------------------------------------------------------------------------------
+[1. TRƯỚC KHI TẠO INDEX (BEFORE - CHƯA TỐI ƯU)]:
+Sort  (cost=5.60..5.60 rows=1 width=26) (actual time=0.040..0.040 rows=1 loops=1)
+  Sort Key: issued_at DESC
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=6
+  ->  Seq Scan on invoice  (cost=0.00..5.59 rows=1 width=26) (actual time=0.009..0.020 rows=1 loops=1)
+        Filter: (customer_id = 5)
+        Rows Removed by Filter: 206
+        Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=128
+Planning Time: 1.672 ms
+Execution Time: 0.047 ms
+
+[2. SAU KHI TẠO INDEX (AFTER - CHIẾN LƯỢC TỐI ƯU CỦA PLANNER)]:
+Sort  (cost=5.60..5.60 rows=1 width=26) (actual time=0.015..0.016 rows=1 loops=1)
+  Sort Key: issued_at DESC
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=3
+  ->  Seq Scan on invoice  (cost=0.00..5.59 rows=1 width=26) (actual time=0.005..0.013 rows=1 loops=1)
+        Filter: (customer_id = 5)
+        Rows Removed by Filter: 206
+        Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=15
+Planning Time: 0.061 ms
+Execution Time: 0.020 ms
+
+[3. MINH HỌA CÂY THỰC THI TRUY VẤN INDEX (INDEX SCAN PLAN)]:
+Sort  (cost=8.17..8.18 rows=1 width=26) (actual time=0.029..0.029 rows=1 loops=1)
+  Sort Key: issued_at DESC
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=1 read=1
+  ->  Index Scan using idx_invoice_customer_id on invoice  (cost=0.14..8.16 rows=1 width=26) (actual time=0.027..0.028 rows=1 loops=1)
+        Index Cond: (customer_id = 5)
+        Buffers: shared hit=1 read=1
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.029 ms
+Execution Time: 0.033 ms
+
+================================================================================

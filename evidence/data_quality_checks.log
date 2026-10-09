@@ -1,0 +1,39 @@
+﻿You are now connected to database "netcafe_db" as user "postgres".
+SET
+psql.exe : psql:tests/data_quality_checks.sql:154: NOTICE:  
+============================================================
+At line:1 char:67
++ ... tanh1105@'; & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgr ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (psql:tests/data...===============:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+psql:tests/data_quality_checks.sql:154: NOTICE:  KIß╗éM CHß╗¿NG 4 TI├èU CH├ì CHß║ñT L╞»ß╗óNG Dß╗« LIß╗åU (DATA QUALITY)
+psql:tests/data_quality_checks.sql:154: NOTICE:  ============================================================
+psql:tests/data_quality_checks.sql:154: NOTICE:  --- KIß╗éM TRA TI├èU CH├ì 1: Sß║áCH ---
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 1.1. To├án bß╗Ö hß╗ì t├¬n kh├ích h├áng sß║ích (Kh├┤ng thß╗½a 
+khoß║úng trß║»ng).
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 1.2. To├án bß╗Ö sß╗æ ─æiß╗çn thoß║íi tu├ón thß╗º nghi├¬m 
+ngß║╖t Regex chuß║⌐n 10 sß╗æ.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 1.3. Kh├┤ng c├│ bß║Ñt kß╗│ bß║ún ghi n├áo tr├╣ng lß║╖p S─ÉT 
+hoß║╖c Username.
+psql:tests/data_quality_checks.sql:154: NOTICE:  --- KIß╗éM TRA TI├èU CH├ì 2: Sß╗ÉNG ---
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 2.1. Dß╗» liß╗çu sß╗æng: Ghi nhß║¡n 208 phi├¬n ch╞íi trong 30 
+ng├áy qua.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 2.2. Ph├ón bß╗æ thß╗▒c tß║┐: 89 phi├¬n ch╞íi diß╗àn ra trong 
+khung giß╗¥ cao ─æiß╗âm (18h-23h).
+psql:tests/data_quality_checks.sql:154: NOTICE:  --- KIß╗éM TRA TI├èU CH├ì 3: ─É├ÜNG ---
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 3.1. 100% phi├¬n ch╞íi ─æß║úm bß║úo end_time > start_time.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 3.2. 100% h├│a ─æ╞ín tu├ón thß╗º c├┤ng thß╗⌐c t├¡nh tiß╗ün 
+tuyß╗çt ─æß╗æi.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 3.3. Sß╗æ d╞░ t├ái khoß║ún kh├ích h├áng kh├┤ng bao giß╗¥ ├óm.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 3.4. Tß╗ôn kho sß║ún phß║⌐m F&B kh├┤ng bao giß╗¥ ├óm.
+psql:tests/data_quality_checks.sql:154: NOTICE:  --- KIß╗éM TRA TI├èU CH├ì 4: ─Éß╗ª ---
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 4.1. Kh├┤ng c├│ gi├í trß╗ï NULL ß╗ƒ c├íc cß╗Öt bß║»t buß╗Öc.
+psql:tests/data_quality_checks.sql:154: NOTICE:  [PASS] 4.2. Danh mß╗Ñc m├íy trß║ím bao phß╗º ─æß╗º c├íc trß║íng th├íi 
+thß╗▒c tß║┐ (1 trß║íng th├íi).
+psql:tests/data_quality_checks.sql:154: NOTICE:  ============================================================
+psql:tests/data_quality_checks.sql:154: NOTICE:  Kß║╛T QUß║ó: TO├ÇN Bß╗ÿ 4 TI├èU CH├ì (Sß║áCH - Sß╗ÉNG - ─É├ÜNG - 
+─Éß╗ª) ─Éß║áT 100%!
+psql:tests/data_quality_checks.sql:154: NOTICE:  ============================================================
+DO

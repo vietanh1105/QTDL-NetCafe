@@ -1,0 +1,36 @@
+﻿You are now connected to database "netcafe_db" as user "postgres".
+SET
+psql.exe : psql:tests/verify.sql:355: NOTICE:  ============================================================
+At line:1 char:67
++ ... tanh1105@'; & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgr ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (psql:tests/veri...===============:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+psql:tests/verify.sql:355: NOTICE:  BẮT ĐẦU KIỂM THỬ RÀNG BUỘC TOÀN VẸN (SCHEMA CONSTRAINTS)
+psql:tests/verify.sql:355: NOTICE:  ============================================================
+psql:tests/verify.sql:355: NOTICE:  truncate cascades to table "duplicate_candidate"
+psql:tests/verify.sql:355: NOTICE:  -> [HAPPY PATH] Khởi tạo dữ liệu mồi hợp lệ thành công.
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 1: Chặn thành công SĐT sai định dạng (SQLSTATE: 23514 - new row for 
+relation "customer" violates check constraint "ck_customer_phone")
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 2: Chặn thành công SĐT có đầu số không thuộc ^0[35789]
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 3: Chặn thành công Email sai cấu trúc
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 4: Chặn thành công mã máy không đúng định dạng ^PC[0-9]{3,4}$
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 5: Chặn thành công username không bắt đầu bằng chữ cái thường
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 6: Chặn thành công số dư tài khoản âm
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 7: Chặn thành công giá giờ chơi âm
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 8: Chặn thành công tồn kho âm
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 9: Chặn thành công chi tiết món có số lượng = 0
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 10: Chặn thành công xóa dữ liệu cha đang được tham chiếu (RESTRICT)
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 11: Chặn thành công chèn bản ghi trùng lặp UNIQUE SĐT
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 12: Chặn thành công phiên chơi có end_time < start_time
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 13: Chặn thành công mâu thuẫn giữa status phiên và end_time
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 14: Khóa EXCLUDE USING gist chặn thành công đặt trùng giờ (Overbooking)
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 15: Chặn thành công sai lệch công thức tổng tiền hóa đơn
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 16: Chặn thành công giao dịch hóa đơn thiếu invoice_id
+psql:tests/verify.sql:355: NOTICE:  [PASS] Test 17: Khóa UNIQUE session_id bảo đảm quan hệ 1-1 giữa phiên chơi và hóa 
+đơn
+psql:tests/verify.sql:355: NOTICE:  ============================================================
+psql:tests/verify.sql:355: NOTICE:  KẾT QUẢ KIỂM THỬ: TỔNG SỐ TEST: 17, ĐẠT: 17, THẤT BẠI: 0
+psql:tests/verify.sql:355: NOTICE:  ============================================================
+DO

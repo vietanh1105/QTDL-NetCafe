@@ -1,0 +1,7 @@
+# Các thư viện Python phục vụ đề tài Quản trị CSDL (QTDL) NetCafe
+psycopg[binary]>=3.2.0
+pandas>=2.2.0
+faker>=30.0.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+python-docx>=1.1.0

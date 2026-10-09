@@ -1,0 +1,43 @@
+================================================================================
+KIỂM THỬ KHẢ NĂNG PHỤC HỒI THẢM HỌA (DISASTER RECOVERY TEST: BACKUP & RESTORE)
+Môn: Quản trị Cơ sở Dữ liệu (QTDL)
+Nguồn: netcafe_db -> Đích phục hồi: netcafe_restore
+================================================================================
+
+[BƯỚC 1]: Tạo bản sao lưu định dạng nhị phân pg_dump (-Fc)...
+-> Đã tạo dump thành công: backup\netcafe_test_recovery.dump (265.16 KB)
+
+[BƯỚC 2]: Khởi tạo cơ sở dữ liệu độc lập netcafe_restore...
+-> Đã tạo database netcafe_restore từ template0 chuẩn UTF-8.
+
+[BƯỚC 3]: Thực hiện khôi phục dữ liệu qua pg_restore vào netcafe_restore...
+-> pg_restore hoàn tất (Return code: 0)
+
+[BƯỚC 4]: Kiểm tra tính toàn vẹn và đối chiếu số dòng (Row Count Verification)...
+Schema       | Table                  | Source (netcafe_db)  | Restored (netcafe_restore)   | Trạng thái
+-----------------------------------------------------------------------------------------------
+core         | room                   | 3                    | 3                            | KHỚP 100% [PASS]
+core         | computer_type          | 3                    | 3                            | KHỚP 100% [PASS]
+core         | computer               | 20                   | 20                           | KHỚP 100% [PASS]
+core         | customer               | 477                  | 477                          | KHỚP 100% [PASS]
+core         | gaming_session         | 208                  | 208                          | KHỚP 100% [PASS]
+core         | booking                | 2                    | 2                            | KHỚP 100% [PASS]
+inventory    | product_category       | 4                    | 4                            | KHỚP 100% [PASS]
+inventory    | product                | 10                   | 10                           | KHỚP 100% [PASS]
+inventory    | food_order             | 1                    | 1                            | KHỚP 100% [PASS]
+inventory    | food_order_detail      | 1                    | 1                            | KHỚP 100% [PASS]
+billing      | promotion              | 3                    | 3                            | KHỚP 100% [PASS]
+billing      | invoice                | 207                  | 207                          | KHỚP 100% [PASS]
+billing      | invoice_promotion      | 0                    | 0                            | KHỚP 100% [PASS]
+billing      | payment                | 211                  | 211                          | KHỚP 100% [PASS]
+hr           | employee               | 6                    | 6                            | KHỚP 100% [PASS]
+hr           | maintenance            | 2                    | 2                            | KHỚP 100% [PASS]
+audit        | audit_log              | 0                    | 0                            | KHỚP 100% [PASS]
+
+[BƯỚC 5]: Dọn dẹp môi trường thử nghiệm...
+-> Đã dọn dẹp cơ sở dữ liệu thử nghiệm netcafe_restore.
+-> Đã xóa file dump tạm thời.
+
+================================================================================
+KẾT LUẬN: THỬ NGHIỆM PHỤC HỒI DỮ LIỆU THÀNH CÔNG 100% - TOÀN VẸN DỮ LIỆU TUYỆT ĐỐI!
+================================================================================

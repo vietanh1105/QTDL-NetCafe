@@ -1,0 +1,27 @@
+# Environment & secrets
+.env
+*.log
+!evidence/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.pytest_cache/
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Backup & scratch
+backup/*.dump
+scratch/
+
+# Temporary office files & OS files
+~$*
+Thumbs.db
+.DS_Store
