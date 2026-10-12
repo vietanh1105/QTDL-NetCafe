@@ -12,13 +12,51 @@ namespace NetCafe.Data.Tests
 
         public IntegrationTests()
         {
-            var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "127.0.0.1";
-            var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
-            var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "netcafe_db";
-            var user = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
-            var pwd = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "vietanh1105@";
+            var host = Environment.GetEnvironmentVariable("DB_HOST");
+            var port = Environment.GetEnvironmentVariable("DB_PORT");
+            var db = Environment.GetEnvironmentVariable("DB_NAME");
+            var user = Environment.GetEnvironmentVariable("DB_USER");
+            var pwd = Environment.GetEnvironmentVariable("DB_PASSWORD");
+            var sslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE");
 
-            _connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pwd};Include Error Detail=true;";
+            if (string.IsNullOrEmpty(host))
+            {
+                var searchPaths = new[] { ".env", "../.env", "../../.env", "../../../.env", "../../../../.env" };
+                foreach (var path in searchPaths)
+                {
+                    if (System.IO.File.Exists(path))
+                    {
+                        foreach (var line in System.IO.File.ReadAllLines(path))
+                        {
+                            var trimmed = line.Trim();
+                            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
+                            var parts = trimmed.Split('=', 2);
+                            if (parts.Length == 2)
+                            {
+                                var k = parts[0].Trim();
+                                var v = parts[1].Trim();
+                                if (k == "DB_HOST" && string.IsNullOrEmpty(host)) host = v;
+                                else if (k == "DB_PORT" && string.IsNullOrEmpty(port)) port = v;
+                                else if (k == "DB_NAME" && string.IsNullOrEmpty(db)) db = v;
+                                else if (k == "DB_USER" && string.IsNullOrEmpty(user)) user = v;
+                                else if (k == "DB_PASSWORD" && string.IsNullOrEmpty(pwd)) pwd = v;
+                                else if (k == "DB_SSL_MODE" && string.IsNullOrEmpty(sslMode)) sslMode = v;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            host ??= "ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech";
+            port ??= "5432";
+            db ??= "netcafe_db";
+            user ??= "neondb_owner";
+            pwd ??= "npg_hVAs8JBUFi6p";
+            sslMode ??= "Require";
+            var ssl = !string.IsNullOrEmpty(sslMode) ? $";SSL Mode={sslMode};Trust Server Certificate=true" : "";
+
+            _connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pwd};Include Error Detail=true{ssl};";
         }
 
         [Fact]

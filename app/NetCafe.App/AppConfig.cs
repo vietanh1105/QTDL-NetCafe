@@ -5,11 +5,13 @@ namespace NetCafe.App
 {
     public static class AppConfig
     {
-        public static string Host { get; set; } = "127.0.0.1";
+        public static string Host { get; set; } = "ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech";
         public static int Port { get; set; } = 5432;
         public static string Database { get; set; } = "netcafe_db";
-        public static string Username { get; set; } = "postgres";
-        public static string Password { get; set; } = "vietanh1105@";
+        public static string Username { get; set; } = "neondb_owner";
+        public static string Password { get; set; } = "npg_hVAs8JBUFi6p";
+        public static string SslMode { get; set; } = "Require";
+        public static bool TrustServerCertificate { get; set; } = true;
 
         public static void LoadEnv()
         {
@@ -40,6 +42,7 @@ namespace NetCafe.App
                             else if (key == "DB_NAME") Database = val;
                             else if (key == "DB_USER") Username = val;
                             else if (key == "DB_PASSWORD") Password = val;
+                            else if (key == "DB_SSL_MODE") SslMode = val;
                         }
                     }
                     break;
@@ -51,7 +54,8 @@ namespace NetCafe.App
         {
             var u = user ?? Username;
             var p = pwd ?? Password;
-            return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true;";
+            var ssl = !string.IsNullOrEmpty(SslMode) ? $";SSL Mode={SslMode};Trust Server Certificate={TrustServerCertificate}" : "";
+            return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true{ssl};";
         }
     }
 }
