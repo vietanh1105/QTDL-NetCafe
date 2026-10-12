@@ -1961,9 +1961,14 @@ namespace NetCafe.App
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            _cts.Cancel();
-            _refreshTimer.Stop();
+            try
+            {
+                _cts.Cancel();
+                _refreshTimer.Stop();
+            }
+            catch { }
             base.OnFormClosing(e);
+            Environment.Exit(0);
         }
     }
 }
