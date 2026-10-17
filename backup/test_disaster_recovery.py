@@ -1,3 +1,5 @@
+# Trách nhiệm: kiểm thử backup/restore bằng database do người vận hành cấp.
+# Không chứa credential mặc định và không tự trỏ tới database production.
 import os
 import sys
 import subprocess
@@ -9,10 +11,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
-SRC_DB = "netcafe_db"
-RESTORE_DB = "netcafe_restore"
+SRC_DB = os.getenv("DB_NAME", "netcafe_qa")
+RESTORE_DB = os.getenv("RESTORE_DB_NAME", "netcafe_qa_restore")
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "vietanh1105@")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
 PG_BIN = r"C:\Program Files\PostgreSQL\17\bin"
 PG_DUMP = os.path.join(PG_BIN, "pg_dump.exe")

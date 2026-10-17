@@ -1,3 +1,6 @@
+// Trách nhiệm: integration test chỉ chạy trên netcafe_qa, không chạm database production/Neon.
+// Liên kết: scripts/reset-qa.ps1 và DbRepository.cs.
+
 using System;
 using System.Threading.Tasks;
 using NetCafe.Data;
@@ -48,12 +51,16 @@ namespace NetCafe.Data.Tests
                 }
             }
 
-            host ??= "ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech";
+            host ??= "localhost";
             port ??= "5432";
-            db ??= "netcafe_db";
-            user ??= "neondb_owner";
-            pwd ??= "npg_hVAs8JBUFi6p";
-            sslMode ??= "Require";
+            db ??= "netcafe_qa";
+            user ??= "postgres";
+            pwd ??= string.Empty;
+            sslMode ??= "Disable";
+            if (!string.Equals(db, "netcafe_qa", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("IntegrationTests chỉ được chạy trên database netcafe_qa.");
+            }
             var ssl = !string.IsNullOrEmpty(sslMode) ? $";SSL Mode={sslMode};Trust Server Certificate=true" : "";
 
             _connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pwd};Include Error Detail=true{ssl};";

@@ -172,7 +172,7 @@ DECLARE
 BEGIN
     -- 1. Tìm các bảng có tỷ lệ Sequential Scan cao trên dữ liệu đáng kể
     FOR r IN
-        SELECT 
+        SELECT
             schemaname || '.' || relname AS full_table,
             relname,
             seq_scan,
@@ -184,10 +184,32 @@ BEGIN
           AND (idx_scan IS NULL OR idx_scan < seq_scan)
     LOOP
         v_tbl := r.full_table;
-        v_col := 'created_at / status / filter_columns';
+        -- Chỉ sinh SQL khi cột đích thật sự tồn tại trong catalog.
+        SELECT a.attname
+        INTO v_col
+        FROM pg_attribute a
+        WHERE a.attrelid = to_regclass(v_tbl)
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND a.attname IN ('created_at', 'started_at', 'logged_at', 'order_date', 'invoice_date', 'status')
+        ORDER BY CASE a.attname
+            WHEN 'created_at' THEN 1
+            WHEN 'started_at' THEN 2
+            WHEN 'logged_at' THEN 3
+            WHEN 'order_date' THEN 4
+            WHEN 'invoice_date' THEN 5
+            WHEN 'status' THEN 6
+            ELSE 99
+        END
+        LIMIT 1;
+
+        IF v_col IS NULL THEN
+            CONTINUE;
+        END IF;
+
         v_reason := format('Bảng %s có %s lượt quét tuần tự (seq_scan) trong khi chỉ có %s lượt quét chỉ mục.', 
                            v_tbl, r.seq_scan, COALESCE(r.idx_scan, 0));
-        v_sql := format('CREATE INDEX idx_%s_auto_opt ON %s (created_at);', r.relname, v_tbl);
+        v_sql := format('CREATE INDEX idx_%s_auto_opt ON %s (%I);', r.relname, v_tbl, v_col);
 
         -- Ghi vào bảng khuyến nghị nếu chưa tồn tại
         IF NOT EXISTS (SELECT 1 FROM ai.index_recommendation WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql) THEN

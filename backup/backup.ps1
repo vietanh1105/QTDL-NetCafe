@@ -10,9 +10,9 @@ $ErrorActionPreference = "Stop"
 
 $DB_HOST = if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }
 $DB_PORT = if ($env:DB_PORT) { $env:DB_PORT } else { "5432" }
-$DB_NAME = if ($env:DB_NAME) { $env:DB_NAME } else { "netcafe_db" }
+$DB_NAME = if ($env:DB_NAME) { $env:DB_NAME } else { "netcafe_qa" }
 $DB_USER = if ($env:DB_USER) { $env:DB_USER } else { "postgres" }
-if (-not $env:PGPASSWORD) { $env:PGPASSWORD = "vietanh1105@" }
+if (-not $env:PGPASSWORD) { $env:PGPASSWORD = "" }
 
 $PG_BIN = "C:\Program Files\PostgreSQL\17\bin"
 $PG_DUMP = Join-Path $PG_BIN "pg_dump.exe"

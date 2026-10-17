@@ -10,9 +10,9 @@ set -euo pipefail
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DB_NAME="${DB_NAME:-netcafe_db}"
+DB_NAME="${DB_NAME:-netcafe_qa}"
 DB_USER="${DB_USER:-postgres}"
-export PGPASSWORD="${PGPASSWORD:-vietanh1105@}"
+export PGPASSWORD="${PGPASSWORD:-}"
 
 BACKUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

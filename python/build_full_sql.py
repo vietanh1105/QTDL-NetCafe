@@ -12,6 +12,7 @@ SQL_FILES = [
     "sql/05_indexes_partition.sql",
     "sql/06_seed_base.sql",
     "sql/07_ai_modules.sql",
+    "sql/08_station_customer.sql",
 ]
 
 TARGET_FILE = "sql/netcafe_full.sql"

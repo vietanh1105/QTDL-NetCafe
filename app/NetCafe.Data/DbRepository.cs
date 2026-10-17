@@ -1,3 +1,6 @@
+// Trách nhiệm: truy cập PostgreSQL cho Admin và Station; liên kết Models.cs với các function SQL.
+// Luồng mới: StationRepository.cs chứa contract customer login, heartbeat, logout, F&B và support.
+
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -8,7 +11,7 @@ using Npgsql;
 
 namespace NetCafe.Data
 {
-    public class DbRepository
+    public partial class DbRepository
     {
         private readonly string _connectionString;
         public event Action<SqlLogEntry>? OnSqlExecuted;
@@ -410,7 +413,7 @@ namespace NetCafe.Data
                     OnNotificationReceived?.Invoke(e.Channel, e.Payload);
                 };
 
-                await using var cmd = new NpgsqlCommand("LISTEN audit_alert;", conn);
+                await using var cmd = new NpgsqlCommand("LISTEN ai_security_alert;", conn);
                 await cmd.ExecuteNonQueryAsync(ct);
 
                 while (!ct.IsCancellationRequested)
@@ -421,7 +424,7 @@ namespace NetCafe.Data
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                LogSql("LISTEN audit_alert", "", 0, false, ex.Message);
+                LogSql("LISTEN ai_security_alert", "", 0, false, ex.Message);
             }
         }
     }

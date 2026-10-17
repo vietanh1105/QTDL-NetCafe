@@ -1,3 +1,6 @@
+// Trách nhiệm: DTO thuần cho Admin/Station; mapping được thực hiện trong repository.
+// Không chứa SQL hoặc trạng thái UI.
+
 using System;
 using System.Collections.Generic;
 
@@ -99,5 +102,48 @@ namespace NetCafe.Data
         public string? DbUsername { get; set; }
         public string EmpRole { get; set; } = string.Empty;
         public string DefaultShift { get; set; } = string.Empty;
+    }
+
+    public class BookingItem
+    {
+        public int BookingId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string ComputerCode { get; set; } = string.Empty;
+        public DateTimeOffset BookedFrom { get; set; }
+        public DateTimeOffset BookedTo { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class DailyRevenueItem
+    {
+        public DateTime RevenueDate { get; set; }
+        public long TotalInvoices { get; set; }
+        public decimal TotalPlayAmount { get; set; }
+        public decimal TotalServiceAmount { get; set; }
+        public decimal TotalDiscountAmount { get; set; }
+        public decimal NetRevenue { get; set; }
+    }
+
+    public class ComputerUsageItem
+    {
+        public int ComputerId { get; set; }
+        public string ComputerCode { get; set; } = string.Empty;
+        public string ComputerName { get; set; } = string.Empty;
+        public string RoomName { get; set; } = string.Empty;
+        public long TotalSessions { get; set; }
+        public decimal TotalHoursPlayed { get; set; }
+        public decimal TotalPlayRevenue { get; set; }
+    }
+
+    public class TopCustomerItem
+    {
+        public int CustomerId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string MembershipTier { get; set; } = string.Empty;
+        public int LoyaltyPoints { get; set; }
+        public long TotalSessions { get; set; }
+        public decimal TotalSpent { get; set; }
+        public DateTime? LastPlayedAt { get; set; }
     }
 }

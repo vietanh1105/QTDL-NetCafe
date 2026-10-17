@@ -1,3 +1,6 @@
+// Trách nhiệm: đọc cấu hình connection cho Admin từ environment hoặc .env.
+// Không chứa credential thật; role/password phải được cấp ngoài source control.
+
 using System;
 using System.IO;
 
@@ -5,12 +8,12 @@ namespace NetCafe.App
 {
     public static class AppConfig
     {
-        public static string Host { get; set; } = "ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech";
+        public static string Host { get; set; } = "localhost";
         public static int Port { get; set; } = 5432;
-        public static string Database { get; set; } = "netcafe_db";
-        public static string Username { get; set; } = "neondb_owner";
-        public static string Password { get; set; } = "npg_hVAs8JBUFi6p";
-        public static string SslMode { get; set; } = "Require";
+        public static string Database { get; set; } = "netcafe_qa";
+        public static string Username { get; set; } = "postgres";
+        public static string Password { get; set; } = string.Empty;
+        public static string SslMode { get; set; } = "Disable";
         public static bool TrustServerCertificate { get; set; } = true;
 
         public static void LoadEnv()
@@ -56,6 +59,18 @@ namespace NetCafe.App
             var p = pwd ?? Password;
             var ssl = !string.IsNullOrEmpty(SslMode) ? $";SSL Mode={SslMode};Trust Server Certificate={TrustServerCertificate}" : "";
             return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true{ssl};";
+        }
+
+        public static string GetConfiguredRolePassword(string role)
+        {
+            var key = role switch
+            {
+                "nv_thao" => "DB_CASHIER_PASSWORD",
+                "nv_manager" => "DB_MANAGER_PASSWORD",
+                "nv_hung" => "DB_TECHNICIAN_PASSWORD",
+                _ => "DB_ADMIN_PASSWORD"
+            };
+            return Environment.GetEnvironmentVariable(key) ?? string.Empty;
         }
     }
 }

@@ -33,9 +33,10 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 
 ```text
 ├── app/                  # Ứng dụng Desktop C# .NET 10 (WinForms Thin Client)
-│   ├── NetCafe.App/      # Giao diện người dùng Windows Forms
-│   ├── NetCafe.Data/     # Lớp truy cập dữ liệu (Npgsql)
-│   └── NetCafe.Data.Tests/ # Bộ kiểm thử tích hợp xUnit
+│   ├── NetCafe.App/      # Admin shell + các UserControl Designer
+│   ├── NetCafe.Client/   # Station customer theo computer_code
+│   ├── NetCafe.Data/     # Lớp truy cập dữ liệu (Npgsql), Admin/Station functions
+│   └── NetCafe.Data.Tests/ # Bộ kiểm thử tích hợp xUnit trên netcafe_qa
 ├── backup/               # Script sao lưu tự động & Disaster Recovery
 │   ├── backup.ps1 / .sh  # Script backup định kỳ
 │   └── test_disaster_recovery.py # Kịch bản kiểm thử khôi phục thảm họa
@@ -67,7 +68,11 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 │   ├── 05_indexes_partition.sql
 │   ├── 06_seed_base.sql
 │   ├── 07_ai_modules.sql
-│   └── netcafe_full.sql  # Toàn bộ mã nguồn hợp nhất
+│   ├── 08_station_customer.sql # heartbeat, role station, support, wallet
+│   └── netcafe_full.sql  # Toàn bộ mã nguồn hợp nhất 00–08
+├── scripts/
+│   ├── reset-qa.ps1      # Chỉ reset database netcafe_qa
+│   └── run-qa.ps1        # reset + build + test
 ├── tests/                # Bộ kiểm thử SQL tự động
 ├── .env.example          # Mẫu cấu hình môi trường
 └── .gitignore            # Cấu hình bỏ qua tệp tạm, secrets
@@ -77,31 +82,34 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 
 ## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
 
-### 1. Chuẩn Bị Cơ Sở Dữ Liệu PostgreSQL 17
+### 1. Chuẩn Bị Cơ Sở Dữ Liệu QA PostgreSQL
 
-1. Sao chép cấu hình môi trường:
+1. Sao chép cấu hình môi trường và tự điền credential ngoài source:
    ```powershell
    Copy-Item .env.example .env
    ```
    Chỉnh sửa thông tin kết nối trong file `.env` cho phù hợp với máy của bạn.
 
-2. Khởi tạo cơ sở dữ liệu:
-   - Chạy file hợp nhất:
-     ```powershell
-     psql -U postgres -d postgres -f sql/00_create_database.sql
-     psql -U postgres -d netcafe_db -f sql/netcafe_full.sql
-     ```
-   - Hoặc chạy theo thứ tự các file từ `00` đến `07` trong thư mục [`sql/`](file:///c:/Users/Administrator/Documents/QTDL%20-%20Cuối%20kỳ/sql/).
+2. Reset duy nhất database QA, không chạy trên Neon chính:
+   ```powershell
+   $env:DB_NAME = "netcafe_qa"
+   $env:DB_PASSWORD = "<cấp ngoài source>"
+   powershell -ExecutionPolicy Bypass -File .\scripts\reset-qa.ps1
+   ```
+   Script áp dụng schema/migration/seed 01–08 và ghi marker QA.
 
-### 2. Chạy Ứng Dụng Desktop Client (C# .NET 10)
+### 2. Chạy Admin và Station (C# .NET 10)
 
 ```powershell
 dotnet run --project app/NetCafe.App
+dotnet run --project app/NetCafe.Client
 ```
 
 Chạy bộ kiểm thử tích hợp:
 ```powershell
 dotnet test app/NetCafe.Data.Tests
+
+Station đọc `computer_code` từ `station.json` hoặc `NETCAFE_COMPUTER_CODE`; role `station_runtime` và password phải được cấp ngoài source.
 ```
 
 ### 3. Chạy Quy Trình Python (ETL & Báo Cáo)
@@ -118,6 +126,15 @@ python generate_report.py
 Xem chi tiết từng bước trong [`demo/runbook.md`](file:///c:/Users/Administrator/Documents/QTDL%20-%20Cuối%20kỳ/demo/runbook.md) với 4 kịch bản SQL có sẵn trong [`demo/`](file:///c:/Users/Administrator/Documents/QTDL%20-%20Cuối%20kỳ/demo/).
 
 ---
+
+## 🧭 Tài liệu kiến trúc và QA
+
+- [`docs/code-map.md`](docs/code-map.md): map file nguồn/config/script/test/doc.
+- [`docs/bug-register.md`](docs/bug-register.md): triệu chứng, nguyên nhân, sửa và bằng chứng.
+- [`docs/optimization-report.md`](docs/optimization-report.md): refresh gate, heartbeat và cách đo EXPLAIN.
+- [`docs/ai-modules.md`](docs/ai-modules.md): contract 5 module AI PostgreSQL.
+- [`tests/station_customer.sql`](tests/station_customer.sql): assertion contract station chỉ đọc trên QA.
+- [`demo/runbook.md`](demo/runbook.md): live demonstration Admin, Station, Support và AI.
 
 ## 🛡️ Tác Quyền & Đóng Góp
 

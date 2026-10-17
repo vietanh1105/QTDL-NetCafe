@@ -45,3 +45,27 @@
 
 ### Câu 6: Thuật toán AI trong đề tài này có gọi API bên ngoài (OpenAI/ChatGPT) không?
 > **Trả lời:** "Dạ thưa Thầy/Cô, đề tài tuân thủ nghiêm ngặt nguyên tắc In-Database Intelligence: 100% thuật toán chạy nội bộ bằng toán học, thống kê và hàm PL/pgSQL có sẵn của PostgreSQL 17 (Z-score với `stddev_samp`, khoảng cách chuỗi Trigram với `similarity`, thống kê cửa sổ `NTILE`, Moving Average trên Materialized Views). Hệ thống hoàn toàn không gọi API bên ngoài và có thể chạy độc lập không cần kết nối Internet."
+
+## 4. KỊCH BẢN QA STATION VÀ SUPPORT
+
+1. Chạy `scripts/reset-qa.ps1`; xác nhận marker và chỉ có database `netcafe_qa` được reset.
+2. Chạy `tests/station_customer.sql`; kiểm tra cột heartbeat, function, role station, notification channel và service request.
+3. Mở `NetCafe.Client` tại PC001, đăng nhập customer có balance dương; kiểm tra session active và máy chuyển `in_use`.
+4. Chờ heartbeat theo cấu hình 30 giây; projected play/service chỉ hiển thị, chưa tạo payment.
+5. Gọi món trong hạn mức; thử vượt ví để chứng minh database từ chối đơn.
+6. Gửi support request và xử lý `new → acknowledged → resolved` trong Support queue Admin.
+7. Logout station; kiểm tra invoice/payment, session `finished`, close reason `station_logout`, máy `available`.
+8. Dừng station không logout, đợi hơn 90 giây rồi mở Computers; watcher reconcile với close reason `stale_timeout`.
+9. Mở AiCenter, chạy đủ 5 module; index SQL readonly, duplicate không tự merge.
+
+## 5. Lệnh kiểm tra nhanh
+
+```powershell
+$env:DB_NAME = "netcafe_qa"
+$env:DB_PASSWORD = "<cấp ngoài source>"
+powershell -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
+dotnet run --project .\app\NetCafe.App
+dotnet run --project .\app\NetCafe.Client
+```
+
+Nếu không có credential QA, chỉ báo cáo build/static check; không dùng database production hoặc evidence cũ để kết luận live demo.

@@ -1,3 +1,5 @@
+# Trách nhiệm: áp dụng các migration vào database do người vận hành cấu hình.
+# Không chứa host, role hoặc credential thật; production/Neon phải được cấp ngoài source.
 import os
 import sys
 import psycopg
@@ -5,12 +7,12 @@ import psycopg
 sys.stdout.reconfigure(encoding='utf-8')
 
 # Đọc cấu hình từ .env
-HOST = os.getenv("DB_HOST", "ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech")
+HOST = os.getenv("DB_HOST", "localhost")
 PORT = int(os.getenv("DB_PORT", "5432"))
-DBNAME = os.getenv("DB_NAME", "netcafe_db")
-USER = os.getenv("DB_USER", "neondb_owner")
-PASS = os.getenv("DB_PASSWORD", "npg_hVAs8JBUFi6p")
-SSL_MODE = os.getenv("DB_SSL_MODE", "require")
+DBNAME = os.getenv("DB_NAME", "netcafe_qa")
+USER = os.getenv("DB_USER", "postgres")
+PASS = os.getenv("DB_PASSWORD", "")
+SSL_MODE = os.getenv("DB_SSL_MODE", "disable")
 
 # Đọc từ file .env nếu có
 env_file = os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -38,6 +40,7 @@ SQL_FILES = [
     "sql/05_indexes_partition.sql",
     "sql/06_seed_base.sql",
     "sql/07_ai_modules.sql",
+    "sql/08_station_customer.sql",
 ]
 
 def clean_sql(content: str) -> str:

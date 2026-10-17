@@ -1,0 +1,10 @@
+{
+  "ComputerCode": "PC001",
+  "Host": "localhost",
+  "Port": 5432,
+  "Database": "netcafe_qa",
+  "Username": "station_runtime",
+  "Password": "",
+  "SslMode": "Disable",
+  "HeartbeatSeconds": 30
+}
