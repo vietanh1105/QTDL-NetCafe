@@ -2,7 +2,10 @@
 # Không chứa host, role hoặc credential thật; production/Neon phải được cấp ngoài source.
 import os
 import sys
-import psycopg
+try:
+    import psycopg
+except ImportError:
+    import psycopg2 as psycopg
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -33,13 +36,6 @@ if os.path.exists(env_file):
                 elif k == "DB_SSL_MODE": SSL_MODE = v
 
 SQL_FILES = [
-    "sql/01_schema.sql",
-    "sql/02_functions_triggers.sql",
-    "sql/03_views.sql",
-    "sql/04_security.sql",
-    "sql/05_indexes_partition.sql",
-    "sql/06_seed_base.sql",
-    "sql/07_ai_modules.sql",
     "sql/08_station_customer.sql",
 ]
 
@@ -53,9 +49,18 @@ def clean_sql(content: str) -> str:
     return "\n".join(lines)
 
 def main():
+    if DBNAME != "netcafe_db":
+        raise RuntimeError("Script này chỉ áp dụng migration 08 cho netcafe_db; dùng scripts/run-qa.ps1 cho QA.")
+    if os.getenv("NETCAFE_MAIN_MIGRATION") != "08_only":
+        raise RuntimeError("Đặt NETCAFE_MAIN_MIGRATION=08_only để xác nhận chỉ chạy migration additive 08.")
     print(f"Connecting to Database {DBNAME} at {HOST}:{PORT} (user: {USER})...")
     conn_str = f"postgresql://{USER}:{PASS}@{HOST}:{PORT}/{DBNAME}?sslmode={SSL_MODE.lower()}"
-    with psycopg.connect(conn_str, autocommit=True) as conn:
+    if getattr(psycopg, "__name__", "") == "psycopg2":
+        conn = psycopg.connect(conn_str)
+        conn.autocommit = True
+    else:
+        conn = psycopg.connect(conn_str, autocommit=True)
+    with conn:
         with conn.cursor() as cur:
             cur.execute("SELECT version();")
             print("Connected! Version:", cur.fetchone()[0])

@@ -12,6 +12,9 @@ public sealed class AdminViewContext
     public required Action<Exception> ShowError { get; init; }
     public string CurrentUser { get; set; } = "postgres";
     public int CurrentEmployeeId { get; set; }
+    public string ConnectionSummary { get; set; } = string.Empty;
+    public bool CanManageCustomers { get; set; }
+    public bool CanManageSessions { get; set; }
 }
 
 public interface IAdminView

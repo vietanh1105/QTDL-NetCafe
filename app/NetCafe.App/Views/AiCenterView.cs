@@ -17,17 +17,17 @@ public partial class AiCenterView : AdminDataViewBase
         _runAllButton.ForeColor = Color.White;
         _runAllButton.FlatStyle = FlatStyle.Flat;
         _runAllButton.FlatAppearance.BorderSize = 0;
-        _runAllButton.Click += async (_, _) => await RefreshAsync();
+        _runAllButton.Click += async (_, _) => await RunAllAsync();
         Toolbar.Controls.Add(_runAllButton);
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var alerts = await RequiredContext.Repository.GetAiAlertsAsync(cancellationToken);
-        var indexes = await RequiredContext.Repository.RecommendIndexesAsync(cancellationToken);
-        var duplicates = await RequiredContext.Repository.DetectDuplicatesAsync(cancellationToken);
-        var anomalies = await RequiredContext.Repository.DetectAnomaliesAsync(cancellationToken);
-        var promotions = await RequiredContext.Repository.SuggestPromotionsAsync(cancellationToken);
+        var indexes = await RequiredContext.Repository.GetIndexRecommendationsAsync(cancellationToken);
+        var duplicates = await RequiredContext.Repository.GetDuplicateCandidatesAsync(cancellationToken);
+        var anomalies = await RequiredContext.Repository.GetAnomalyFlagsAsync(cancellationToken);
+        var promotions = await RequiredContext.Repository.GetPromotionSuggestionsAsync(cancellationToken);
 
         var rows = new List<AiModuleRow>();
         rows.AddRange(alerts.Select(item => new AiModuleRow("Security Alert", item.AlertId.ToString(), item.Reason, item.Status)));
@@ -36,6 +36,19 @@ public partial class AiCenterView : AdminDataViewBase
         rows.AddRange(anomalies.Select(item => new AiModuleRow("Anomaly Detection", item.FlagId.ToString(), $"{item.AnomalyType}: z={item.ZScore}", item.Status)));
         rows.AddRange(promotions.Select(item => new AiModuleRow("Promotion Suggestion", item.SuggestionId.ToString(), item.Details, item.SuggestionType)));
         SetRows(rows, $"5 module PostgreSQL: {alerts.Count} alert, {indexes.Count} index, {duplicates.Count} duplicate, {anomalies.Count} anomaly, {promotions.Count} promotion.");
+    }
+
+    private async Task RunAllAsync()
+    {
+        try
+        {
+            await RequiredContext.Repository.RunAiModulesAsync();
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
     }
 
     private sealed record AiModuleRow(string Module, string Key, string Summary, string Status);

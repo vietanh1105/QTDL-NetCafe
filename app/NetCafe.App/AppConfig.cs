@@ -2,6 +2,7 @@
 // Không chứa credential thật; role/password phải được cấp ngoài source control.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace NetCafe.App
@@ -15,19 +16,31 @@ namespace NetCafe.App
         public static string Password { get; set; } = string.Empty;
         public static string SslMode { get; set; } = "Disable";
         public static bool TrustServerCertificate { get; set; } = true;
+        public static int StationServiceEmployeeId { get; private set; }
+        public static string LoadedEnvFile { get; private set; } = string.Empty;
 
         public static void LoadEnv()
         {
-            var searchPaths = new[]
+            var explicitPath = Environment.GetEnvironmentVariable("NETCAFE_ENV_FILE");
+            var searchPaths = new List<string>();
+            if (!string.IsNullOrWhiteSpace(explicitPath))
             {
-                ".env",
-                "../.env",
-                "../../.env",
-                "../../../.env",
-                "../../../../.env"
-            };
+                searchPaths.Add(Path.GetFullPath(explicitPath));
+            }
+            else
+            {
+                var roots = new[] { Environment.CurrentDirectory, AppContext.BaseDirectory };
+                foreach (var root in roots)
+                {
+                    var directory = new DirectoryInfo(root);
+                    for (var depth = 0; depth < 7 && directory is not null; depth++, directory = directory.Parent)
+                    {
+                        searchPaths.Add(Path.Combine(directory.FullName, ".env"));
+                    }
+                }
+            }
 
-            foreach (var path in searchPaths)
+            foreach (var path in searchPaths.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (File.Exists(path))
                 {
@@ -46,11 +59,28 @@ namespace NetCafe.App
                             else if (key == "DB_USER") Username = val;
                             else if (key == "DB_PASSWORD") Password = val;
                             else if (key == "DB_SSL_MODE") SslMode = val;
+                            else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId)) StationServiceEmployeeId = employeeId;
                         }
                     }
+                    LoadedEnvFile = Path.GetFullPath(path);
                     break;
                 }
             }
+
+            Host = Environment.GetEnvironmentVariable("DB_HOST") ?? Host;
+            if (int.TryParse(Environment.GetEnvironmentVariable("DB_PORT"), out var envPort)) Port = envPort;
+            Database = Environment.GetEnvironmentVariable("DB_NAME") ?? Database;
+            Username = Environment.GetEnvironmentVariable("DB_USER") ?? Username;
+            Password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? Password;
+            SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? SslMode;
+            if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId)) StationServiceEmployeeId = envEmployeeId;
+        }
+
+        public static string ConnectionSummary(string? user = null)
+        {
+            var effectiveUser = user ?? Username;
+            var source = string.IsNullOrWhiteSpace(LoadedEnvFile) ? "default/environment" : LoadedEnvFile;
+            return $"Host={Host}:{Port} | Database={Database} | User={effectiveUser} | SSL={SslMode} | Source={source}";
         }
 
         public static string GetConnectionString(string? user = null, string? pwd = null)

@@ -29,10 +29,12 @@ public sealed class StationConfig
             Host = Environment.GetEnvironmentVariable("DB_HOST") ?? config.Host,
             Port = int.TryParse(Environment.GetEnvironmentVariable("DB_PORT"), out var port) ? port : config.Port,
             Database = Environment.GetEnvironmentVariable("DB_NAME") ?? config.Database,
-            Username = Environment.GetEnvironmentVariable("DB_USER") ?? config.Username,
-            Password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? config.Password,
+            Username = Environment.GetEnvironmentVariable("STATION_DB_USER") ?? config.Username,
+            Password = Environment.GetEnvironmentVariable("STATION_DB_PASSWORD") ?? config.Password,
             SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? config.SslMode,
-            HeartbeatSeconds = 30
+            HeartbeatSeconds = int.TryParse(Environment.GetEnvironmentVariable("STATION_HEARTBEAT_SECONDS"), out var heartbeat)
+                ? Math.Max(5, heartbeat)
+                : config.HeartbeatSeconds
         };
     }
 

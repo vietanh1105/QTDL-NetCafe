@@ -11,11 +11,15 @@
 | Wallet | Có nguy cơ trừ payment mỗi heartbeat. | Heartbeat chỉ tính projected amount; logout/auto-close mới tạo invoice/payment. | Tránh payment trùng và giữ balance không âm. |
 | AI index | Gợi ý `created_at` dù bảng không có cột. | Tra catalog và chỉ sinh SQL cho cột hiện hữu. | SQL đề xuất có thể chạy kiểm tra được. |
 | Credential | Một số script có password mặc định. | Password rỗng nếu không được cấp từ environment/secret store. | Không commit credential thật. |
+| Database preflight | Admin không biết đang trỏ database nào và timer gọi function thiếu. | Preflight hiển thị host/database/user và capability migration trước khi timer chạy. | Không phát sinh truy vấn reconcile lỗi lặp lại trên DB legacy. |
+| Card máy | Grid dựng lại datasource toàn bộ sau mỗi lần refresh. | Dictionary `ComputerId -> ComputerCardControl`, chỉ bind thêm/sửa/xóa card thay đổi. | Giảm tạo control và giữ trạng thái chọn/hover của card. |
+| AI promotion | Mở AI Center có thể gọi function kèm refresh materialized view. | Snapshot đọc bảng; chạy function chỉ khi bấm nút. | Tránh side effect và query nặng ngoài ý muốn. |
 
 ## Số liệu và cách đo
 
 - Build baseline kiểm chứng được: `dotnet build app/NetCafe.slnx --no-restore` → 0 warning, 0 error.
 - Chưa ghi số query/latency/memory runtime vì local PostgreSQL yêu cầu password chưa được cung cấp trong môi trường chạy này.
+- Chưa ghi số query/latency/memory runtime của bản thay đổi này vì local PostgreSQL yêu cầu password chưa được cung cấp; không dùng số liệu cũ để kết luận.
 - Khi có quyền QA, chạy `scripts/run-qa.ps1`; dùng `EXPLAIN (ANALYZE, BUFFERS)` trong `python/measure_explain.py` trên `netcafe_qa`.
 - Không dùng `enable_seqscan = off`; kết quả chỉ chấp nhận khi planner tự chọn index với fixture thật.
 - UI acceptance cần chạy headed trên Windows: mở Admin, đổi role, mở Computers, tạo station session và quan sát không có refresh chồng. Build không thay thế visual/runtime evidence.

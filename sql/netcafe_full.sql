@@ -2335,8 +2335,6 @@ COMMENT ON FUNCTION ai.fn_suggest_promotions IS 'Module AI 5: Đề xuất ưu �
 -- Liên kết: sql/01_schema.sql, sql/02_functions_triggers.sql, app/NetCafe.Data.
 -- Bảo mật: station chỉ EXECUTE function SECURITY DEFINER, không đọc bảng trực tiếp.
 
-\c netcafe_db;
-
 ALTER TABLE core.gaming_session
     ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;
 
@@ -2349,6 +2347,14 @@ WHERE last_heartbeat_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_session_heartbeat_active
     ON core.gaming_session (last_heartbeat_at)
+    WHERE status = 'active';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_session_customer
+    ON core.gaming_session (customer_id)
+    WHERE status = 'active';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_session_computer
+    ON core.gaming_session (computer_id)
     WHERE status = 'active';
 
 CREATE TABLE IF NOT EXISTS core.service_request (
@@ -2374,28 +2380,34 @@ CREATE INDEX IF NOT EXISTS idx_service_request_status_created
 CREATE INDEX IF NOT EXISTS idx_service_request_session
     ON core.service_request (session_id, created_at DESC);
 
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM hr.employee WHERE username = 'station_service') THEN
-        INSERT INTO hr.employee (
-            full_name, phone, username, db_username, password_hash,
-            emp_role, default_shift, salary, hired_date, is_active
-        ) VALUES (
-            'Station Service', '0980000000', 'station_service', NULL,
-            crypt('service-only', gen_salt('bf')), 'staff', 'night', 0,
-            CURRENT_DATE, TRUE
-        );
-    END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS core.station_runtime_config (
+    config_key VARCHAR(50) PRIMARY KEY,
+    config_value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+COMMENT ON TABLE core.station_runtime_config IS 'Cấu hình station không chứa mật khẩu; service_employee_id phải trỏ nhân viên active.';
 
 CREATE OR REPLACE FUNCTION core.fn_station_service_employee_id()
 RETURNS INT
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = core, hr, pg_catalog
 AS $$
-    SELECT employee_id FROM hr.employee WHERE username = 'station_service' AND is_active = TRUE;
+DECLARE
+    v_employee_id INT;
+BEGIN
+    SELECT e.employee_id INTO v_employee_id
+    FROM hr.employee e
+    JOIN core.station_runtime_config c ON c.config_key = 'service_employee_id'
+    WHERE e.employee_id = c.config_value::INT AND e.is_active = TRUE;
+    IF v_employee_id IS NULL THEN
+        RAISE EXCEPTION 'STATION_SERVICE_EMPLOYEE_ID chưa được cấu hình hoặc nhân viên không active.'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN v_employee_id;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION billing.sp_close_session_and_pay_at(
@@ -2498,12 +2510,12 @@ BEGIN
         UPDATE core.customer
         SET balance = balance - v_total_amount,
             loyalty_points = loyalty_points + FLOOR(v_total_amount / 10000),
-            membership_tier = core.fn_membership_tier(loyalty_points + FLOOR(v_total_amount / 10000))
+            membership_tier = core.fn_membership_tier((loyalty_points + FLOOR(v_total_amount / 10000))::INT)
         WHERE customer_id = v_session.customer_id;
     ELSE
         UPDATE core.customer
         SET loyalty_points = loyalty_points + FLOOR(v_total_amount / 10000),
-            membership_tier = core.fn_membership_tier(loyalty_points + FLOOR(v_total_amount / 10000))
+            membership_tier = core.fn_membership_tier((loyalty_points + FLOOR(v_total_amount / 10000))::INT)
         WHERE customer_id = v_session.customer_id;
     END IF;
 
@@ -2584,10 +2596,10 @@ DECLARE
     v_service_employee INT;
 BEGIN
     SELECT * INTO v_customer
-    FROM core.customer
-    WHERE username = p_username
-      AND is_active = TRUE
-      AND password_hash = crypt(p_password, password_hash)
+    FROM core.customer AS c
+    WHERE c.username = p_username
+      AND c.is_active = TRUE
+      AND c.password_hash = public.crypt(p_password, c.password_hash::TEXT)
     FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Sai tài khoản hoặc mật khẩu!';
@@ -2596,22 +2608,22 @@ BEGIN
         RAISE EXCEPTION 'Tài khoản không đủ số dư để mở phiên!';
     END IF;
     IF EXISTS (
-        SELECT 1 FROM core.gaming_session
-        WHERE customer_id = v_customer.customer_id AND status = 'active'
+        SELECT 1 FROM core.gaming_session AS s
+        WHERE s.customer_id = v_customer.customer_id AND s.status = 'active'
     ) THEN
         RAISE EXCEPTION 'Khách hàng đang có phiên hoạt động!';
     END IF;
 
-    SELECT c INTO v_computer
+    SELECT * INTO v_computer
     FROM core.computer c
     WHERE c.computer_code = p_computer_code
     FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Máy % không tồn tại!', p_computer_code;
     END IF;
-    SELECT hourly_rate INTO v_rate
-    FROM core.computer_type
-    WHERE type_id = v_computer.type_id;
+    SELECT ct.hourly_rate INTO v_rate
+    FROM core.computer_type AS ct
+    WHERE ct.type_id = v_computer.type_id;
     IF NOT FOUND OR v_computer.status <> 'available' THEN
         RAISE EXCEPTION 'Máy % không sẵn sàng!', p_computer_code;
     END IF;
@@ -2659,21 +2671,21 @@ DECLARE
     v_status VARCHAR(20) := 'active';
 BEGIN
     SELECT * INTO v_session
-    FROM core.gaming_session
-    WHERE session_id = p_session_id
-      AND customer_id = p_customer_id
-      AND computer_id = p_computer_id
-      AND status = 'active'
+    FROM core.gaming_session AS s
+    WHERE s.session_id = p_session_id
+      AND s.customer_id = p_customer_id
+      AND s.computer_id = p_computer_id
+      AND s.status = 'active'
     FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Phiên station không hợp lệ hoặc đã đóng!';
     END IF;
 
-    UPDATE core.gaming_session
+    UPDATE core.gaming_session AS gs
     SET last_heartbeat_at = v_heartbeat
-    WHERE session_id = p_session_id;
+    WHERE gs.session_id = p_session_id;
 
-    SELECT balance INTO v_balance FROM core.customer WHERE customer_id = p_customer_id;
+    SELECT c.balance INTO v_balance FROM core.customer AS c WHERE c.customer_id = p_customer_id;
     v_play := core.fn_calc_session_amount(v_session.start_time, v_heartbeat, v_session.hourly_rate_applied);
     SELECT COALESCE(SUM(d.quantity * d.unit_price), 0) INTO v_service
     FROM inventory.food_order o
@@ -2707,9 +2719,9 @@ DECLARE
     v_valid BOOLEAN;
 BEGIN
     SELECT EXISTS (
-        SELECT 1 FROM core.gaming_session
-        WHERE session_id = p_session_id AND customer_id = p_customer_id
-          AND computer_id = p_computer_id AND status = 'active'
+        SELECT 1 FROM core.gaming_session AS s
+        WHERE s.session_id = p_session_id AND s.customer_id = p_customer_id
+          AND s.computer_id = p_computer_id AND s.status = 'active'
     ) INTO v_valid;
     IF NOT v_valid THEN
         RAISE EXCEPTION 'Phiên station không hợp lệ hoặc đã đóng!';
@@ -2733,10 +2745,10 @@ DECLARE
     v_invoice BIGINT;
 BEGIN
     FOR v_session IN
-        SELECT session_id
-        FROM core.gaming_session
-        WHERE status = 'active'
-          AND last_heartbeat_at < clock_timestamp() - make_interval(secs => GREATEST(1, p_timeout_seconds))
+        SELECT s.session_id
+        FROM core.gaming_session AS s
+        WHERE s.status = 'active'
+          AND s.last_heartbeat_at < clock_timestamp() - make_interval(secs => GREATEST(1, p_timeout_seconds))
         FOR UPDATE SKIP LOCKED
     LOOP
         v_invoice := billing.sp_close_session_and_pay_at(
@@ -2774,17 +2786,17 @@ BEGIN
         RAISE EXCEPTION 'Số lượng món phải lớn hơn 0!';
     END IF;
     SELECT * INTO v_session
-    FROM core.gaming_session
-    WHERE session_id = p_session_id AND customer_id = p_customer_id AND status = 'active'
+    FROM core.gaming_session AS s
+    WHERE s.session_id = p_session_id AND s.customer_id = p_customer_id AND s.status = 'active'
     FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Phiên station không hợp lệ!';
     END IF;
-    SELECT * INTO v_product FROM inventory.product WHERE product_id = p_product_id AND is_active = TRUE FOR UPDATE;
+    SELECT * INTO v_product FROM inventory.product AS p WHERE p.product_id = p_product_id AND p.is_active = TRUE FOR UPDATE;
     IF NOT FOUND OR v_product.stock_qty < p_quantity THEN
         RAISE EXCEPTION 'Sản phẩm không tồn tại hoặc không đủ tồn kho!';
     END IF;
-    SELECT balance INTO v_balance FROM core.customer WHERE customer_id = p_customer_id FOR UPDATE;
+    SELECT c.balance INTO v_balance FROM core.customer AS c WHERE c.customer_id = p_customer_id FOR UPDATE;
     v_play := core.fn_calc_session_amount(v_session.start_time, clock_timestamp(), v_session.hourly_rate_applied);
     SELECT COALESCE(SUM(d.quantity * d.unit_price), 0) INTO v_service
     FROM inventory.food_order o
@@ -2860,9 +2872,9 @@ DECLARE
     v_id BIGINT;
 BEGIN
     IF NOT EXISTS (
-        SELECT 1 FROM core.gaming_session
-        WHERE session_id = p_session_id AND customer_id = p_customer_id
-          AND computer_id = p_computer_id AND status = 'active'
+        SELECT 1 FROM core.gaming_session AS s
+        WHERE s.session_id = p_session_id AND s.customer_id = p_customer_id
+          AND s.computer_id = p_computer_id AND s.status = 'active'
     ) THEN
         RAISE EXCEPTION 'Phiên station không hợp lệ!';
     END IF;
@@ -2872,6 +2884,42 @@ BEGIN
     RETURN v_id;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION core.fn_notify_computer_state()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    PERFORM pg_notify('computer_state_changed', COALESCE(NEW.computer_id, OLD.computer_id)::TEXT);
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_computer_state ON core.gaming_session;
+CREATE TRIGGER trg_notify_computer_state
+    AFTER INSERT OR UPDATE ON core.gaming_session
+    FOR EACH ROW
+    EXECUTE FUNCTION core.fn_notify_computer_state();
+
+CREATE OR REPLACE FUNCTION core.fn_notify_support_queue()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    PERFORM pg_notify('support_queue_changed', COALESCE(NEW.service_request_id, OLD.service_request_id)::TEXT);
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_support_queue ON core.service_request;
+CREATE TRIGGER trg_notify_support_queue
+    AFTER INSERT OR UPDATE ON core.service_request
+    FOR EACH ROW
+    EXECUTE FUNCTION core.fn_notify_support_queue();
 
 DO $$
 BEGIN

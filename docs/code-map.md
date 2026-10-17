@@ -9,6 +9,8 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.App/NetCafe.App.csproj`: project WinForms Admin .NET 10 và dependency Guna/Npgsql.
 - `app/NetCafe.App/Program.cs`: entry point khởi tạo WinForms Admin.
 - `app/NetCafe.App/AppConfig.cs`: đọc connection config từ environment/.env, không giữ credential thật.
+- `app/NetCafe.App/Controls/ComputerCardControl.cs`: card trạng thái từng máy, màu status và event chi tiết.
+- `app/NetCafe.App/Controls/ComputerCardControl.Designer.cs`: layout Designer của card máy.
 - `app/NetCafe.App/MainForm.cs`: shell lifecycle, navigation, role switch, listener và refresh gate.
 - `app/NetCafe.App/MainForm.Designer.cs`: header, sidebar, content, error banner và timer của shell.
 - `app/NetCafe.App/MainForm.resx`: resource WinForms hiện có trong checkout, không phải logic dữ liệu.
@@ -17,7 +19,7 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.App/Views/AdminDataViewBase.cs`: toolbar/grid dùng lại cho các view dữ liệu.
 - `app/NetCafe.App/Views/ComputersView.cs`: sơ đồ máy, session và refresh theo ComputerId.
 - `app/NetCafe.App/Views/ComputersView.Designer.cs`: metadata Designer của ComputersView.
-- `app/NetCafe.App/Views/CustomersView.cs`: tìm khách, xem ví và nạp tiền qua repository.
+- `app/NetCafe.App/Views/CustomersView.cs`: tìm khách, CRUD, reset mật khẩu, bật/tắt và nạp tiền qua repository.
 - `app/NetCafe.App/Views/CustomersView.Designer.cs`: metadata Designer của CustomersView.
 - `app/NetCafe.App/Views/BookingView.cs`: danh sách booking và trạng thái overbooking từ DB.
 - `app/NetCafe.App/Views/BookingView.Designer.cs`: metadata Designer của BookingView.
@@ -43,8 +45,11 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.Data/NetCafe.Data.csproj`: project thư viện Npgsql dùng chung.
 - `app/NetCafe.Data/Class1.cs`: file khung cũ của project, không chứa luồng nghiệp vụ mới.
 - `app/NetCafe.Data/DbRepository.cs`: query Admin hiện hữu, SQL logger và LISTEN `ai_security_alert`.
+- `app/NetCafe.Data/DatabaseMetadataRepository.cs`: preflight host/database/user, migration 08 và function capability.
+- `app/NetCafe.Data/CustomerAdminRepository.cs`: CRUD/reset/kích hoạt khách hàng, hash mật khẩu trong DB.
+- `app/NetCafe.Data/AiRepository.cs`: đọc snapshot AI và chạy module chỉ theo nút Admin.
 - `app/NetCafe.Data/AdminQueries.cs`: booking, support status và ba reporting query.
-- `app/NetCafe.Data/StationRepository.cs`: function calls cho station, reconcile và 5 AI.
+- `app/NetCafe.Data/StationRepository.cs`: function calls cho station, reconcile và mapping kết quả station.
 - `app/NetCafe.Data/Models.cs`: DTO Admin và reporting.
 - `app/NetCafe.Data/StationModels.cs`: DTO login, heartbeat, order, support và AI.
 
@@ -93,9 +98,13 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 
 - `scripts/reset-qa.ps1`: chỉ drop/create `netcafe_qa`, strip psql connect directive và apply 01–08.
 - `scripts/run-qa.ps1`: reset QA, build solution và chạy xUnit.
+- `scripts/migrate-main.ps1`: backup/preflight và chỉ áp dụng migration 08 trên `netcafe_db`.
 - `tests/station_customer.sql`: assertion SQL cho contract station/RLS/AI, chỉ chạy trên QA.
 - `app/NetCafe.Data.Tests/NetCafe.Data.Tests.csproj`: project xUnit integration.
 - `app/NetCafe.Data.Tests/IntegrationTests.cs`: integration test có guard database `netcafe_qa`.
+- `app/NetCafe.Data.Tests/AssemblyInfo.cs`: tắt chạy song song để fixture test_xunit_* không tranh chấp máy.
+- `tests/verify_main_station.py`: test main có fixture `test_station_*`, privilege station và login/heartbeat/logout.
+- `scripts/migrate-main.ps1`: backup/preflight và chỉ áp dụng migration 08 trên `netcafe_db`.
 - `backup/backup.ps1`: backup PostgreSQL Windows, password lấy từ PGPASSWORD.
 - `backup/backup.sh`: backup PostgreSQL Linux, password lấy từ PGPASSWORD.
 - `backup/test_disaster_recovery.py`: kiểm thử restore với DB do environment cấp.

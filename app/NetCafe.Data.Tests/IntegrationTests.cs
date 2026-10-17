@@ -1,151 +1,187 @@
-// Trách nhiệm: integration test chỉ chạy trên netcafe_qa, không chạm database production/Neon.
-// Liên kết: scripts/reset-qa.ps1 và DbRepository.cs.
+// Trách nhiệm: integration test trên duy nhất netcafe_qa với fixture test_xunit_*.
+// Không dùng ID cố định, không reset/truncate dữ liệu thật và không chạy trên Neon.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using NetCafe.Data;
 using Npgsql;
 using Xunit;
 
-namespace NetCafe.Data.Tests
+namespace NetCafe.Data.Tests;
+
+public sealed class IntegrationTests
 {
-    public class IntegrationTests
+    private readonly string _connectionString;
+
+    public IntegrationTests()
     {
-        private readonly string _connectionString;
-
-        public IntegrationTests()
+        var config = ReadConfig();
+        if (!string.Equals(config.Database, "netcafe_qa", StringComparison.OrdinalIgnoreCase))
         {
-            var host = Environment.GetEnvironmentVariable("DB_HOST");
-            var port = Environment.GetEnvironmentVariable("DB_PORT");
-            var db = Environment.GetEnvironmentVariable("DB_NAME");
-            var user = Environment.GetEnvironmentVariable("DB_USER");
-            var pwd = Environment.GetEnvironmentVariable("DB_PASSWORD");
-            var sslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE");
-
-            if (string.IsNullOrEmpty(host))
-            {
-                var searchPaths = new[] { ".env", "../.env", "../../.env", "../../../.env", "../../../../.env" };
-                foreach (var path in searchPaths)
-                {
-                    if (System.IO.File.Exists(path))
-                    {
-                        foreach (var line in System.IO.File.ReadAllLines(path))
-                        {
-                            var trimmed = line.Trim();
-                            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
-                            var parts = trimmed.Split('=', 2);
-                            if (parts.Length == 2)
-                            {
-                                var k = parts[0].Trim();
-                                var v = parts[1].Trim();
-                                if (k == "DB_HOST" && string.IsNullOrEmpty(host)) host = v;
-                                else if (k == "DB_PORT" && string.IsNullOrEmpty(port)) port = v;
-                                else if (k == "DB_NAME" && string.IsNullOrEmpty(db)) db = v;
-                                else if (k == "DB_USER" && string.IsNullOrEmpty(user)) user = v;
-                                else if (k == "DB_PASSWORD" && string.IsNullOrEmpty(pwd)) pwd = v;
-                                else if (k == "DB_SSL_MODE" && string.IsNullOrEmpty(sslMode)) sslMode = v;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-
-            host ??= "localhost";
-            port ??= "5432";
-            db ??= "netcafe_qa";
-            user ??= "postgres";
-            pwd ??= string.Empty;
-            sslMode ??= "Disable";
-            if (!string.Equals(db, "netcafe_qa", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("IntegrationTests chỉ được chạy trên database netcafe_qa.");
-            }
-            var ssl = !string.IsNullOrEmpty(sslMode) ? $";SSL Mode={sslMode};Trust Server Certificate=true" : "";
-
-            _connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pwd};Include Error Detail=true{ssl};";
+            throw new InvalidOperationException("IntegrationTests chỉ được chạy trên database netcafe_qa.");
         }
+        _connectionString = config.ConnectionString;
+    }
 
-        [Fact]
-        public async Task Test_GetComputersGrid_ShouldReturnComputers()
+    [Fact]
+    public async Task Test_GetComputersGrid_ShouldReturnComputers()
+    {
+        var list = await new DbRepository(_connectionString).GetComputersAsync();
+        Assert.NotNull(list);
+        Assert.NotEmpty(list);
+    }
+
+    [Fact]
+    public async Task Test_GetCustomers_ShouldReturnCustomers()
+    {
+        var list = await new DbRepository(_connectionString).GetCustomersAsync();
+        Assert.NotNull(list);
+        Assert.NotEmpty(list);
+    }
+
+    [Fact]
+    public async Task Test_TopUp_ShouldIncreaseBalance()
+    {
+        var fixture = await PrepareFixtureAsync();
+        var newBalance = await new DbRepository(_connectionString).TopUpAsync(fixture.CustomerA, fixture.EmployeeId, 10000, "cash", "test_xunit_topup");
+        Assert.True(newBalance >= 10000);
+    }
+
+    [Fact]
+    public async Task Test_Open_Close_Session_Lifecycle()
+    {
+        var fixture = await PrepareFixtureAsync();
+        var repository = new DbRepository(_connectionString);
+        var sessionId = await repository.OpenSessionAsync(fixture.CustomerA, fixture.ComputerA, fixture.EmployeeId);
+        try
         {
-            var repo = new DbRepository(_connectionString);
-            var list = await repo.GetComputersAsync();
-            Assert.NotNull(list);
-            Assert.NotEmpty(list);
+            Assert.True(sessionId > 0);
+            var invoiceId = await repository.CloseSessionAndPayAsync(sessionId, fixture.EmployeeId, "balance");
+            Assert.True(invoiceId > 0);
         }
-
-        [Fact]
-        public async Task Test_GetCustomers_ShouldReturnCustomers()
+        finally
         {
-            var repo = new DbRepository(_connectionString);
-            var list = await repo.GetCustomersAsync();
-            Assert.NotNull(list);
-            Assert.NotEmpty(list);
-        }
-
-        [Fact]
-        public async Task Test_TopUp_ShouldIncreaseBalance()
-        {
-            var repo = new DbRepository(_connectionString);
-            var newBal = await repo.TopUpAsync(1, 1, 10000, "cash", "Test topup xUnit");
-            Assert.True(newBal > 0);
-        }
-
-        [Fact]
-        public async Task Test_Open_Close_Session_Lifecycle()
-        {
-            var repo = new DbRepository(_connectionString);
-            // Mở phiên máy 3 (PC003) cho khách 2 (Hoàng Đức Anh)
-            var sessId = await repo.OpenSessionAsync(2, 3, 1);
-            Assert.True(sessId > 0);
-
-            // Đóng phiên và thanh toán bằng số dư
-            var invId = await repo.CloseSessionAndPayAsync(sessId, 1, "balance");
-            Assert.True(invId > 0);
-        }
-
-        [Fact]
-        public async Task Test_Overbooking_ShouldThrow_ExclusionViolation()
-        {
-            var repo = new DbRepository(_connectionString);
-            var randomDays = Random.Shared.Next(100, 9000);
-            var from = DateTime.Today.AddDays(randomDays).AddHours(10);
-            var to = DateTime.Today.AddDays(randomDays).AddHours(14);
-
-            // Đặt lịch lần 1 thành công
-            var b1 = await repo.CreateBookingAsync(1, 5, from, to);
-            Assert.True(b1 > 0);
-
-            // Đặt lịch trùng giờ lần 2 phải ném lỗi PostgreSQL exclusion violation (23P01)
-            var ex = await Assert.ThrowsAsync<PostgresException>(async () =>
-            {
-                await repo.CreateBookingAsync(2, 5, from.AddHours(1), to.AddHours(1));
-            });
-
-            Assert.Equal("23P01", ex.SqlState);
-            Assert.Contains("ex_booking_no_overlap", ex.ConstraintName);
-        }
-
-        [Fact]
-        public async Task Test_Oversell_ShouldThrow_CheckViolation()
-        {
-            var repo = new DbRepository(_connectionString);
-
-            // Mở phiên máy 4 cho khách 3
-            var sessId = await repo.OpenSessionAsync(3, 4, 1);
-
-            // Mua 999999 chai Sting vượt tồn kho (CHECK stock_qty >= 0)
-            var ex = await Assert.ThrowsAsync<PostgresException>(async () =>
-            {
-                await repo.PlaceOrderAsync(sessId, 1, 1, 999999);
-            });
-
-            // Đóng phiên để dọn dẹp
-            await repo.CloseSessionAndPayAsync(sessId, 1, "cash");
-
-            // Có thể là CHECK constraint từ CSDL hoặc exception từ Stored Procedure
-            Assert.True(ex.SqlState == "23514" || ex.SqlState == "P0001");
+            await CloseIfStillActiveAsync(repository, sessionId, fixture.EmployeeId);
         }
     }
+
+    [Fact]
+    public async Task Test_Overbooking_ShouldThrow_ExclusionViolation()
+    {
+        var fixture = await PrepareFixtureAsync();
+        var repository = new DbRepository(_connectionString);
+        var randomDays = Random.Shared.Next(100, 9000);
+        var from = DateTime.Today.AddDays(randomDays).AddHours(10);
+        var to = DateTime.Today.AddDays(randomDays).AddHours(14);
+
+        var firstBooking = await repository.CreateBookingAsync(fixture.CustomerA, fixture.ComputerA, from, to);
+        Assert.True(firstBooking > 0);
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await repository.CreateBookingAsync(fixture.CustomerB, fixture.ComputerA, from.AddHours(1), to.AddHours(1)));
+
+        Assert.Equal("23P01", exception.SqlState);
+        Assert.Contains("ex_booking_no_overlap", exception.ConstraintName);
+    }
+
+    [Fact]
+    public async Task Test_Oversell_ShouldThrow_CheckViolation()
+    {
+        var fixture = await PrepareFixtureAsync();
+        var repository = new DbRepository(_connectionString);
+        var sessionId = await repository.OpenSessionAsync(fixture.CustomerA, fixture.ComputerA, fixture.EmployeeId);
+        try
+        {
+            var exception = await Assert.ThrowsAsync<PostgresException>(async () =>
+                await repository.PlaceOrderAsync(sessionId, fixture.EmployeeId, 1, 999999));
+            Assert.True(exception.SqlState == "23514" || exception.SqlState == "P0001");
+        }
+        finally
+        {
+            await CloseIfStillActiveAsync(repository, sessionId, fixture.EmployeeId);
+        }
+    }
+
+    private async Task<TestFixture> PrepareFixtureAsync()
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var usernameA = $"test_xunit_a_{suffix}";
+        var usernameB = $"test_xunit_b_{suffix}";
+        var phoneA = $"093{Random.Shared.Next(1000000, 9999999)}";
+        var phoneB = $"093{Random.Shared.Next(1000000, 9999999)}";
+        await using var command = new NpgsqlCommand(@"
+            INSERT INTO core.customer(full_name, phone, email, username, password_hash, balance)
+            VALUES (@nameA, @phoneA, @emailA, @usernameA, public.crypt('Test@123', public.gen_salt('bf')), 80000)
+            RETURNING customer_id;", connection);
+        command.Parameters.AddWithValue("nameA", $"TEST xUnit A {suffix}");
+        command.Parameters.AddWithValue("phoneA", phoneA);
+        command.Parameters.AddWithValue("emailA", $"{usernameA}@example.com");
+        command.Parameters.AddWithValue("usernameA", usernameA);
+        var customerA = Convert.ToInt32(await command.ExecuteScalarAsync());
+
+        await using var second = new NpgsqlCommand(@"
+            INSERT INTO core.customer(full_name, phone, email, username, password_hash, balance)
+            VALUES (@nameB, @phoneB, @emailB, @usernameB, public.crypt('Test@123', public.gen_salt('bf')), 80000)
+            RETURNING customer_id;", connection);
+        second.Parameters.AddWithValue("nameB", $"TEST xUnit B {suffix}");
+        second.Parameters.AddWithValue("phoneB", phoneB);
+        second.Parameters.AddWithValue("emailB", $"{usernameB}@example.com");
+        second.Parameters.AddWithValue("usernameB", usernameB);
+        var customerB = Convert.ToInt32(await second.ExecuteScalarAsync());
+
+        await using var employee = new NpgsqlCommand("SELECT employee_id FROM hr.employee WHERE is_active = TRUE ORDER BY employee_id LIMIT 1;", connection);
+        var employeeId = Convert.ToInt32(await employee.ExecuteScalarAsync());
+        await using var computers = new NpgsqlCommand("SELECT computer_id FROM core.computer WHERE status = 'available' ORDER BY computer_id LIMIT 2;", connection);
+        await using var reader = await computers.ExecuteReaderAsync();
+        var computerIds = new List<int>();
+        while (await reader.ReadAsync()) computerIds.Add(reader.GetInt32(0));
+        if (computerIds.Count < 2) throw new InvalidOperationException("QA cần ít nhất hai máy available cho integration test.");
+        return new TestFixture(customerA, customerB, employeeId, computerIds[0], computerIds[1]);
+    }
+
+    private async Task CloseIfStillActiveAsync(DbRepository repository, long sessionId, int employeeId)
+    {
+        try
+        {
+            await repository.CloseSessionAndPayAsync(sessionId, employeeId, "cash");
+        }
+        catch (PostgresException exception) when (exception.MessageText.Contains("đã đóng", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+    }
+
+    private static TestConfig ReadConfig()
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var envPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env");
+        foreach (var line in File.ReadAllLines(envPath))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#') || !trimmed.Contains('=')) continue;
+            var parts = trimmed.Split('=', 2);
+            values[parts[0].Trim()] = parts[1].Trim().Trim('"').Trim('\'');
+        }
+        foreach (var key in new[] { "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_SSL_MODE" })
+        {
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key))) values[key] = Environment.GetEnvironmentVariable(key)!;
+        }
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = values.GetValueOrDefault("DB_HOST", "localhost"),
+            Port = int.Parse(values.GetValueOrDefault("DB_PORT", "5432")),
+            Database = values.GetValueOrDefault("DB_NAME", "netcafe_qa"),
+            Username = values.GetValueOrDefault("DB_USER", "postgres"),
+            Password = values.GetValueOrDefault("DB_PASSWORD", string.Empty),
+            SslMode = Enum.TryParse<SslMode>(values.GetValueOrDefault("DB_SSL_MODE", "Disable"), true, out var ssl) ? ssl : SslMode.Disable,
+            IncludeErrorDetail = true
+        };
+        return new TestConfig(builder.Database, builder.ConnectionString);
+    }
+
+    private sealed record TestConfig(string Database, string ConnectionString);
+    private sealed record TestFixture(int CustomerA, int CustomerB, int EmployeeId, int ComputerA, int ComputerB);
 }

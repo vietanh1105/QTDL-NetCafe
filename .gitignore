@@ -19,6 +19,7 @@ obj/
 
 # Backup & scratch
 backup/*.dump
+backup/main-migration-*/
 scratch/
 
 # Temporary office files & OS files

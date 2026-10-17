@@ -22,6 +22,17 @@ namespace NetCafe.Data
         }
     }
 
+    public sealed class DatabaseRuntimeInfo
+    {
+        public string Database { get; init; } = string.Empty;
+        public string User { get; init; } = string.Empty;
+        public string Host { get; init; } = string.Empty;
+        public string ServerVersion { get; init; } = string.Empty;
+        public bool HasStationMigration { get; init; }
+        public bool HasReconcileFunction { get; init; }
+        public string Summary => $"{Host} | {Database} | {User} | PostgreSQL {ServerVersion}";
+    }
+
     public class SqlLogEntry
     {
         public DateTime Timestamp { get; set; } = DateTime.Now;

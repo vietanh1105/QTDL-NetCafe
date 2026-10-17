@@ -8,6 +8,10 @@ $env:DB_HOST = if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }
 $env:DB_PORT = if ($env:DB_PORT) { $env:DB_PORT } else { "5432" }
 $env:DB_USER = if ($env:DB_USER) { $env:DB_USER } else { "postgres" }
 if (-not $env:DB_PASSWORD) { $env:DB_PASSWORD = "" }
+if ([string]::IsNullOrWhiteSpace($env:DB_PASSWORD)) {
+    throw "QA bị dừng trước khi kết nối: cần đặt DB_PASSWORD cho PostgreSQL local để tránh treo chờ nhập."
+}
+$env:PGPASSWORD = $env:DB_PASSWORD
 
 & (Join-Path $PSScriptRoot "reset-qa.ps1")
 dotnet build (Join-Path (Split-Path $PSScriptRoot -Parent) "app/NetCafe.slnx") --no-restore

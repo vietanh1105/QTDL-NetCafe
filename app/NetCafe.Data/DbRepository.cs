@@ -413,7 +413,7 @@ namespace NetCafe.Data
                     OnNotificationReceived?.Invoke(e.Channel, e.Payload);
                 };
 
-                await using var cmd = new NpgsqlCommand("LISTEN ai_security_alert;", conn);
+                await using var cmd = new NpgsqlCommand("LISTEN ai_security_alert; LISTEN computer_state_changed; LISTEN support_queue_changed;", conn);
                 await cmd.ExecuteNonQueryAsync(ct);
 
                 while (!ct.IsCancellationRequested)

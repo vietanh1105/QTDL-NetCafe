@@ -25,8 +25,9 @@ public partial class SettingsView : AdminViewBase
         var context = RequiredContext;
         _details.Text = $"Role hiện tại: {context.CurrentUser}\n" +
                         $"Employee ID: {context.CurrentEmployeeId}\n" +
-                        "Mode: cấu hình từ environment/.env\n" +
-                        "QA: dùng DB_NAME=netcafe_qa; không reset database production.";
+                        $"{context.ConnectionSummary}\n" +
+                        $"Quyền session/customer: {(context.CanManageSessions ? "có" : "không")} / {(context.CanManageCustomers ? "có" : "không")}\n" +
+                        "Migration chính: chỉ bổ sung 08_station_customer, không reset/seed/ETL.";
         return Task.CompletedTask;
     }
 }

@@ -19,6 +19,8 @@ public partial class MainForm : Form
     private int _currentEmployeeId;
     private IAdminView? _activeView;
     private bool _loadingRole;
+    private bool _reconcileAvailable;
+    private readonly System.Windows.Forms.Timer _notificationDebounceTimer = new() { Interval = 250 };
 
     public MainForm()
     {
@@ -44,6 +46,11 @@ public partial class MainForm : Form
         _refreshButton.Click += async (_, _) => await RefreshVisibleAsync();
         _dismissErrorButton.Click += (_, _) => _errorBanner.Visible = false;
         _timer.Tick += async (_, _) => await ReconcileAndRefreshAsync();
+        _notificationDebounceTimer.Tick += async (_, _) =>
+        {
+            _notificationDebounceTimer.Stop();
+            await RefreshVisibleAsync();
+        };
     }
 
     private void BuildViews()
@@ -60,19 +67,7 @@ public partial class MainForm : Form
         AddView("SupportQueue", "Support queue", new SupportQueueView());
         AddView("Settings", "Cài đặt", new SettingsView());
 
-        _viewContext = new AdminViewContext
-        {
-            Repository = _repository,
-            RefreshComputersAsync = async () => await RefreshViewAsync("Computers"),
-            ShowError = ShowError,
-            CurrentUser = _currentUser,
-            CurrentEmployeeId = _currentEmployeeId
-        };
-
-        foreach (var view in _views.Values)
-        {
-            view.SetContext(_viewContext);
-        }
+        ApplyContext();
 
         SwitchView("Computers");
     }
@@ -132,9 +127,42 @@ public partial class MainForm : Form
     {
         BuildViews();
         _timer.Interval = 15000;
+        await RefreshDatabaseStatusAsync();
         _timer.Start();
         await RestartListenerAsync();
         await RefreshVisibleAsync();
+    }
+
+    private void ApplyContext()
+    {
+        _viewContext = new AdminViewContext
+        {
+            Repository = _repository,
+            RefreshComputersAsync = async () => await RefreshViewAsync("Computers"),
+            ShowError = ShowError,
+            CurrentUser = _currentUser,
+            CurrentEmployeeId = _currentEmployeeId,
+            ConnectionSummary = AppConfig.ConnectionSummary(_currentUser),
+            CanManageCustomers = _currentUser is "postgres" or "nv_admin" or "nv_manager",
+            CanManageSessions = _currentUser is "postgres" or "nv_admin" or "nv_manager" or "nv_thao"
+        };
+
+        foreach (var view in _views.Values)
+        {
+            view.SetContext(_viewContext);
+        }
+    }
+
+    private async Task RefreshDatabaseStatusAsync()
+    {
+        var runtime = await _repository.GetDatabaseRuntimeInfoAsync(_lifetimeCancellation.Token);
+        _reconcileAvailable = runtime.HasReconcileFunction;
+        _dbStatusLabel.Text = runtime.Summary;
+        if (!runtime.HasStationMigration)
+        {
+            _dbStatusLabel.Text += " | Cần migration 08";
+        }
+        ApplyContext();
     }
 
     private async Task RefreshVisibleAsync()
@@ -171,7 +199,7 @@ public partial class MainForm : Form
 
     private async Task ReconcileAndRefreshAsync()
     {
-        if (_activeView is not ComputersView)
+        if (!_reconcileAvailable || _activeView is not ComputersView)
         {
             return;
         }
@@ -185,6 +213,13 @@ public partial class MainForm : Form
         }
         catch (Exception exception)
         {
+            var error = DbRepository.ParseException(exception);
+            if (error.SqlState == "42883")
+            {
+                _reconcileAvailable = false;
+                _dbStatusLabel.Text = "Migration 08 chưa có: reconcile tạm dừng";
+                return;
+            }
             ShowError(exception);
         }
     }
@@ -205,19 +240,8 @@ public partial class MainForm : Form
             _repository = nextRepository;
             _currentUser = user;
             _currentEmployeeId = employee?.EmployeeId ?? 0;
-            _viewContext = new AdminViewContext
-            {
-                Repository = _repository,
-                RefreshComputersAsync = async () => await RefreshViewAsync("Computers"),
-                ShowError = ShowError,
-                CurrentUser = _currentUser,
-                CurrentEmployeeId = _currentEmployeeId
-            };
-            foreach (var view in _views.Values)
-            {
-                view.SetContext(_viewContext);
-            }
-            _dbStatusLabel.Text = $"Role: {_currentUser} | Employee: {_currentEmployeeId}";
+            ApplyContext();
+            await RefreshDatabaseStatusAsync();
             await RestartListenerAsync();
             await RefreshVisibleAsync();
         }
@@ -248,9 +272,10 @@ public partial class MainForm : Form
         BeginInvoke(() =>
         {
             _dbStatusLabel.Text = $"🔔 {channel}: cảnh báo mới";
-            if (_activeView is AiCenterView)
+            if (channel is "ai_security_alert" or "computer_state_changed" or "support_queue_changed")
             {
-                _ = RefreshVisibleAsync();
+                _notificationDebounceTimer.Stop();
+                _notificationDebounceTimer.Start();
             }
         });
     }
@@ -265,6 +290,7 @@ public partial class MainForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _timer.Stop();
+        _notificationDebounceTimer.Stop();
         _listenerCancellation.Cancel();
         _lifetimeCancellation.Cancel();
         _refreshGate.Dispose();

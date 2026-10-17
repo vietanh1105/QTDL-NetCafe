@@ -5,11 +5,11 @@
 
 ## 1. CHUẨN BỊ TRƯỚC BUỔI BẢO VỆ (CHECKLIST 5 PHÚT)
 
-1. **Khởi động PostgreSQL 17**: Đảm bảo dịch vụ đang chạy trên cổng `5432`.
-2. **Kiểm tra CSDL**: Chạy file tổng hợp `sql/netcafe_full.sql` (hoặc chạy file phục hồi).
+1. **Khởi động PostgreSQL 17/18**: Đảm bảo dịch vụ đang chạy trên cổng `5432`.
+2. **Kiểm tra CSDL**: QA dùng `scripts/run-qa.ps1`; database chính dùng `scripts/migrate-main.ps1` sau khi có backup. Không chạy full SQL/reset/seed lên `netcafe_db`.
 3. **Bố trí 2 cửa sổ song song trên màn hình chiếu (Dual-Window Layout)**:
-   - **Nửa màn hình TRÁI (50%)**: Mở phần mềm Desktop Client (`NetCafe.App.exe` từ thư mục `app/NetCafe.App/bin/Debug/net10.0-windows/`).
-   - **Nửa màn hình PHẢI (50%)**: Mở **pgAdmin 4** hoặc **DBeaver**, kết nối tới `netcafe_db`, sẵn sàng 4 tab chứa các file `demo/demo_1_init_constraints.sql`, `demo/demo_2_security_rls.sql`, `demo/demo_3_performance.sql`, `demo/demo_4_highlights.sql`.
+   - **Nửa màn hình TRÁI (50%)**: Mở Admin (`NetCafe.App.exe`) và Station (`NetCafe.Client.exe`) ở hai cửa sổ riêng.
+   - **Nửa màn hình PHẢI (50%)**: Mở **pgAdmin 4** hoặc **DBeaver**, kết nối đúng database đang hiển thị trong Settings.
 
 ---
 
