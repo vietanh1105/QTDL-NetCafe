@@ -65,7 +65,7 @@ $env:DB_NAME = "netcafe_qa"
 $env:DB_PASSWORD = "<cấp ngoài source>"
 powershell -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
 dotnet run --project .\app\NetCafe.App
-dotnet run --project .\app\NetCafe.Client
+powershell -ExecutionPolicy Bypass -File .\scripts\run-station.ps1 -ComputerCode PC001
 ```
 
 Nếu không có credential QA, chỉ báo cáo build/static check; không dùng database production hoặc evidence cũ để kết luận live demo.
