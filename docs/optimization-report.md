@@ -17,10 +17,10 @@
 
 ## Số liệu và cách đo
 
-- Build baseline kiểm chứng được: `dotnet build app/NetCafe.slnx --no-restore` → 0 warning, 0 error.
-- Chưa ghi số query/latency/memory runtime vì local PostgreSQL yêu cầu password chưa được cung cấp trong môi trường chạy này.
-- Chưa ghi số query/latency/memory runtime của bản thay đổi này vì local PostgreSQL yêu cầu password chưa được cung cấp; không dùng số liệu cũ để kết luận.
-- Khi có quyền QA, chạy `scripts/run-qa.ps1`; dùng `EXPLAIN (ANALYZE, BUFFERS)` trong `python/measure_explain.py` trên `netcafe_qa`.
+- Build hiện tại kiểm chứng được: `dotnet build app/NetCafe.slnx --no-restore` → 0 warning, 0 error.
+- QA ngày 2026-10-18: reset `netcafe_qa`, station contract PASS, login/heartbeat/order/support/logout PASS và xUnit 6/6 PASS.
+- Chưa ghi p50/p95 latency, memory hoặc số query headed vì chưa chạy fixture 100.000 dòng và chưa mở soak UI 60 giây.
+- Khi đo performance, chạy `python/measure_explain.py` trên `netcafe_qa` với `EXPLAIN (ANALYZE, BUFFERS)` thực tế.
 - Không dùng `enable_seqscan = off`; kết quả chỉ chấp nhận khi planner tự chọn index với fixture thật.
 - UI acceptance cần chạy headed trên Windows: mở Admin, đổi role, mở Computers, tạo station session và quan sát không có refresh chồng. Build không thay thế visual/runtime evidence.
 
@@ -35,4 +35,4 @@
 
 ## Giới hạn hiện tại
 
-Migration và code đã được compile/static review nhưng chưa được chạy trên `netcafe_qa` do thiếu credential PostgreSQL local. Không dùng log cũ trong `evidence/` để kết luận runtime cho phiên bản mới.
+Migration, code và QA contract đã được kiểm chứng trên `netcafe_qa`. Performance fixture lớn, headed UI và số liệu trước/sau vẫn chưa có bằng chứng mới nên không kết luận thay cho các cổng đó.

@@ -98,9 +98,14 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 
 - `scripts/reset-qa.ps1`: chỉ drop/create `netcafe_qa`, strip psql connect directive và apply 01–08.
 - `scripts/run-qa.ps1`: reset QA, build solution và chạy xUnit.
+- `scripts/run-station.cmd`: wrapper Windows PowerShell 5.1 để chạy station khi máy không có `pwsh`.
 - `scripts/migrate-main.ps1`: backup/preflight và chỉ áp dụng migration 08 trên `netcafe_db`.
 - `scripts/run-station.ps1`: nạp station credential từ `.env` và chạy Client theo `computer_code`.
 - `tests/station_customer.sql`: assertion SQL cho contract station/RLS/AI, chỉ chạy trên QA.
+- `tests/verify_qa_station_prepare.sql`: tạo fixture station `test_station_qa` trên QA.
+- `tests/verify_qa_station.sql`: kiểm tra station role, login, heartbeat, F&B, support và logout.
+- `tests/verify_qa_station_assert.sql`: owner kiểm tra máy available và payment sau logout.
+- `tests/verify_qa_ai.sql`: kiểm chứng Security Alert và bốn function AI còn lại trên QA.
 - `app/NetCafe.Data.Tests/NetCafe.Data.Tests.csproj`: project xUnit integration.
 - `app/NetCafe.Data.Tests/IntegrationTests.cs`: integration test có guard database `netcafe_qa`.
 - `app/NetCafe.Data.Tests/AssemblyInfo.cs`: tắt chạy song song để fixture test_xunit_* không tranh chấp máy.

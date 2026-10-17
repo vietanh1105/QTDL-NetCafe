@@ -7,6 +7,55 @@ namespace NetCafe.Data;
 
 public partial class DbRepository
 {
+    public async Task RunAiModuleAsync(string module, CancellationToken cancellationToken = default)
+    {
+        var sql = module switch
+        {
+            "index" => "SELECT ai.fn_recommend_indexes();",
+            "duplicate" => "SELECT ai.fn_detect_duplicates(0.65);",
+            "anomaly" => "SELECT ai.fn_detect_anomalies(2.0);",
+            "promotion" => "SELECT ai.fn_suggest_promotions();",
+            _ => throw new ArgumentException($"Module AI không hợp lệ: {module}", nameof(module))
+        };
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateAiAlertStatusAsync(int alertId, string status, CancellationToken cancellationToken = default)
+    {
+        if (status is not ("new" or "reviewed"))
+        {
+            throw new ArgumentException("Trạng thái cảnh báo AI không hợp lệ.", nameof(status));
+        }
+
+        const string sql = "UPDATE ai.ai_alert SET status = @status WHERE alert_id = @alertId;";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("alertId", alertId);
+        command.Parameters.AddWithValue("status", status);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateDuplicateCandidateStatusAsync(int candidateId, string status, CancellationToken cancellationToken = default)
+    {
+        if (status is not ("pending" or "merged" or "ignored"))
+        {
+            throw new ArgumentException("Trạng thái duplicate không hợp lệ.", nameof(status));
+        }
+
+        const string sql = "UPDATE ai.duplicate_candidate SET status = @status WHERE cand_id = @candidateId;";
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("candidateId", candidateId);
+        command.Parameters.AddWithValue("status", status);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public Task<IReadOnlyList<IndexRecommendationItem>> GetIndexRecommendationsAsync(CancellationToken ct = default) =>
         ReadAsync("SELECT rec_id, table_name, column_list, reason, suggested_sql FROM ai.index_recommendation ORDER BY rec_id DESC LIMIT 100;", reader => new IndexRecommendationItem
         {

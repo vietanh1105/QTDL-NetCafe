@@ -63,9 +63,10 @@
 ```powershell
 $env:DB_NAME = "netcafe_qa"
 $env:DB_PASSWORD = "<cấp ngoài source>"
-powershell -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
 dotnet run --project .\app\NetCafe.App
-powershell -ExecutionPolicy Bypass -File .\scripts\run-station.ps1 -ComputerCode PC001
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-station.ps1 -ComputerCode PC001
+# Hoặc dùng wrapper: .\scripts\run-station.cmd -ComputerCode PC001
 ```
 
-Nếu không có credential QA, chỉ báo cáo build/static check; không dùng database production hoặc evidence cũ để kết luận live demo.
+Nếu Developer PowerShell không có `pwsh`, dùng `powershell` hoặc `run-station.cmd`. QA station hiện chạy thêm ba script `verify_qa_station_*.sql`; không dùng database production hoặc evidence cũ để kết luận live demo.

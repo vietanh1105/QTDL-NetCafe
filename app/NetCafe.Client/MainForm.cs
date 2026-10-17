@@ -36,6 +36,7 @@ public partial class MainForm : Form
         _foodOrderView.BackRequested += () => ShowView(_sessionView);
         _supportRequestView.BackRequested += () => ShowView(_sessionView);
         _foodOrderView.OrderRequested += PlaceOrderAsync;
+        _foodOrderView.OrdersRefreshRequested += RefreshFoodOrdersAsync;
         _supportRequestView.RequestSubmitted += CreateSupportRequestAsync;
         _sessionController.HeartbeatReceived += result => BeginInvoke(() => HandleHeartbeat(result));
         _sessionController.HeartbeatFailed += exception => BeginInvoke(() => _sessionView.SetHeartbeat(new StationHeartbeatResult
@@ -85,6 +86,10 @@ public partial class MainForm : Form
             ShowView(_loginView);
             return;
         }
+        if (!LogoutView.Confirm(this))
+        {
+            return;
+        }
         try
         {
             var invoiceId = await _repository.StationLogoutAsync(_session.SessionId, _session.CustomerId, _session.ComputerId);
@@ -110,6 +115,7 @@ public partial class MainForm : Form
         {
             var menu = await _repository.GetCustomerMenuAsync();
             _foodOrderView.SetMenu(menu);
+            await RefreshFoodOrdersAsync();
             ShowView(_foodOrderView);
         }
         catch (Exception exception)
@@ -133,11 +139,23 @@ public partial class MainForm : Form
         {
             var orderId = await _repository.CustomerPlaceOrderAsync(_session.SessionId, _session.CustomerId, productId, quantity);
             _foodOrderView.ShowMessage($"Đã gửi đơn #{orderId}; tồn kho và ví được database kiểm tra.");
+            await RefreshFoodOrdersAsync();
         }
         catch (Exception exception)
         {
             _foodOrderView.ShowMessage(DbRepository.ParseException(exception).Message);
         }
+    }
+
+    private async Task RefreshFoodOrdersAsync()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var orders = await _repository.GetCustomerOrderStatusAsync(_session.SessionId, _session.CustomerId);
+        _foodOrderView.SetOrders(orders);
     }
 
     private async Task CreateSupportRequestAsync(string type, string message)

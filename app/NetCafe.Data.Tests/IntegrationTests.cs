@@ -145,13 +145,19 @@ public sealed class IntegrationTests
 
     private async Task CloseIfStillActiveAsync(DbRepository repository, long sessionId, int employeeId)
     {
-        try
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT status FROM core.gaming_session WHERE session_id = @sessionId;",
+            connection);
+        command.Parameters.AddWithValue("sessionId", sessionId);
+        var status = await command.ExecuteScalarAsync();
+        if (status is not string sessionStatus || !string.Equals(sessionStatus, "active", StringComparison.OrdinalIgnoreCase))
         {
-            await repository.CloseSessionAndPayAsync(sessionId, employeeId, "cash");
+            return;
         }
-        catch (PostgresException exception) when (exception.MessageText.Contains("đã đóng", StringComparison.OrdinalIgnoreCase))
-        {
-        }
+
+        await repository.CloseSessionAndPayAsync(sessionId, employeeId, "cash");
     }
 
     private static TestConfig ReadConfig()

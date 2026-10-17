@@ -72,7 +72,9 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 │   └── netcafe_full.sql  # Toàn bộ mã nguồn hợp nhất 00–08
 ├── scripts/
 │   ├── reset-qa.ps1      # Chỉ reset database netcafe_qa
-│   └── run-qa.ps1        # reset + build + test
+│   ├── run-qa.ps1        # reset + station contract + build + test
+│   ├── run-station.ps1   # Chạy station bằng role giới hạn
+│   └── run-station.cmd   # Wrapper cho Windows PowerShell 5.1
 ├── tests/                # Bộ kiểm thử SQL tự động
 ├── .env.example          # Mẫu cấu hình môi trường
 └── .gitignore            # Cấu hình bỏ qua tệp tạm, secrets
@@ -102,15 +104,20 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 
 ```powershell
 dotnet run --project app/NetCafe.App
-dotnet run --project app/NetCafe.Client
+# Windows PowerShell 5.1 hoặc PowerShell 7 đều dùng được
+.\scripts\run-station.cmd -ComputerCode PC001
 ```
+
+`run-station.cmd` nạp `STATION_DB_USER`, `STATION_DB_PASSWORD` và `NETCAFE_COMPUTER_CODE` từ `.env`/environment trước khi chạy Client. Có thể dùng `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-station.ps1 -ComputerCode PC001` nếu không muốn dùng wrapper. Không chạy station bằng `DB_USER` owner.
 
 Chạy bộ kiểm thử tích hợp:
 ```powershell
-dotnet test app/NetCafe.Data.Tests
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
+```
+
+Lệnh QA reset duy nhất `netcafe_qa`, kiểm tra role station, login/heartbeat/order/support/logout và chạy xUnit. Không dùng lệnh này cho database chính.
 
 Station đọc `computer_code` từ `station.json` hoặc `NETCAFE_COMPUTER_CODE`; role `station_runtime` và password phải được cấp ngoài source.
-```
 
 ### 3. Chạy Quy Trình Python (ETL & Báo Cáo)
 

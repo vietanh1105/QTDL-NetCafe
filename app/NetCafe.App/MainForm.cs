@@ -12,6 +12,7 @@ public partial class MainForm : Form
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Dictionary<string, IAdminView> _views = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Button> _navigationButtons = new(StringComparer.OrdinalIgnoreCase);
     private DbRepository _repository = null!;
     private CancellationTokenSource _listenerCancellation = new();
     private AdminViewContext _viewContext = null!;
@@ -55,14 +56,19 @@ public partial class MainForm : Form
 
     private void BuildViews()
     {
+        AddNavigationSeparator("VẬN HÀNH");
         AddView("Computers", "Máy trạm", new ComputersView());
         AddView("Customers", "Hội viên", new CustomersView());
         AddView("Booking", "Đặt máy", new BookingView());
         AddView("Orders", "F&B", new OrdersView());
         AddView("Invoices", "Hóa đơn", new InvoicesView());
+
+        AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
         AddView("Reports", "Báo cáo", new ReportsView());
         AddView("Employees", "Nhân viên", new EmployeesView());
         AddView("Maintenance", "Bảo trì", new MaintenanceView());
+
+        AddNavigationSeparator("HỖ TRỢ VÀ HỆ THỐNG");
         AddView("AiCenter", "AI Center", new AiCenterView());
         AddView("SupportQueue", "Support queue", new SupportQueueView());
         AddView("Settings", "Cài đặt", new SettingsView());
@@ -97,12 +103,41 @@ public partial class MainForm : Form
             Padding = new Padding(12, 0, 0, 0)
         };
         button.FlatAppearance.BorderSize = 0;
+        _navigationButtons[key] = button;
         button.Click += async (_, _) =>
         {
             SwitchView(key);
             await RefreshVisibleAsync();
         };
+        button.MouseEnter += (_, _) =>
+        {
+            if (!string.Equals(_activeViewLabel.Text, $"Đang mở: {key}", StringComparison.Ordinal))
+            {
+                button.BackColor = Color.FromArgb(239, 246, 255);
+            }
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            if (!string.Equals(_activeViewLabel.Text, $"Đang mở: {key}", StringComparison.Ordinal))
+            {
+                button.BackColor = Color.White;
+            }
+        };
         _navigationPanel.Controls.Add(button);
+    }
+
+    private void AddNavigationSeparator(string title)
+    {
+        _navigationPanel.Controls.Add(new Label
+        {
+            Text = title,
+            Width = 190,
+            Height = 26,
+            Margin = new Padding(4, 8, 4, 0),
+            ForeColor = Color.FromArgb(100, 116, 139),
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        });
     }
 
     private void SwitchView(string key)
@@ -118,6 +153,12 @@ public partial class MainForm : Form
             {
                 control.Visible = ReferenceEquals(candidate, view);
             }
+        }
+        foreach (var item in _navigationButtons)
+        {
+            var selected = string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase);
+            item.Value.BackColor = selected ? Color.FromArgb(219, 234, 254) : Color.White;
+            item.Value.ForeColor = selected ? Color.FromArgb(30, 64, 175) : Color.FromArgb(51, 65, 85);
         }
         _activeView = view;
         _activeViewLabel.Text = $"Đang mở: {key}";

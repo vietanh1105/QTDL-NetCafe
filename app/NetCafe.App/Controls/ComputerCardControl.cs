@@ -45,7 +45,9 @@ public partial class ComputerCardControl : UserControl
         };
         _statusLabel.ForeColor = statusColor;
         _customerLabel.Text = string.IsNullOrWhiteSpace(model.CurrentCustomerName) ? "Chưa có khách" : model.CurrentCustomerName;
-        _costLabel.Text = model.PlayedMinutes is null ? "" : $"{model.PlayedMinutes:N0} phút";
+        _costLabel.Text = model.PlayedMinutes is null
+            ? "Chưa có phiên"
+            : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0}đ / {model.PlayedMinutes:N0} phút";
         _baseColor = Color.FromArgb(255, 255, 255);
         BackColor = _baseColor;
     }
