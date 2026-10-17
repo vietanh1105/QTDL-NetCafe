@@ -75,7 +75,7 @@ $configSql = @"
 DO `$`$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM hr.employee WHERE employee_id = $serviceEmployeeId AND is_active = TRUE) THEN
-        RAISE EXCEPTION 'STATION_SERVICE_EMPLOYEE_ID không trỏ nhân viên active.' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'STATION_SERVICE_EMPLOYEE_ID must reference an active employee.' USING ERRCODE = '23514';
     END IF;
 END `$`$;
 INSERT INTO core.station_runtime_config(config_key, config_value, updated_at)

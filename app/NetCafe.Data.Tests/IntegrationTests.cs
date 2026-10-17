@@ -157,13 +157,24 @@ public sealed class IntegrationTests
     private static TestConfig ReadConfig()
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var envPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env");
-        foreach (var line in File.ReadAllLines(envPath))
+        // Tìm .env từ thư mục chạy; QA vẫn ưu tiên biến môi trường do run-qa.ps1 cấp.
+        var envPath = Environment.GetEnvironmentVariable("NETCAFE_ENV_FILE");
+        var currentDirectory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (string.IsNullOrWhiteSpace(envPath) && currentDirectory != null)
         {
-            var trimmed = line.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#') || !trimmed.Contains('=')) continue;
-            var parts = trimmed.Split('=', 2);
-            values[parts[0].Trim()] = parts[1].Trim().Trim('"').Trim('\'');
+            var candidate = Path.Combine(currentDirectory.FullName, ".env");
+            if (File.Exists(candidate)) envPath = candidate;
+            currentDirectory = currentDirectory.Parent;
+        }
+        if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
+        {
+            foreach (var line in File.ReadAllLines(envPath))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#') || !trimmed.Contains('=')) continue;
+                var parts = trimmed.Split('=', 2);
+                values[parts[0].Trim()] = parts[1].Trim().Trim('"').Trim('\'');
+            }
         }
         foreach (var key in new[] { "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_SSL_MODE" })
         {
