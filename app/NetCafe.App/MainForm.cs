@@ -54,7 +54,23 @@ public partial class MainForm : Form
             }
         };
 
-        _refreshButton.Click += async (_, _) => await RefreshVisibleAsync();
+        _refreshButton.Click += async (_, _) =>
+        {
+            if (!_databaseContractReady)
+            {
+                AppConfig.LoadEnv();
+                _currentUser = AppConfig.Username;
+                _currentEmployeeId = AppConfig.AdminEmployeeId;
+                _repository = new DbRepository(AppConfig.GetConnectionString(_currentUser, AppConfig.GetConfiguredRolePassword(_currentUser)));
+                await RefreshDatabaseStatusAsync();
+                if (_databaseContractReady)
+                {
+                    _timer.Start();
+                    await RestartListenerAsync();
+                }
+            }
+            await RefreshVisibleAsync();
+        };
         _dismissErrorButton.Click += (_, _) => _errorBanner.Visible = false;
         _timer.Tick += async (_, _) => await ReconcileAndRefreshAsync();
         _notificationDebounceTimer.Tick += async (_, _) =>
@@ -174,9 +190,12 @@ public partial class MainForm : Form
         BuildViews();
         _timer.Interval = 15000;
         await RefreshDatabaseStatusAsync();
-        _timer.Start();
-        await RestartListenerAsync();
-        await RefreshVisibleAsync();
+        if (_databaseContractReady)
+        {
+            _timer.Start();
+            await RestartListenerAsync();
+            await RefreshVisibleAsync();
+        }
     }
 
     private void ApplyContext()
@@ -202,22 +221,43 @@ public partial class MainForm : Form
 
     private async Task RefreshDatabaseStatusAsync()
     {
-        var runtime = await _repository.GetDatabaseRuntimeInfoAsync(_lifetimeCancellation.Token);
-        _runtimeSummary = runtime.Summary;
-        _runtimeContractStatus = runtime.ContractStatus;
-        _databaseContractReady = runtime.IsStationContractReady;
-        _reconcileAvailable = runtime.HasReconcileFunction && _databaseContractReady;
-        if (_currentEmployeeId <= 0)
+        if (string.IsNullOrWhiteSpace(AppConfig.Password))
         {
-            var employees = await _repository.GetEmployeesAsync();
-            var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, _currentUser, StringComparison.OrdinalIgnoreCase));
-            _currentEmployeeId = employee?.EmployeeId ?? 0;
+            _databaseContractReady = false;
+            _reconcileAvailable = false;
+            _runtimeSummary = "Chưa có mật khẩu kết nối CSDL";
+            UpdateHeaderStatus();
+            ShowError(new InvalidOperationException("Chưa cấu hình mật khẩu CSDL (DB_PASSWORD). Vui lòng tạo file .env hoặc cấu hình trong .env.example."));
+            return;
         }
-        ApplyContext();
-        UpdateHeaderStatus();
-        if (!_databaseContractReady)
+
+        try
         {
-            ShowError(new InvalidOperationException(_runtimeContractStatus));
+            var runtime = await _repository.GetDatabaseRuntimeInfoAsync(_lifetimeCancellation.Token);
+            _runtimeSummary = runtime.Summary;
+            _runtimeContractStatus = runtime.ContractStatus;
+            _databaseContractReady = runtime.IsStationContractReady;
+            _reconcileAvailable = runtime.HasReconcileFunction && _databaseContractReady;
+            if (_currentEmployeeId <= 0)
+            {
+                var employees = await _repository.GetEmployeesAsync();
+                var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, _currentUser, StringComparison.OrdinalIgnoreCase));
+                _currentEmployeeId = employee?.EmployeeId ?? 0;
+            }
+            ApplyContext();
+            UpdateHeaderStatus();
+            if (!_databaseContractReady)
+            {
+                ShowError(new InvalidOperationException(_runtimeContractStatus));
+            }
+        }
+        catch (Exception exception)
+        {
+            _databaseContractReady = false;
+            _reconcileAvailable = false;
+            _runtimeSummary = "Không thể kết nối CSDL";
+            UpdateHeaderStatus();
+            ShowError(exception);
         }
     }
 

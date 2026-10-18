@@ -23,48 +23,40 @@ namespace NetCafe.App
         public static void LoadEnv()
         {
             var explicitPath = Environment.GetEnvironmentVariable("NETCAFE_ENV_FILE");
-            var searchPaths = new List<string>();
-            if (!string.IsNullOrWhiteSpace(explicitPath))
-            {
-                searchPaths.Add(Path.GetFullPath(explicitPath));
-            }
-            else
-            {
-                var roots = new[] { Environment.CurrentDirectory, AppContext.BaseDirectory };
-                foreach (var root in roots)
-                {
-                    var directory = new DirectoryInfo(root);
-                    for (var depth = 0; depth < 7 && directory is not null; depth++, directory = directory.Parent)
-                    {
-                        searchPaths.Add(Path.Combine(directory.FullName, ".env"));
-                    }
-                }
-            }
+            var candidateFileNames = new[] { ".env", ".env.example" };
 
-            foreach (var path in searchPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var fileName in candidateFileNames)
             {
-                if (File.Exists(path))
+                var searchPaths = new List<string>();
+                if (!string.IsNullOrWhiteSpace(explicitPath))
                 {
-                    foreach (var line in File.ReadAllLines(path))
+                    searchPaths.Add(Path.GetFullPath(explicitPath));
+                }
+                else
+                {
+                    var roots = new[] { Environment.CurrentDirectory, AppContext.BaseDirectory };
+                    foreach (var root in roots)
                     {
-                        var trimmed = line.Trim();
-                        if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
-                        var parts = trimmed.Split('=', 2);
-                        if (parts.Length == 2)
+                        var directory = new DirectoryInfo(root);
+                        for (var depth = 0; depth < 7 && directory is not null; depth++, directory = directory.Parent)
                         {
-                            var key = parts[0].Trim();
-                            var val = parts[1].Trim();
-                            if (key == "DB_HOST") Host = val;
-                            else if (key == "DB_PORT" && int.TryParse(val, out var p)) Port = p;
-                            else if (key == "DB_NAME") Database = val;
-                            else if (key == "DB_USER") Username = val;
-                            else if (key == "DB_PASSWORD") Password = val;
-                            else if (key == "DB_SSL_MODE") SslMode = val;
-                            else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId)) StationServiceEmployeeId = employeeId;
-                            else if (key == "DB_ADMIN_EMPLOYEE_ID" && int.TryParse(val, out var adminEmployeeId)) AdminEmployeeId = adminEmployeeId;
+                            searchPaths.Add(Path.Combine(directory.FullName, fileName));
                         }
                     }
-                    LoadedEnvFile = Path.GetFullPath(path);
+                }
+
+                foreach (var path in searchPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (File.Exists(path))
+                    {
+                        LoadFromFile(path);
+                        LoadedEnvFile = Path.GetFullPath(path);
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(LoadedEnvFile))
+                {
                     break;
                 }
             }
@@ -77,6 +69,35 @@ namespace NetCafe.App
             SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? SslMode;
             if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId)) StationServiceEmployeeId = envEmployeeId;
             if (int.TryParse(Environment.GetEnvironmentVariable("DB_ADMIN_EMPLOYEE_ID"), out var envAdminEmployeeId)) AdminEmployeeId = envAdminEmployeeId;
+        }
+
+        private static void LoadFromFile(string path)
+        {
+            foreach (var line in File.ReadAllLines(path))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length == 2)
+                {
+                    var key = parts[0].Trim();
+                    var val = parts[1].Trim().Trim('"').Trim('\'');
+
+                    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+                    {
+                        Environment.SetEnvironmentVariable(key, val);
+                    }
+
+                    if (key == "DB_HOST") Host = val;
+                    else if (key == "DB_PORT" && int.TryParse(val, out var p)) Port = p;
+                    else if (key == "DB_NAME") Database = val;
+                    else if (key == "DB_USER") Username = val;
+                    else if (key == "DB_PASSWORD") Password = val;
+                    else if (key == "DB_SSL_MODE") SslMode = val;
+                    else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId)) StationServiceEmployeeId = employeeId;
+                    else if (key == "DB_ADMIN_EMPLOYEE_ID" && int.TryParse(val, out var adminEmployeeId)) AdminEmployeeId = adminEmployeeId;
+                }
+            }
         }
 
         public static string ConnectionSummary(string? user = null)
@@ -108,7 +129,12 @@ namespace NetCafe.App
                 "nv_hung" => "DB_TECHNICIAN_PASSWORD",
                 _ => "DB_ADMIN_PASSWORD"
             };
-            return Environment.GetEnvironmentVariable(key) ?? string.Empty;
+            var pwd = Environment.GetEnvironmentVariable(key);
+            if (string.IsNullOrWhiteSpace(pwd))
+            {
+                pwd = Environment.GetEnvironmentVariable("DEMO_PASSWORD");
+            }
+            return pwd ?? string.Empty;
         }
 
         public static IReadOnlyList<string> GetConfiguredRoles()
@@ -121,7 +147,7 @@ namespace NetCafe.App
 
             foreach (var role in new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" })
             {
-                if (!string.IsNullOrWhiteSpace(GetConfiguredRolePassword(role)))
+                if (!string.IsNullOrWhiteSpace(GetConfiguredRolePassword(role)) && !roles.Contains(role))
                 {
                     roles.Add(role);
                 }
