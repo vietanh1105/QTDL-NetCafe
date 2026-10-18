@@ -18,8 +18,9 @@ public partial class MainForm
         _contentPanel = new Panel();
         SuspendLayout();
         Text = "NetCafe Station";
-        Size = new Size(900, 620);
-        MinimumSize = new Size(720, 500);
+        Size = new Size(450, 1350);
+        MinimumSize = new Size(450, 500);
+        MaximumSize = new Size(450, Screen.PrimaryScreen?.WorkingArea.Height ?? 1350);
         StartPosition = FormStartPosition.CenterScreen;
         _headerPanel.Dock = DockStyle.Top;
         _headerPanel.Height = 58;
@@ -30,6 +31,7 @@ public partial class MainForm
         _stationLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         _headerPanel.Controls.Add(_stationLabel);
         _contentPanel.Dock = DockStyle.Fill;
+        _contentPanel.AutoScroll = true;
         _contentPanel.BackColor = Color.FromArgb(243, 246, 251);
         Controls.Add(_contentPanel);
         Controls.Add(_headerPanel);

@@ -10,9 +10,12 @@ public sealed class AdminViewContext
     public required DbRepository Repository { get; init; }
     public required Func<Task> RefreshComputersAsync { get; init; }
     public required Action<Exception> ShowError { get; init; }
-    public string CurrentUser { get; set; } = "postgres";
+    public Action<string>? NavigateToView { get; init; }
+    public string CurrentUser { get; set; } = string.Empty;
     public int CurrentEmployeeId { get; set; }
     public string ConnectionSummary { get; set; } = string.Empty;
+    public string ListenerStatus { get; set; } = "Chưa khởi động";
+    public DatabaseRuntimeInfo? RuntimeInfo { get; set; }
     public bool CanManageCustomers { get; set; }
     public bool CanManageSessions { get; set; }
 }

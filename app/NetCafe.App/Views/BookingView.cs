@@ -2,7 +2,7 @@
 
 namespace NetCafe.App.Views;
 
-public partial class BookingView : AdminDataViewBase
+public partial class BookingView : AdminCardViewBase
 {
     public BookingView()
     {
@@ -13,6 +13,16 @@ public partial class BookingView : AdminDataViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetBookingsAsync(cancellationToken);
-        SetRows(rows, $"{rows.Count} booking");
+        SetCards(
+            rows,
+            booking => new AdminCardModel(
+                $"{booking.CustomerName} · {booking.ComputerCode}",
+                $"{booking.BookedFrom:dd/MM HH:mm} → {booking.BookedTo:HH:mm}",
+                $"Booking #{booking.BookingId}",
+                booking.Status,
+                booking.Status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)
+                    ? CyberTheme.Success
+                    : CyberTheme.Warning),
+            $"{rows.Count} booking");
     }
 }

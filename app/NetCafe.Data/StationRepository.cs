@@ -145,13 +145,14 @@ public partial class DbRepository
 
     public async Task<IReadOnlyList<CustomerMenuItem>> GetCustomerMenuAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT * FROM inventory.fn_customer_menu();";
+        const string sql = "SELECT * FROM inventory.fn_customer_menu_v2();";
         return await ReadAsync(sql, reader => new CustomerMenuItem
         {
             ProductId = reader.GetInt32(0),
-            ProductName = reader.GetString(1),
-            UnitPrice = reader.GetDecimal(2),
-            StockQty = reader.GetInt32(3)
+            Sku = reader.GetString(1),
+            ProductName = reader.GetString(2),
+            UnitPrice = reader.GetDecimal(3),
+            StockQty = reader.GetInt32(4)
         }, cancellationToken);
     }
 

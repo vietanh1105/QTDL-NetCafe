@@ -12,9 +12,9 @@ public abstract class AdminViewBase : UserControl, IAdminView
 
     protected AdminViewContext RequiredContext => Context ?? throw new InvalidOperationException("Admin view chưa được gắn context.");
 
-    protected static Color SurfaceColor => Color.White;
-    protected static Color BackgroundColor => Color.FromArgb(243, 246, 251);
-    protected static Color PrimaryColor => Color.FromArgb(37, 99, 235);
+    protected static Color SurfaceColor => CyberTheme.Surface;
+    protected static Color BackgroundColor => CyberTheme.Background;
+    protected static Color PrimaryColor => CyberTheme.Primary;
 
     public virtual void SetContext(AdminViewContext context)
     {
@@ -41,12 +41,14 @@ public abstract class AdminViewBase : UserControl, IAdminView
         grid.BorderStyle = BorderStyle.None;
         grid.EnableHeadersVisualStyles = false;
         grid.ColumnHeadersHeight = 36;
-        grid.ColumnHeadersDefaultCellStyle.BackColor = PrimaryColor;
-        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = CyberTheme.SurfaceRaised;
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = CyberTheme.Text;
         grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         grid.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
-        grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(30, 58, 138);
-        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+        grid.DefaultCellStyle.BackColor = CyberTheme.Surface;
+        grid.DefaultCellStyle.ForeColor = CyberTheme.Text;
+        grid.DefaultCellStyle.SelectionBackColor = CyberTheme.SurfaceRaised;
+        grid.DefaultCellStyle.SelectionForeColor = CyberTheme.Text;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(22, 32, 52);
     }
 }

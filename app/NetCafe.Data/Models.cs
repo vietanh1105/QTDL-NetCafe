@@ -30,6 +30,17 @@ namespace NetCafe.Data
         public string ServerVersion { get; init; } = string.Empty;
         public bool HasStationMigration { get; init; }
         public bool HasReconcileFunction { get; init; }
+        public bool HasComputerGridContract { get; init; }
+        public bool HasCustomerMenuContract { get; init; }
+        public bool HasStationLogoutContract { get; init; }
+        public bool IsStationContractReady => HasStationMigration
+            && HasReconcileFunction
+            && HasComputerGridContract
+            && HasCustomerMenuContract
+            && HasStationLogoutContract;
+        public string ContractStatus => IsStationContractReady
+            ? "Migration 08 đầy đủ"
+            : "Migration 08 chưa đầy đủ: thiếu contract station";
         public string Summary => $"{Host} | {Database} | {User} | PostgreSQL {ServerVersion}";
     }
 
@@ -66,6 +77,10 @@ namespace NetCafe.Data
         public string? CurrentUsername { get; set; }
         public DateTime? SessionStartTime { get; set; }
         public decimal? PlayedMinutes { get; set; }
+        public decimal? CurrentPlayAmount { get; set; }
+        public decimal? CurrentServiceAmount { get; set; }
+        public decimal? CurrentBalance { get; set; }
+        public DateTime? LastHeartbeatAt { get; set; }
         public string Specs { get; set; } = "{}";
     }
 

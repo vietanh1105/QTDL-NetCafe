@@ -1,5 +1,5 @@
-// Trách nhiệm: shell điều phối navigation, repository lifecycle và refresh Admin views.
-// Liên kết: MainForm.Designer.cs, Views/*.cs, AppConfig.cs và DbRepository partial.
+// Trách nhiệm: shell điều phối navigation, role thật, listener và refresh Admin.
+// Liên kết: MainForm.Designer.cs, Views/*.cs, AppConfig.cs và DbRepository.
 
 using System.Drawing;
 using NetCafe.App.Views;
@@ -13,19 +13,26 @@ public partial class MainForm : Form
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Dictionary<string, IAdminView> _views = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Button> _navigationButtons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pendingNotificationChannels = new(StringComparer.OrdinalIgnoreCase);
     private DbRepository _repository = null!;
     private CancellationTokenSource _listenerCancellation = new();
     private AdminViewContext _viewContext = null!;
-    private string _currentUser = "postgres";
+    private string _currentUser = string.Empty;
     private int _currentEmployeeId;
     private IAdminView? _activeView;
     private bool _loadingRole;
     private bool _reconcileAvailable;
+    private bool _databaseContractReady;
+    private string _runtimeSummary = "CSDL chưa kiểm tra";
+    private string _runtimeContractStatus = string.Empty;
+    private string _listenerStatus = "Chưa khởi động";
     private readonly System.Windows.Forms.Timer _notificationDebounceTimer = new() { Interval = 250 };
 
     public MainForm()
     {
         AppConfig.LoadEnv();
+        _currentUser = AppConfig.Username;
+        _currentEmployeeId = AppConfig.AdminEmployeeId;
         _repository = new DbRepository(AppConfig.GetConnectionString());
         InitializeComponent();
         InitializeShell();
@@ -34,13 +41,16 @@ public partial class MainForm : Form
 
     private void InitializeShell()
     {
-        _roleCombo.Items.AddRange(new object[] { "postgres", "nv_manager", "nv_thao", "nv_hung" });
-        _roleCombo.SelectedItem = _currentUser;
+        _roleCombo.Items.AddRange(AppConfig.GetConfiguredRoles().Cast<object>().ToArray());
+        if (_roleCombo.Items.Count > 0)
+        {
+            _roleCombo.SelectedItem = _roleCombo.Items.Contains(_currentUser) ? _currentUser : _roleCombo.Items[0];
+        }
         _roleCombo.SelectedIndexChanged += async (_, _) =>
         {
-            if (!_loadingRole)
+            if (!_loadingRole && _roleCombo.SelectedItem is string user)
             {
-                await SwitchRoleAsync(_roleCombo.SelectedItem?.ToString() ?? "postgres");
+                await SwitchRoleAsync(user);
             }
         };
 
@@ -50,7 +60,7 @@ public partial class MainForm : Form
         _notificationDebounceTimer.Tick += async (_, _) =>
         {
             _notificationDebounceTimer.Stop();
-            await RefreshVisibleAsync();
+            await RefreshNotificationViewsAsync();
         };
     }
 
@@ -62,19 +72,15 @@ public partial class MainForm : Form
         AddView("Booking", "Đặt máy", new BookingView());
         AddView("Orders", "F&B", new OrdersView());
         AddView("Invoices", "Hóa đơn", new InvoicesView());
-
         AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
         AddView("Reports", "Báo cáo", new ReportsView());
         AddView("Employees", "Nhân viên", new EmployeesView());
         AddView("Maintenance", "Bảo trì", new MaintenanceView());
-
         AddNavigationSeparator("HỖ TRỢ VÀ HỆ THỐNG");
         AddView("AiCenter", "AI Center", new AiCenterView());
         AddView("SupportQueue", "Support queue", new SupportQueueView());
         AddView("Settings", "Cài đặt", new SettingsView());
-
         ApplyContext();
-
         SwitchView("Computers");
     }
 
@@ -89,7 +95,6 @@ public partial class MainForm : Form
         control.Visible = false;
         control.Dock = DockStyle.Fill;
         _contentPanel.Controls.Add(control);
-
         var button = new Button
         {
             Text = label,
@@ -181,13 +186,14 @@ public partial class MainForm : Form
             Repository = _repository,
             RefreshComputersAsync = async () => await RefreshViewAsync("Computers"),
             ShowError = ShowError,
+            NavigateToView = SwitchView,
             CurrentUser = _currentUser,
             CurrentEmployeeId = _currentEmployeeId,
             ConnectionSummary = AppConfig.ConnectionSummary(_currentUser),
-            CanManageCustomers = _currentUser is "postgres" or "nv_admin" or "nv_manager",
-            CanManageSessions = _currentUser is "postgres" or "nv_admin" or "nv_manager" or "nv_thao"
+            ListenerStatus = _listenerStatus,
+            CanManageCustomers = _currentEmployeeId > 0,
+            CanManageSessions = _currentEmployeeId > 0
         };
-
         foreach (var view in _views.Values)
         {
             view.SetContext(_viewContext);
@@ -197,17 +203,30 @@ public partial class MainForm : Form
     private async Task RefreshDatabaseStatusAsync()
     {
         var runtime = await _repository.GetDatabaseRuntimeInfoAsync(_lifetimeCancellation.Token);
-        _reconcileAvailable = runtime.HasReconcileFunction;
-        _dbStatusLabel.Text = runtime.Summary;
-        if (!runtime.HasStationMigration)
+        _runtimeSummary = runtime.Summary;
+        _runtimeContractStatus = runtime.ContractStatus;
+        _databaseContractReady = runtime.IsStationContractReady;
+        _reconcileAvailable = runtime.HasReconcileFunction && _databaseContractReady;
+        if (_currentEmployeeId <= 0)
         {
-            _dbStatusLabel.Text += " | Cần migration 08";
+            var employees = await _repository.GetEmployeesAsync();
+            var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, _currentUser, StringComparison.OrdinalIgnoreCase));
+            _currentEmployeeId = employee?.EmployeeId ?? 0;
         }
         ApplyContext();
+        UpdateHeaderStatus();
+        if (!_databaseContractReady)
+        {
+            ShowError(new InvalidOperationException(_runtimeContractStatus));
+        }
     }
 
     private async Task RefreshVisibleAsync()
     {
+        if (!_databaseContractReady && (_activeView is ComputersView || _activeView is MaintenanceView))
+        {
+            return;
+        }
         if (_activeView is null || !await _refreshGate.WaitAsync(0))
         {
             return;
@@ -231,11 +250,30 @@ public partial class MainForm : Form
 
     private async Task RefreshViewAsync(string key)
     {
-        if (!_views.TryGetValue(key, out var view) || !ReferenceEquals(view, _activeView))
+        if (_views.TryGetValue(key, out var view) && ReferenceEquals(view, _activeView))
         {
-            return;
+            await RefreshVisibleAsync();
         }
-        await RefreshVisibleAsync();
+    }
+
+    private async Task RefreshNotificationViewsAsync()
+    {
+        var channels = _pendingNotificationChannels.ToArray();
+        _pendingNotificationChannels.Clear();
+        foreach (var channel in channels)
+        {
+            var target = channel switch
+            {
+                "computer_state_changed" => "Computers",
+                "support_queue_changed" => "SupportQueue",
+                "ai_security_alert" => "AiCenter",
+                _ => string.Empty
+            };
+            if (!string.IsNullOrEmpty(target))
+            {
+                await RefreshViewAsync(target);
+            }
+        }
     }
 
     private async Task ReconcileAndRefreshAsync()
@@ -271,10 +309,14 @@ public partial class MainForm : Form
         try
         {
             var password = AppConfig.GetConfiguredRolePassword(user);
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                ShowError(new InvalidOperationException($"Role {user} chưa có credential cấu hình."));
+                return;
+            }
             var nextRepository = new DbRepository(AppConfig.GetConnectionString(user, password));
             var employees = await nextRepository.GetEmployeesAsync();
             var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, user, StringComparison.OrdinalIgnoreCase));
-
             _listenerCancellation.Cancel();
             _listenerCancellation.Dispose();
             _listenerCancellation = new CancellationTokenSource();
@@ -298,9 +340,12 @@ public partial class MainForm : Form
 
     private async Task RestartListenerAsync()
     {
+        _listenerStatus = "Đang lắng nghe";
+        UpdateHeaderStatus();
         _repository.OnNotificationReceived -= HandleNotification;
         _repository.OnNotificationReceived += HandleNotification;
         _ = Task.Run(() => _repository.StartListeningAsync(_listenerCancellation.Token));
+        ApplyContext();
         await Task.CompletedTask;
     }
 
@@ -312,13 +357,37 @@ public partial class MainForm : Form
         }
         BeginInvoke(() =>
         {
-            _dbStatusLabel.Text = $"🔔 {channel}: cảnh báo mới";
+            _pendingNotificationChannels.Add(channel);
+            var notice = channel switch
+            {
+                "computer_state_changed" => "Đã cập nhật trạng thái máy",
+                "support_queue_changed" => "Có yêu cầu hỗ trợ mới",
+                "ai_security_alert" => "Có cảnh báo AI mới",
+                _ => $"Đã nhận thông báo {channel}"
+            };
+            UpdateHeaderStatus(notice);
             if (channel is "ai_security_alert" or "computer_state_changed" or "support_queue_changed")
             {
                 _notificationDebounceTimer.Stop();
                 _notificationDebounceTimer.Start();
             }
         });
+    }
+
+    private void UpdateHeaderStatus(string? notice = null)
+    {
+        if (!string.IsNullOrWhiteSpace(notice))
+        {
+            _dbStatusLabel.Text = $"{notice} | Listener: {_listenerStatus}";
+            return;
+        }
+
+        var status = $"{_runtimeSummary} | Nhân viên: {_currentEmployeeId} | Listener: {_listenerStatus}";
+        if (!_databaseContractReady && !string.IsNullOrWhiteSpace(_runtimeContractStatus))
+        {
+            status += $" | {_runtimeContractStatus}";
+        }
+        _dbStatusLabel.Text = status;
     }
 
     private void ShowError(Exception exception)

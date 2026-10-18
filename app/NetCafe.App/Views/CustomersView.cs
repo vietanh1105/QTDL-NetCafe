@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace NetCafe.App.Views;
 
-public partial class CustomersView : AdminDataViewBase
+public partial class CustomersView : AdminCardViewBase
 {
     private readonly TextBox _searchBox = new();
     private readonly TextBox _topUpBox = new();
@@ -55,7 +55,15 @@ public partial class CustomersView : AdminDataViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetCustomersAsync(_searchBox.Text);
-        SetRows(rows, $"{rows.Count} hội viên");
+        SetCards(
+            rows,
+            customer => new AdminCardModel(
+                customer.FullName,
+                $"@{customer.Username} | {customer.Phone}",
+                $"Số dư: {customer.Balance:N0} đ\nĐiểm: {customer.LoyaltyPoints:N0}",
+                customer.IsActive ? $"Đang hoạt động · {customer.MembershipTier}" : "Đã khóa",
+                customer.IsActive ? CyberTheme.Success : CyberTheme.Danger),
+            $"{rows.Count} hội viên");
     }
 
     private async Task TopUpAsync()
@@ -82,7 +90,7 @@ public partial class CustomersView : AdminDataViewBase
         }
     }
 
-    private NetCafe.Data.CustomerItem? SelectedCustomer => Grid.CurrentRow?.DataBoundItem as NetCafe.Data.CustomerItem;
+    private NetCafe.Data.CustomerItem? SelectedCustomer => SelectedItem as NetCafe.Data.CustomerItem;
 
     private async Task CreateCustomerAsync()
     {

@@ -12,7 +12,23 @@ public partial class SessionView : UserControl
     public SessionView()
     {
         InitializeComponent();
-        _logoutButton.Click += async (_, _) => { if (LogoutRequested is not null) await LogoutRequested(); };
+        _logoutButton.Click += async (_, _) =>
+        {
+            if (LogoutRequested is null)
+            {
+                return;
+            }
+
+            _logoutButton.Enabled = false;
+            try
+            {
+                await LogoutRequested();
+            }
+            finally
+            {
+                _logoutButton.Enabled = true;
+            }
+        };
         _foodButton.Click += (_, _) => FoodOrderRequested?.Invoke();
         _supportButton.Click += (_, _) => SupportRequested?.Invoke();
     }

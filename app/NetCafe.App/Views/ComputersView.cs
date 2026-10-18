@@ -1,6 +1,6 @@
-// Trách nhiệm: sơ đồ card máy theo ComputerId; liên kết vw_computer_grid và reconcile.
+// Trách nhiệm: sơ đồ card máy theo ComputerId và mở panel thao tác của Admin.
+// Liên kết: vw_computer_grid, ComputerCardControl và ComputerActionDialog.
 
-using System.Drawing;
 using NetCafe.App.Controls;
 using NetCafe.Data;
 
@@ -13,18 +13,18 @@ public partial class ComputersView : AdminDataViewBase
     public ComputersView()
     {
         InitializeComponent();
-        SetTitle("Sơ đồ máy trạm", "Heartbeat/reconcile được xử lý ở database; refresh chỉ chạy khi view đang hiện.");
+        SetTitle("Sơ đồ máy trạm", "Heartbeat/reconcile được xử lý ở database; card chỉ cập nhật theo ComputerId.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await RequiredContext.Repository.GetComputersAsync();
+        var rows = await RequiredContext.Repository.GetComputersAsync(cancellationToken);
         var activeIds = rows.Select(row => row.ComputerId).ToHashSet();
-
         foreach (var stale in _cards.Keys.Where(id => !activeIds.Contains(id)).ToList())
         {
-            _cardsPanel.Controls.Remove(_cards[stale]);
-            _cards[stale].Dispose();
+            var card = _cards[stale];
+            _cardsGrid.Controls.Remove(card);
+            card.Dispose();
             _cards.Remove(stale);
         }
 
@@ -35,37 +35,41 @@ public partial class ComputersView : AdminDataViewBase
                 card = new ComputerCardControl();
                 card.CardSelected += HandleCardSelected;
                 _cards.Add(row.ComputerId, card);
-                _cardsPanel.Controls.Add(card);
             }
             card.Bind(row);
         }
 
+        RebuildGridPositions();
         SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy | cập nhật {DateTime.Now:HH:mm:ss} | card chỉ cập nhật theo ComputerId");
     }
 
-    private async void HandleCardSelected(object? sender, ComputerGridItem computer)
+    private void RebuildGridPositions()
     {
-        if (computer.CurrentSessionId is null)
+        var width = Math.Max(300, _cardsViewport.ClientSize.Width - _cardsViewport.Padding.Horizontal - _cardsGrid.Padding.Horizontal);
+        var columnCount = width >= 1100 ? 4 : width >= 760 ? 3 : 2;
+        _cardsGrid.RowCount = Math.Max(1, (int)Math.Ceiling((double)_cards.Count / columnCount));
+        _cardsGrid.RowStyles.Clear();
+        for (var row = 0; row < _cardsGrid.RowCount; row++)
         {
-            MessageBox.Show($"{computer.ComputerCode}\nTrạng thái: {computer.ComputerStatus}\nKhách: chưa có", "Chi tiết máy", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            _cardsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         }
 
-        var message = $"{computer.ComputerCode}\nKhách: {computer.CurrentCustomerName}\n" +
-                      $"Thời gian: {computer.PlayedMinutes:N0} phút\nChi phí dự kiến: {computer.HourlyRate * (computer.PlayedMinutes ?? 0) / 60:N0}đ\n\nĐóng phiên ngay?";
-        if (RequiredContext.CurrentEmployeeId <= 0 || MessageBox.Show(message, "Chi tiết phiên", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        var index = 0;
+        foreach (var card in _cards.Values.OrderBy(item => item.Model?.ComputerId))
         {
-            return;
+            if (!_cardsGrid.Controls.Contains(card))
+            {
+                _cardsGrid.Controls.Add(card);
+            }
+            _cardsGrid.SetCellPosition(card, new TableLayoutPanelCellPosition(index % columnCount, index / columnCount));
+            index++;
         }
+        LayoutCards();
+    }
 
-        try
-        {
-            await RequiredContext.Repository.CloseSessionAndPayAsync(computer.CurrentSessionId.Value, RequiredContext.CurrentEmployeeId);
-            await RefreshAsync();
-        }
-        catch (Exception exception)
-        {
-            ReportError(exception);
-        }
+    private void HandleCardSelected(object? sender, ComputerGridItem computer)
+    {
+        using var dialog = new ComputerActionDialog(computer, RequiredContext);
+        dialog.ShowDialog(FindForm());
     }
 }

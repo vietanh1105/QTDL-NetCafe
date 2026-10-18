@@ -12,6 +12,43 @@ UPDATE core.gaming_session
 SET last_heartbeat_at = COALESCE(last_heartbeat_at, start_time)
 WHERE last_heartbeat_at IS NULL;
 
+-- View mở rộng sau migration để Admin đọc đủ tiền session, số dư và heartbeat.
+CREATE OR REPLACE VIEW reporting.vw_computer_grid AS
+SELECT
+    c.computer_id,
+    c.computer_code,
+    c.computer_name,
+    r.room_name,
+    ct.type_name,
+    ct.hourly_rate,
+    c.status AS computer_status,
+    c.ip_address,
+    s.session_id AS current_session_id,
+    cust.customer_id AS current_customer_id,
+    cust.full_name AS current_customer_name,
+    cust.username AS current_username,
+    s.start_time AS session_start_time,
+    ROUND(EXTRACT(EPOCH FROM (clock_timestamp() - s.start_time)) / 60.0) AS played_minutes,
+    c.specs,
+    -- Giữ specs ở vị trí cũ để CREATE OR REPLACE VIEW không đổi tên cột hiện hữu.
+    COALESCE(s.play_amount, 0) AS current_play_amount,
+    COALESCE((
+        SELECT SUM(fod.quantity * fod.unit_price)
+        FROM inventory.food_order AS fo
+        JOIN inventory.food_order_detail AS fod ON fod.order_id = fo.order_id
+        WHERE fo.session_id = s.session_id
+          AND fo.status <> 'cancelled'
+    ), 0) AS current_service_amount,
+    COALESCE(cust.balance, 0) AS current_balance,
+    s.last_heartbeat_at
+FROM core.computer AS c
+JOIN core.room AS r ON c.room_id = r.room_id
+JOIN core.computer_type AS ct ON c.type_id = ct.type_id
+LEFT JOIN core.gaming_session AS s
+    ON c.computer_id = s.computer_id AND s.status = 'active'
+LEFT JOIN core.customer AS cust ON s.customer_id = cust.customer_id
+ORDER BY c.computer_code;
+
 CREATE INDEX IF NOT EXISTS idx_session_heartbeat_active
     ON core.gaming_session (last_heartbeat_at)
     WHERE status = 'active';
@@ -524,6 +561,26 @@ AS $$
     ORDER BY p.product_name;
 $$;
 
+-- Trả SKU để Station chọn đúng asset ảnh; function cũ vẫn giữ nguyên API tương thích.
+CREATE OR REPLACE FUNCTION inventory.fn_customer_menu_v2()
+RETURNS TABLE (
+    product_id INT,
+    sku VARCHAR(30),
+    product_name VARCHAR(100),
+    unit_price NUMERIC,
+    stock_qty INT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, inventory
+AS $$
+    SELECT p.product_id, p.sku, p.product_name, p.unit_price, p.stock_qty
+    FROM inventory.product AS p
+    WHERE p.is_active = TRUE
+    ORDER BY p.product_id;
+$$;
+
 CREATE OR REPLACE FUNCTION core.sp_create_service_request(
     p_session_id BIGINT,
     p_customer_id INT,
@@ -606,6 +663,7 @@ GRANT EXECUTE ON FUNCTION core.sp_station_logout(BIGINT, INT, INT) TO role_stati
 GRANT EXECUTE ON FUNCTION inventory.sp_customer_place_order(BIGINT, INT, INT, INT) TO role_station;
 GRANT EXECUTE ON FUNCTION inventory.fn_customer_order_status(BIGINT, INT) TO role_station;
 GRANT EXECUTE ON FUNCTION inventory.fn_customer_menu() TO role_station;
+GRANT EXECUTE ON FUNCTION inventory.fn_customer_menu_v2() TO role_station;
 GRANT EXECUTE ON FUNCTION core.sp_create_service_request(BIGINT, INT, INT, VARCHAR, TEXT) TO role_station;
 
 GRANT SELECT, INSERT, UPDATE ON core.service_request TO role_admin, role_manager;

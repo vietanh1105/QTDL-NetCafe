@@ -2,7 +2,7 @@
 
 namespace NetCafe.App.Views;
 
-public partial class OrdersView : AdminDataViewBase
+public partial class OrdersView : AdminCardViewBase
 {
     public OrdersView()
     {
@@ -13,6 +13,14 @@ public partial class OrdersView : AdminDataViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetProductsAsync();
-        SetRows(rows, $"{rows.Count} sản phẩm đang bán");
+        SetCards(
+            rows,
+            product => new AdminCardModel(
+                product.ProductName,
+                $"{product.Sku} · {product.CategoryName}",
+                $"Giá: {product.UnitPrice:N0} đ\nTồn kho: {product.StockQty:N0}",
+                product.StockQty > 0 ? "Đang bán" : "Hết hàng",
+                product.StockQty > 0 ? CyberTheme.Success : CyberTheme.Danger),
+            $"{rows.Count} sản phẩm đang bán");
     }
 }

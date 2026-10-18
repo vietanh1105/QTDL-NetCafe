@@ -75,7 +75,7 @@ public partial class MainForm : Form
             _sessionController.Stop();
             _session = null;
             ShowView(_loginView);
-            _loginView.ShowError("Phiên đã tự đóng vì số dư không còn đủ.");
+            _loginView.ShowError("Phiên đã tự đăng xuất vì số dư không còn đủ.");
         }
     }
 
@@ -96,7 +96,7 @@ public partial class MainForm : Form
             _sessionController.Stop();
             _session = null;
             ShowView(_loginView);
-            _loginView.ShowError($"Đã đóng phiên và tạo hóa đơn #{invoiceId}.");
+            _loginView.ShowError($"Đã đăng xuất và tạo hóa đơn #{invoiceId}.");
         }
         catch (Exception exception)
         {

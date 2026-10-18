@@ -37,6 +37,7 @@ public sealed class CustomerOrderStatus
 public sealed class CustomerMenuItem
 {
     public int ProductId { get; init; }
+    public string Sku { get; init; } = string.Empty;
     public string ProductName { get; init; } = string.Empty;
     public decimal UnitPrice { get; init; }
     public int StockQty { get; init; }

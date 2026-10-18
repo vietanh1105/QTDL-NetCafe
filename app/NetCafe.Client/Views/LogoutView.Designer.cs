@@ -8,7 +8,7 @@ public partial class LogoutView
 {
     private void InitializeComponent()
     {
-        Controls.Add(new Label { Text = "Đóng phiên được xác nhận ở SessionView.", AutoSize = true, Dock = DockStyle.Top });
+        Controls.Add(new Label { Text = "Đăng xuất được xác nhận ở SessionView.", AutoSize = true, Dock = DockStyle.Top });
         Dock = DockStyle.Fill;
     }
 }

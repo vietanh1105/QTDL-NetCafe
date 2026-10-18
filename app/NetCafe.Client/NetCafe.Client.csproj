@@ -10,4 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NetCafe.Data\NetCafe.Data.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\Products\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

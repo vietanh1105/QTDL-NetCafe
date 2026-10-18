@@ -2,7 +2,7 @@
 
 namespace NetCafe.App.Views;
 
-public partial class MaintenanceView : AdminDataViewBase
+public partial class MaintenanceView : AdminCardViewBase
 {
     public MaintenanceView()
     {
@@ -13,6 +13,15 @@ public partial class MaintenanceView : AdminDataViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetComputersAsync();
-        SetRows(rows.Where(row => row.ComputerStatus is "maintenance" or "broken"), "Máy đang bảo trì hoặc hỏng");
+        var maintenanceRows = rows.Where(row => row.ComputerStatus is "maintenance" or "broken").ToList();
+        SetCards(
+            maintenanceRows,
+            computer => new AdminCardModel(
+                $"{computer.ComputerCode} · {computer.ComputerName}",
+                computer.RoomName,
+                $"IP: {computer.IpAddress}\nHeartbeat: {computer.LastHeartbeatAt?.ToLocalTime():dd/MM HH:mm:ss}",
+                computer.ComputerStatus,
+                computer.ComputerStatus == "broken" ? CyberTheme.Danger : CyberTheme.Warning),
+            $"{maintenanceRows.Count} máy đang bảo trì hoặc hỏng");
     }
 }

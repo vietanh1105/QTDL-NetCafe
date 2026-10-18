@@ -1,4 +1,4 @@
-// Trách nhiệm: xác nhận đóng phiên trước khi MainForm gọi transaction logout.
+// Trách nhiệm: xác nhận đăng xuất trước khi MainForm gọi transaction logout.
 // Liên kết: SessionView phát yêu cầu và MainForm thực hiện sp_station_logout.
 
 using System.Windows.Forms;
@@ -16,8 +16,8 @@ public partial class LogoutView : UserControl
     {
         return MessageBox.Show(
             owner,
-            "Bạn có chắc muốn đóng phiên và thanh toán bằng ví không?",
-            "Xác nhận đóng phiên",
+            "Bạn có chắc muốn đăng xuất và thanh toán bằng ví không?",
+            "Xác nhận đăng xuất",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question) == DialogResult.Yes;
     }

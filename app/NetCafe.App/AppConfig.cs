@@ -17,6 +17,7 @@ namespace NetCafe.App
         public static string SslMode { get; set; } = "Disable";
         public static bool TrustServerCertificate { get; set; } = true;
         public static int StationServiceEmployeeId { get; private set; }
+        public static int AdminEmployeeId { get; private set; }
         public static string LoadedEnvFile { get; private set; } = string.Empty;
 
         public static void LoadEnv()
@@ -60,6 +61,7 @@ namespace NetCafe.App
                             else if (key == "DB_PASSWORD") Password = val;
                             else if (key == "DB_SSL_MODE") SslMode = val;
                             else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId)) StationServiceEmployeeId = employeeId;
+                            else if (key == "DB_ADMIN_EMPLOYEE_ID" && int.TryParse(val, out var adminEmployeeId)) AdminEmployeeId = adminEmployeeId;
                         }
                     }
                     LoadedEnvFile = Path.GetFullPath(path);
@@ -74,6 +76,7 @@ namespace NetCafe.App
             Password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? Password;
             SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? SslMode;
             if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId)) StationServiceEmployeeId = envEmployeeId;
+            if (int.TryParse(Environment.GetEnvironmentVariable("DB_ADMIN_EMPLOYEE_ID"), out var envAdminEmployeeId)) AdminEmployeeId = envAdminEmployeeId;
         }
 
         public static string ConnectionSummary(string? user = null)
@@ -93,6 +96,11 @@ namespace NetCafe.App
 
         public static string GetConfiguredRolePassword(string role)
         {
+            if (string.Equals(role, Username, StringComparison.OrdinalIgnoreCase))
+            {
+                return Password;
+            }
+
             var key = role switch
             {
                 "nv_thao" => "DB_CASHIER_PASSWORD",
@@ -101,6 +109,25 @@ namespace NetCafe.App
                 _ => "DB_ADMIN_PASSWORD"
             };
             return Environment.GetEnvironmentVariable(key) ?? string.Empty;
+        }
+
+        public static IReadOnlyList<string> GetConfiguredRoles()
+        {
+            var roles = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password))
+            {
+                roles.Add(Username);
+            }
+
+            foreach (var role in new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" })
+            {
+                if (!string.IsNullOrWhiteSpace(GetConfiguredRolePassword(role)))
+                {
+                    roles.Add(role);
+                }
+            }
+
+            return roles;
         }
     }
 }

@@ -56,36 +56,40 @@ namespace NetCafe.Data
             };
         }
 
-        public async Task<List<ComputerGridItem>> GetComputersAsync()
+        public async Task<List<ComputerGridItem>> GetComputersAsync(CancellationToken cancellationToken = default)
         {
             var sw = Stopwatch.StartNew();
-            var sql = "SELECT computer_id, computer_code, computer_name, room_name, type_name, hourly_rate, computer_status, ip_address::text, current_session_id, current_customer_id, current_customer_name, current_username, session_start_time, played_minutes, specs::text FROM reporting.vw_computer_grid;";
+            var sql = "SELECT computer_id, computer_code, computer_name, room_name, type_name, hourly_rate, computer_status, ip_address::text, current_session_id, current_customer_id, current_customer_name, current_username, session_start_time, played_minutes, current_play_amount, current_service_amount, current_balance, last_heartbeat_at, specs::text FROM reporting.vw_computer_grid;";
             try
             {
                 await using var conn = new NpgsqlConnection(_connectionString);
-                await conn.OpenAsync();
+                await conn.OpenAsync(cancellationToken);
                 await using var cmd = new NpgsqlCommand(sql, conn);
-                await using var reader = await cmd.ExecuteReaderAsync();
+                await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
                 var list = new List<ComputerGridItem>();
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync(cancellationToken))
                 {
                     list.Add(new ComputerGridItem
                     {
-                        ComputerId = reader.GetInt32(0),
-                        ComputerCode = reader.GetString(1),
-                        ComputerName = reader.GetString(2),
-                        RoomName = reader.GetString(3),
-                        TypeName = reader.GetString(4),
-                        HourlyRate = reader.GetDecimal(5),
-                        ComputerStatus = reader.GetString(6),
-                        IpAddress = reader.GetString(7),
+                        ComputerId = reader.IsDBNull(0) ? 0 : reader.GetInt32(0),
+                        ComputerCode = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                        ComputerName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                        RoomName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                        TypeName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                        HourlyRate = reader.IsDBNull(5) ? 0 : reader.GetDecimal(5),
+                        ComputerStatus = reader.IsDBNull(6) ? "unknown" : reader.GetString(6),
+                        IpAddress = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
                         CurrentSessionId = reader.IsDBNull(8) ? null : reader.GetInt64(8),
                         CurrentCustomerId = reader.IsDBNull(9) ? null : reader.GetInt32(9),
                         CurrentCustomerName = reader.IsDBNull(10) ? null : reader.GetString(10),
                         CurrentUsername = reader.IsDBNull(11) ? null : reader.GetString(11),
                         SessionStartTime = reader.IsDBNull(12) ? null : reader.GetDateTime(12),
                         PlayedMinutes = reader.IsDBNull(13) ? null : reader.GetDecimal(13),
-                        Specs = reader.IsDBNull(14) ? "{}" : reader.GetString(14)
+                        CurrentPlayAmount = reader.IsDBNull(14) ? null : reader.GetDecimal(14),
+                        CurrentServiceAmount = reader.IsDBNull(15) ? null : reader.GetDecimal(15),
+                        CurrentBalance = reader.IsDBNull(16) ? null : reader.GetDecimal(16),
+                        LastHeartbeatAt = reader.IsDBNull(17) ? null : reader.GetDateTime(17),
+                        Specs = reader.IsDBNull(18) ? "{}" : reader.GetString(18)
                     });
                 }
                 sw.Stop();

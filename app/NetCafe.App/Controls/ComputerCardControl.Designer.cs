@@ -29,7 +29,7 @@ public partial class ComputerCardControl
         _detailsButton = new Button();
         SuspendLayout();
         Width = 260;
-        Height = 168;
+        Height = 190;
         Margin = new Padding(8);
         Padding = new Padding(12);
         BackColor = Color.White;
@@ -58,15 +58,16 @@ public partial class ComputerCardControl
 
         _customerLabel.AutoSize = true;
         _customerLabel.ForeColor = Color.FromArgb(71, 85, 105);
-        _customerLabel.Location = new Point(12, 125);
+        _customerLabel.Location = new Point(12, 126);
 
         _costLabel.AutoSize = true;
         _costLabel.ForeColor = Color.FromArgb(71, 85, 105);
-        _costLabel.Location = new Point(142, 125);
+        _costLabel.Location = new Point(12, 148);
 
         _detailsButton.Text = "Chi tiết";
         _detailsButton.Size = new Size(70, 27);
         _detailsButton.Location = new Point(178, 8);
+        _detailsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _detailsButton.FlatStyle = FlatStyle.Flat;
         _detailsButton.FlatAppearance.BorderSize = 0;
         _detailsButton.BackColor = Color.FromArgb(219, 234, 254);

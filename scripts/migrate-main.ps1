@@ -74,6 +74,12 @@ UNION ALL SELECT 'gaming_session', count(*) FROM core.gaming_session;
 if ($LASTEXITCODE -ne 0) { throw 'Preflight row-count failed; migration was not started.' }
 
 $migrationPath = Join-Path $repoRoot 'sql\08_station_customer.sql'
+$migrationText = Get-Content -Raw -LiteralPath $migrationPath
+foreach ($forbiddenToken in @('DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM')) {
+    if ($migrationText -match [regex]::Escape($forbiddenToken)) {
+        throw "Migration 08 bị chặn vì chứa thao tác phá hủy: $forbiddenToken"
+    }
+}
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -f $migrationPath
 if ($LASTEXITCODE -ne 0) { throw 'Migration 08 failed; inspect psql output and do not run reset/seed.' }
 
@@ -105,12 +111,68 @@ $configureSql = $configureSql.Replace('__STATION_PASSWORD__', $escapedStationPas
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -c $configureSql
 if ($LASTEXITCODE -ne 0) { throw 'Service employee/station role configuration failed.' }
 
-$verifySql = @"
+$verifySql = @'
 SELECT current_database(), current_user;
-SELECT to_regclass('core.service_request'), to_regprocedure('core.sp_customer_login(character varying,text,character varying)'), to_regprocedure('core.sp_reconcile_stale_sessions(integer)');
+DO $$
+DECLARE
+    v_missing_columns TEXT;
+BEGIN
+    IF current_database() <> 'netcafe_db' THEN
+        RAISE EXCEPTION 'Verification đang chạy sai database.';
+    END IF;
+    IF to_regclass('reporting.vw_computer_grid') IS NULL THEN
+        RAISE EXCEPTION 'Thiếu reporting.vw_computer_grid sau migration.';
+    END IF;
+    SELECT string_agg(required_column, ', ' ORDER BY required_column)
+    INTO v_missing_columns
+    FROM (VALUES
+        ('current_play_amount'),
+        ('current_service_amount'),
+        ('current_balance'),
+        ('last_heartbeat_at')
+    ) AS required(required_column)
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns c
+        WHERE c.table_schema = 'reporting'
+          AND c.table_name = 'vw_computer_grid'
+          AND c.column_name = required.required_column
+    );
+    IF v_missing_columns IS NOT NULL THEN
+        RAISE EXCEPTION 'View thiếu cột: %', v_missing_columns;
+    END IF;
+    IF to_regprocedure('inventory.fn_customer_menu_v2()') IS NULL
+       OR to_regprocedure('core.sp_customer_login(character varying,text,character varying)') IS NULL
+       OR to_regprocedure('core.sp_station_heartbeat(bigint,integer,integer)') IS NULL
+       OR to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NULL
+       OR to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NULL THEN
+        RAISE EXCEPTION 'Thiếu function trong contract station sau migration.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'role_station') THEN
+        RAISE EXCEPTION 'Thiếu role_station sau migration.';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_auth_members m
+        JOIN pg_roles member_role ON member_role.oid = m.member
+        JOIN pg_roles parent_role ON parent_role.oid = m.roleid
+        WHERE member_role.rolname = '__STATION_ROLE__'
+          AND parent_role.rolname = 'role_station'
+    ) THEN
+        RAISE EXCEPTION 'Role __STATION_ROLE__ chưa được cấp role_station.';
+    END IF;
+END $$;
+SELECT to_regclass('core.service_request'),
+       to_regprocedure('inventory.fn_customer_menu_v2()'),
+       to_regprocedure('core.sp_customer_login(character varying,text,character varying)'),
+       to_regprocedure('core.sp_station_heartbeat(bigint,integer,integer)'),
+       to_regprocedure('core.sp_station_logout(bigint,integer,integer)'),
+       to_regprocedure('core.sp_reconcile_stale_sessions(integer)');
 SELECT column_name FROM information_schema.columns WHERE table_schema = 'core' AND table_name = 'gaming_session' AND column_name IN ('last_heartbeat_at', 'close_reason') ORDER BY column_name;
-SELECT rolname FROM pg_roles WHERE rolname IN ('role_station', '$stationRole') ORDER BY rolname;
-"@
+SELECT column_name FROM information_schema.columns WHERE table_schema = 'reporting' AND table_name = 'vw_computer_grid' AND column_name IN ('current_play_amount', 'current_service_amount', 'current_balance', 'last_heartbeat_at') ORDER BY column_name;
+SELECT rolname FROM pg_roles WHERE rolname IN ('role_station', '__STATION_ROLE__') ORDER BY rolname;
+'@
+$verifySql = $verifySql.Replace('__STATION_ROLE__', $stationRole)
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -Atc $verifySql | Set-Content -LiteralPath (Join-Path $backupDir 'verification-after.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Verification sau migration thất bại.' }
 

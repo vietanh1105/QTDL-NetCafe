@@ -1,52 +1,69 @@
-// Designer layout cho gọi món station.
+// Designer layout cho menu Station: hai cột card, đơn đã gọi nằm bên dưới và cuộn nội bộ.
 
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace NetCafe.Client.Views;
 
 public partial class FoodOrderView
 {
-    private ComboBox _productBox = null!;
-    private TextBox _quantityBox = null!;
-    private Button _orderButton = null!;
+    private Panel _scrollPanel = null!;
+    private TableLayoutPanel _menuGrid = null!;
+    private FlowLayoutPanel _ordersPanel = null!;
     private Button _refreshOrdersButton = null!;
     private Button _backButton = null!;
     private Label _messageLabel = null!;
-    private DataGridView _ordersGrid = null!;
 
     private void InitializeComponent()
     {
-        _productBox = new ComboBox { Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
-        _quantityBox = new TextBox { Width = 80, Text = "1" };
-        _orderButton = new Button { Text = "Đặt món", Width = 120, Height = 36 };
-        _refreshOrdersButton = new Button { Text = "Cập nhật đơn", Width = 140, Height = 36 };
-        _backButton = new Button { Text = "Quay lại", Width = 120, Height = 36 };
-        _messageLabel = new Label { AutoSize = true };
-        _ordersGrid = new DataGridView
+        _scrollPanel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.FromArgb(243, 246, 251) };
+        _menuGrid = new TableLayoutPanel
         {
-            Width = 560,
-            Height = 170,
-            ReadOnly = true,
-            AllowUserToAddRows = false,
-            RowHeadersVisible = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 2,
+            RowCount = 1,
+            Padding = new Padding(4),
+            GrowStyle = TableLayoutPanelGrowStyle.AddRows
         };
-        _ordersGrid.Columns.Add("OrderId", "Đơn");
-        _ordersGrid.Columns.Add("Status", "Trạng thái");
-        _ordersGrid.Columns.Add("OrderedAt", "Thời gian");
-        _ordersGrid.Columns.Add("TotalAmount", "Tổng tiền");
-        var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Padding = new Padding(32) };
-        panel.Controls.Add(new Label { Text = "Menu station", AutoSize = true });
-        panel.Controls.Add(_productBox);
-        panel.Controls.Add(_quantityBox);
-        panel.Controls.Add(_orderButton);
-        panel.Controls.Add(_refreshOrdersButton);
-        panel.Controls.Add(new Label { Text = "Đơn đã gọi", AutoSize = true });
-        panel.Controls.Add(_ordersGrid);
-        panel.Controls.Add(_backButton);
-        panel.Controls.Add(_messageLabel);
-        Controls.Add(panel);
+        _menuGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        _menuGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        _ordersPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Padding = new Padding(4)
+        };
+        _refreshOrdersButton = new Button
+        {
+            Text = "Cập nhật đơn",
+            Width = 132,
+            Height = 34,
+            BackColor = Color.FromArgb(37, 99, 235),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        _backButton = new Button { Text = "Quay lại", Width = 112, Height = 34 };
+        _refreshOrdersButton.FlatAppearance.BorderSize = 0;
+        _messageLabel = new Label { Dock = DockStyle.Top, Height = 38, ForeColor = Color.FromArgb(30, 64, 175), Padding = new Padding(4, 8, 4, 0) };
+        var title = new Label { Text = "Menu gọi món", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI", 14F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
+        var ordersTitle = new Label { Text = "Đơn đã gọi", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(4, 4, 4, 4) };
+        actions.Controls.Add(_refreshOrdersButton);
+        actions.Controls.Add(_backButton);
+        var content = new Panel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(14) };
+        content.Controls.Add(_messageLabel);
+        content.Controls.Add(actions);
+        content.Controls.Add(_ordersPanel);
+        content.Controls.Add(ordersTitle);
+        content.Controls.Add(_menuGrid);
+        content.Controls.Add(title);
+        _scrollPanel.Controls.Add(content);
+        Controls.Add(_scrollPanel);
         Dock = DockStyle.Fill;
     }
 }

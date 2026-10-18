@@ -22,27 +22,24 @@ public abstract class AdminDataViewBase : AdminViewBase
 
         Toolbar.Dock = DockStyle.Top;
         Toolbar.Height = 58;
-        Toolbar.BackColor = SurfaceColor;
+        Toolbar.BackColor = CyberTheme.Surface;
         Toolbar.Padding = new Padding(12, 8, 12, 8);
 
         TitleLabel.Dock = DockStyle.Left;
         TitleLabel.AutoSize = true;
         TitleLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        TitleLabel.ForeColor = Color.FromArgb(30, 41, 59);
+        TitleLabel.ForeColor = CyberTheme.Text;
         TitleLabel.TextAlign = ContentAlignment.MiddleLeft;
 
         InfoLabel.Dock = DockStyle.Bottom;
         InfoLabel.Height = 22;
-        InfoLabel.ForeColor = Color.FromArgb(100, 116, 139);
+        InfoLabel.ForeColor = CyberTheme.MutedText;
         InfoLabel.Font = new Font("Segoe UI", 8.5F);
 
         RefreshButton.Dock = DockStyle.Right;
         RefreshButton.Width = 105;
         RefreshButton.Text = "Làm mới";
-        RefreshButton.BackColor = PrimaryColor;
-        RefreshButton.ForeColor = Color.White;
-        RefreshButton.FlatStyle = FlatStyle.Flat;
-        RefreshButton.FlatAppearance.BorderSize = 0;
+        CyberTheme.StyleButton(RefreshButton, PrimaryColor);
         RefreshButton.Click += async (_, _) => await RefreshAsync();
 
         StyleGrid(Grid);

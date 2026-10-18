@@ -12,7 +12,18 @@ public partial class DbRepository
         const string sql = @"SELECT current_database(), current_user, COALESCE(inet_server_addr()::text, 'local'),
                                     current_setting('server_version'),
                                     to_regclass('core.service_request') IS NOT NULL,
-                                    to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NOT NULL;";
+                                    to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NOT NULL,
+                                    (SELECT count(*) = 4
+                                     FROM information_schema.columns
+                                     WHERE table_schema = 'reporting'
+                                       AND table_name = 'vw_computer_grid'
+                                       AND column_name = ANY (ARRAY[
+                                           'current_play_amount',
+                                           'current_service_amount',
+                                           'current_balance',
+                                           'last_heartbeat_at']::text[])),
+                                    to_regprocedure('inventory.fn_customer_menu_v2()') IS NOT NULL,
+                                    to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NOT NULL;";
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
@@ -29,7 +40,10 @@ public partial class DbRepository
             Host = reader.GetString(2),
             ServerVersion = reader.GetString(3),
             HasStationMigration = reader.GetBoolean(4),
-            HasReconcileFunction = reader.GetBoolean(5)
+            HasReconcileFunction = reader.GetBoolean(5),
+            HasComputerGridContract = reader.GetBoolean(6),
+            HasCustomerMenuContract = reader.GetBoolean(7),
+            HasStationLogoutContract = reader.GetBoolean(8)
         };
     }
 
