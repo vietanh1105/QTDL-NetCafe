@@ -9,7 +9,8 @@ namespace NetCafe.App.Views;
 public partial class CustomersView : AdminCardViewBase
 {
     private readonly TextBox _searchBox = new();
-    private readonly TextBox _topUpBox = new();
+    private readonly Button _searchButton = new();
+    private readonly Button _clearSearchButton = new();
     private readonly Button _topUpButton = new();
     private readonly Button _createButton = new();
     private readonly Button _editButton = new();
@@ -19,32 +20,69 @@ public partial class CustomersView : AdminCardViewBase
     public CustomersView()
     {
         InitializeComponent();
-        SetTitle("Hội viên & Ví tiền", "Tìm kiếm không dấu; nạp tiền qua hàm CSDL và tự động ghi nhận thanh toán.");
-        _searchBox.Width = 200;
-        _searchBox.PlaceholderText = "Tìm theo tên / SĐT...";
-        _topUpBox.Width = 100;
-        _topUpBox.Text = "50000";
-        _topUpButton.Text = "Nạp tiền";
-        _topUpButton.Width = 85;
+        SetTitle("Quản lý Hội viên & Ví tài khoản", "Tìm kiếm theo tài khoản/tên/SĐT; nạp tiền qua hàm CSDL có tự động ghi nhận thanh toán.");
+
+        // Cấu hình thanh tìm kiếm tài khoản
+        _searchBox.Width = 250;
+        _searchBox.Height = 32;
+        _searchBox.PlaceholderText = "Tài khoản (username), tên, SĐT...";
+        _searchBox.Font = new Font("Segoe UI", 9.5F);
+        _searchBox.Margin = new Padding(0, 4, 4, 4);
+
+        _searchButton.Text = "🔍 Tìm";
+        _searchButton.Width = 65;
+        _searchButton.Height = 32;
+        _searchButton.BackColor = Color.FromArgb(71, 85, 105);
+        _searchButton.ForeColor = Color.White;
+        _searchButton.FlatStyle = FlatStyle.Flat;
+        _searchButton.FlatAppearance.BorderSize = 0;
+        _searchButton.Margin = new Padding(0, 4, 4, 4);
+
+        _clearSearchButton.Text = "✕ Tất cả";
+        _clearSearchButton.Width = 75;
+        _clearSearchButton.Height = 32;
+        _clearSearchButton.BackColor = Color.FromArgb(148, 163, 184);
+        _clearSearchButton.ForeColor = Color.White;
+        _clearSearchButton.FlatStyle = FlatStyle.Flat;
+        _clearSearchButton.FlatAppearance.BorderSize = 0;
+        _clearSearchButton.Margin = new Padding(0, 4, 12, 4);
+
+        // Nút nạp tiền nổi bật
+        _topUpButton.Text = "💰 Nạp tiền";
+        _topUpButton.Width = 100;
+        _topUpButton.Height = 32;
         _topUpButton.BackColor = Color.FromArgb(16, 185, 129);
         _topUpButton.ForeColor = Color.White;
+        _topUpButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         _topUpButton.FlatStyle = FlatStyle.Flat;
         _topUpButton.FlatAppearance.BorderSize = 0;
-        ConfigureActionButton(_createButton, "Thêm mới", Color.FromArgb(37, 99, 235));
+        _topUpButton.Margin = new Padding(0, 4, 6, 4);
+
+        ConfigureActionButton(_createButton, "+ Thêm mới", Color.FromArgb(37, 99, 235));
         ConfigureActionButton(_editButton, "Chỉnh sửa", Color.FromArgb(71, 85, 105));
         ConfigureActionButton(_toggleButton, "Khóa/Mở", Color.FromArgb(234, 88, 12));
-        ConfigureActionButton(_resetButton, "Đổi mật khẩu", Color.FromArgb(124, 58, 237));
+        ConfigureActionButton(_resetButton, "Đổi MK", Color.FromArgb(124, 58, 237));
+
         Toolbar.Controls.Add(_resetButton);
         Toolbar.Controls.Add(_toggleButton);
         Toolbar.Controls.Add(_editButton);
         Toolbar.Controls.Add(_createButton);
         Toolbar.Controls.Add(_topUpButton);
-        Toolbar.Controls.Add(_topUpBox);
+        Toolbar.Controls.Add(_clearSearchButton);
+        Toolbar.Controls.Add(_searchButton);
         Toolbar.Controls.Add(_searchBox);
+
         _searchBox.KeyDown += async (_, e) =>
         {
             if (e.KeyCode == Keys.Enter) await RefreshAsync();
         };
+        _searchButton.Click += async (_, _) => await RefreshAsync();
+        _clearSearchButton.Click += async (_, _) =>
+        {
+            _searchBox.Clear();
+            await RefreshAsync();
+        };
+
         _topUpButton.Click += async (_, _) => await TopUpAsync();
         _createButton.Click += async (_, _) => await CreateCustomerAsync();
         _editButton.Click += async (_, _) => await EditCustomerAsync();
@@ -69,7 +107,7 @@ public partial class CustomersView : AdminCardViewBase
 
                 return new AdminCardModel(
                     customer.FullName,
-                    $"@{customer.Username} | {customer.Phone}",
+                    $"@{customer.Username} | SĐT: {customer.Phone}",
                     $"Số dư ví: {customer.Balance:N0} đ\nĐiểm thưởng: {customer.LoyaltyPoints:N0}",
                     customer.IsActive ? $"Đang hoạt động · {tierText}" : "Đã khóa tài khoản",
                     customer.IsActive ? CyberTheme.Success : CyberTheme.Danger);
@@ -85,14 +123,34 @@ public partial class CustomersView : AdminCardViewBase
             return;
         }
 
-        if (Grid.CurrentRow?.DataBoundItem is not NetCafe.Data.CustomerItem customer ||
-            !decimal.TryParse(_topUpBox.Text, out var amount) || amount <= 0)
+        var customer = SelectedCustomer;
+        if (customer is null)
+        {
+            MessageBox.Show(FindForm(), "Vui lòng click chọn một thẻ hội viên trong danh sách bên dưới để nạp tiền!", "Chưa chọn hội viên", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dialog = new TopUpDialog(customer);
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
         {
             return;
         }
+
         try
         {
-            await RequiredContext.Repository.TopUpAsync(customer.CustomerId, RequiredContext.CurrentEmployeeId, amount);
+            var newBalance = await RequiredContext.Repository.TopUpAsync(
+                customer.CustomerId,
+                RequiredContext.CurrentEmployeeId,
+                dialog.Amount,
+                dialog.PaymentMethod,
+                string.IsNullOrWhiteSpace(dialog.Note) ? "admin_ui_topup" : dialog.Note);
+
+            MessageBox.Show(FindForm(),
+                $"Nạp thành công {dialog.Amount:N0} đ cho hội viên {customer.FullName} (@{customer.Username}).\nSố dư mới: {newBalance:N0} đ",
+                "Nạp tiền thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
             await RefreshAsync();
         }
         catch (Exception exception)
@@ -158,11 +216,13 @@ public partial class CustomersView : AdminCardViewBase
     private static void ConfigureActionButton(Button button, string text, Color color)
     {
         button.Text = text;
-        button.Width = text.Length > 5 ? 105 : 78;
+        button.Width = text.Length > 6 ? 95 : 78;
+        button.Height = 32;
         button.BackColor = color;
         button.ForeColor = Color.White;
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
+        button.Margin = new Padding(0, 4, 6, 4);
     }
 }
 
@@ -234,5 +294,153 @@ internal sealed class PasswordDialog : Form
         panel.Controls.Add(save, 1, 1);
         Controls.Add(panel);
         AcceptButton = save;
+    }
+}
+
+internal sealed class TopUpDialog : Form
+{
+    private readonly NumericUpDown _amountBox = new();
+    private readonly ComboBox _methodCombo = new();
+    private readonly TextBox _noteBox = new();
+
+    public decimal Amount => _amountBox.Value;
+    public string PaymentMethod => _methodCombo.SelectedItem?.ToString() == "Chuyển khoản (transfer)" ? "transfer" : "cash";
+    public string Note => _noteBox.Text.Trim();
+
+    public TopUpDialog(NetCafe.Data.CustomerItem customer)
+    {
+        Text = $"Nạp tiền ví - {customer.FullName}";
+        Width = 450;
+        Height = 440;
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        BackColor = Color.FromArgb(243, 246, 251);
+
+        var root = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16) };
+        var infoCard = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 72,
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(12)
+        };
+        var nameLabel = new Label
+        {
+            Text = $"Hội viên: {customer.FullName} (@{customer.Username})",
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(30, 64, 175),
+            Dock = DockStyle.Top,
+            Height = 24
+        };
+        var balanceLabel = new Label
+        {
+            Text = $"Số dư ví hiện tại: {customer.Balance:N0} đ | SĐT: {customer.Phone}",
+            Font = new Font("Segoe UI", 9.5F),
+            ForeColor = Color.FromArgb(51, 65, 85),
+            Dock = DockStyle.Top,
+            Height = 24
+        };
+        infoCard.Controls.Add(balanceLabel);
+        infoCard.Controls.Add(nameLabel);
+
+        var amountLabel = new Label
+        {
+            Text = "Số tiền nạp vào ví (VND):",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Location = new Point(16, 100),
+            AutoSize = true
+        };
+
+        _amountBox.Location = new Point(16, 126);
+        _amountBox.Width = 400;
+        _amountBox.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        _amountBox.Maximum = 50000000;
+        _amountBox.Increment = 10000;
+        _amountBox.ThousandsSeparator = true;
+        _amountBox.Value = 50000;
+
+        var quickButtonsPanel = new FlowLayoutPanel
+        {
+            Location = new Point(16, 168),
+            Size = new Size(400, 40),
+            WrapContents = false
+        };
+        int[] quickAmounts = { 20000, 50000, 100000, 200000, 500000 };
+        foreach (var amt in quickAmounts)
+        {
+            var btn = new Button
+            {
+                Text = $"+{amt / 1000}k",
+                Width = 72,
+                Height = 32,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(30, 64, 175),
+                Margin = new Padding(0, 0, 8, 0)
+            };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btn.Click += (_, _) => _amountBox.Value = amt;
+            quickButtonsPanel.Controls.Add(btn);
+        }
+
+        var methodLabel = new Label
+        {
+            Text = "Phương thức thanh toán:",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Location = new Point(16, 218),
+            AutoSize = true
+        };
+        _methodCombo.Location = new Point(16, 240);
+        _methodCombo.Width = 400;
+        _methodCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _methodCombo.Items.AddRange(new object[] { "Tiền mặt (cash)", "Chuyển khoản (transfer)" });
+        _methodCombo.SelectedIndex = 0;
+
+        var noteLabel = new Label
+        {
+            Text = "Ghi chú giao dịch:",
+            Location = new Point(16, 275),
+            AutoSize = true
+        };
+        _noteBox.Location = new Point(16, 298);
+        _noteBox.Width = 400;
+        _noteBox.PlaceholderText = "Nhập mã tham chiếu hoặc ghi chú nếu có...";
+
+        var btnPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        var cancelBtn = new Button { Text = "Hủy bỏ", Width = 95, Height = 36, DialogResult = DialogResult.Cancel };
+        var okBtn = new Button
+        {
+            Text = "Xác nhận nạp",
+            Width = 130,
+            Height = 36,
+            DialogResult = DialogResult.OK,
+            BackColor = Color.FromArgb(16, 185, 129),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        okBtn.FlatAppearance.BorderSize = 0;
+        btnPanel.Controls.Add(cancelBtn);
+        btnPanel.Controls.Add(okBtn);
+
+        root.Controls.Add(btnPanel);
+        root.Controls.Add(_noteBox);
+        root.Controls.Add(noteLabel);
+        root.Controls.Add(_methodCombo);
+        root.Controls.Add(methodLabel);
+        root.Controls.Add(quickButtonsPanel);
+        root.Controls.Add(_amountBox);
+        root.Controls.Add(amountLabel);
+        root.Controls.Add(infoCard);
+        Controls.Add(root);
+        AcceptButton = okBtn;
+        CancelButton = cancelBtn;
     }
 }

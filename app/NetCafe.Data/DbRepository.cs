@@ -406,6 +406,87 @@ namespace NetCafe.Data
             }
         }
 
+        public async Task<List<KitchenOrderItem>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+        {
+            var sw = Stopwatch.StartNew();
+            var sql = @"
+                SELECT 
+                    fo.order_id,
+                    fo.session_id,
+                    COALESCE(c.computer_code, 'N/A') AS computer_code,
+                    COALESCE(cust.full_name, 'Khách vãng lai') AS customer_name,
+                    COALESCE(string_agg(p.product_name || ' (x' || fod.quantity || ')', ', '), 'Món ăn') AS items_summary,
+                    COALESCE(SUM(fod.quantity * fod.unit_price), 0) AS total_amount,
+                    fo.status,
+                    fo.ordered_at
+                FROM inventory.food_order fo
+                LEFT JOIN core.gaming_session s ON s.session_id = fo.session_id
+                LEFT JOIN core.computer c ON c.computer_id = s.computer_id
+                LEFT JOIN core.customer cust ON cust.customer_id = s.customer_id
+                LEFT JOIN inventory.food_order_detail fod ON fod.order_id = fo.order_id
+                LEFT JOIN inventory.product p ON p.product_id = fod.product_id
+                GROUP BY fo.order_id, fo.session_id, c.computer_code, cust.full_name, fo.status, fo.ordered_at
+                ORDER BY 
+                    CASE WHEN fo.status = 'placed' THEN 0 ELSE 1 END,
+                    fo.ordered_at DESC
+                LIMIT 100;";
+            try
+            {
+                await using var conn = new NpgsqlConnection(_connectionString);
+                await conn.OpenAsync(cancellationToken);
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                var list = new List<KitchenOrderItem>();
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    list.Add(new KitchenOrderItem
+                    {
+                        OrderId = reader.GetInt64(0),
+                        SessionId = reader.GetInt64(1),
+                        ComputerCode = reader.IsDBNull(2) ? "N/A" : reader.GetString(2),
+                        CustomerName = reader.IsDBNull(3) ? "Khách vãng lai" : reader.GetString(3),
+                        ItemsSummary = reader.IsDBNull(4) ? "Món ăn" : reader.GetString(4),
+                        TotalAmount = reader.IsDBNull(5) ? 0 : reader.GetDecimal(5),
+                        Status = reader.IsDBNull(6) ? "placed" : reader.GetString(6),
+                        OrderedAt = reader.IsDBNull(7) ? DateTime.Now : reader.GetDateTime(7)
+                    });
+                }
+                sw.Stop();
+                LogSql(sql, "", sw.ElapsedMilliseconds, true, null);
+                return list;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogSql(sql, "", sw.ElapsedMilliseconds, false, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task UpdateFoodOrderStatusAsync(long orderId, string status, int employeeId = 0)
+        {
+            var sw = Stopwatch.StartNew();
+            var sql = "UPDATE inventory.food_order SET status = @status, employee_id = CASE WHEN @empId > 0 THEN @empId ELSE employee_id END WHERE order_id = @orderId;";
+            try
+            {
+                await using var conn = new NpgsqlConnection(_connectionString);
+                await conn.OpenAsync();
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("status", status);
+                cmd.Parameters.AddWithValue("empId", employeeId);
+                cmd.Parameters.AddWithValue("orderId", orderId);
+                await cmd.ExecuteNonQueryAsync();
+                sw.Stop();
+                LogSql(sql, $"orderId={orderId}, status={status}", sw.ElapsedMilliseconds, true, null);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogSql(sql, $"orderId={orderId}, status={status}", sw.ElapsedMilliseconds, false, ex.Message);
+                throw;
+            }
+        }
+
         public async Task StartListeningAsync(CancellationToken ct)
         {
             try

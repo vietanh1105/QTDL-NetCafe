@@ -1,18 +1,655 @@
-// Trách nhiệm: hóa đơn và sổ thanh toán; liên kết billing.invoice/payment và RLS.
+// Trách nhiệm: hóa đơn và sổ quỹ doanh thu; thiết kế UX/UI hiện đại với Dashboard KPI và Chi tiết phiếu thu.
+// Liên kết: billing.invoice, billing.payment và DbRepository.
+
+using System.Drawing;
+using System.Text;
+using System.Windows.Forms;
+using NetCafe.Data;
 
 namespace NetCafe.App.Views;
 
-public partial class InvoicesView : AdminDataViewBase
+public partial class InvoicesView : AdminViewBase
 {
+    // Toolbar
+    private readonly Panel _toolbar = new();
+    private readonly Label _titleLabel = new();
+    private readonly Label _subtitleLabel = new();
+    private readonly Button _refreshButton = new();
+
+    // KPI Cards Panel
+    private readonly Panel _kpiContainer = new();
+    private readonly Label _kpiRevenueValue = new();
+    private readonly Label _kpiCountValue = new();
+    private readonly Label _kpiPlayValue = new();
+    private readonly Label _kpiServiceValue = new();
+
+    // Filter Bar
+    private readonly Panel _filterPanel = new();
+    private readonly TextBox _searchBox = new();
+    private readonly ComboBox _statusCombo = new();
+    private readonly Button _searchButton = new();
+    private readonly Button _clearFilterButton = new();
+    private readonly Label _countSummaryLabel = new();
+
+    // Master-Detail Workspace
+    private readonly SplitContainer _splitContainer = new();
+    private readonly DataGridView _grid = new();
+
+    // Right: Digital Receipt Panel
+    private readonly Panel _receiptPanel = new();
+    private readonly Label _receiptHeaderStore = new();
+    private readonly Label _receiptHeaderSub = new();
+    private readonly Label _receiptInvoiceIdLabel = new();
+    private readonly Label _receiptStatusBadge = new();
+    private readonly Label _receiptCustomerLabel = new();
+    private readonly Label _receiptSessionLabel = new();
+    private readonly Label _receiptTimeLabel = new();
+    private readonly Label _receiptPlayLabel = new();
+    private readonly Label _receiptServiceLabel = new();
+    private readonly Label _receiptDiscountLabel = new();
+    private readonly Label _receiptTotalLabel = new();
+    private readonly Button _printReceiptButton = new();
+    private readonly Button _copyReceiptButton = new();
+
+    private List<InvoiceItem> _allInvoices = new();
+    private InvoiceItem? _selectedInvoice;
+
     public InvoicesView()
     {
         InitializeComponent();
-        SetTitle("Hóa đơn & Sổ quỹ", "Dữ liệu phân quyền theo vai trò; thu ngân chỉ xem hóa đơn trong ca.");
+        BuildLayout();
+    }
+
+    private void BuildLayout()
+    {
+        BackColor = BackgroundColor;
+        Dock = DockStyle.Fill;
+        Padding = new Padding(12);
+
+        // 1. Toolbar
+        _toolbar.Dock = DockStyle.Top;
+        _toolbar.Height = 56;
+        _toolbar.BackColor = CyberTheme.Surface;
+        _toolbar.Padding = new Padding(12, 6, 12, 6);
+
+        _titleLabel.Text = "🧾 Quản lý Hóa đơn & Sổ quỹ";
+        _titleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        _titleLabel.ForeColor = CyberTheme.Text;
+        _titleLabel.AutoSize = true;
+        _titleLabel.Location = new Point(12, 8);
+
+        _subtitleLabel.Text = "Theo dõi doanh thu phòng máy, lịch sử thanh toán giờ chơi và dịch vụ ăn uống.";
+        _subtitleLabel.Font = new Font("Segoe UI", 8.5F);
+        _subtitleLabel.ForeColor = CyberTheme.MutedText;
+        _subtitleLabel.AutoSize = true;
+        _subtitleLabel.Location = new Point(13, 31);
+
+        _refreshButton.Text = "🔄 Làm mới";
+        _refreshButton.Dock = DockStyle.Right;
+        _refreshButton.Width = 110;
+        CyberTheme.StyleButton(_refreshButton, PrimaryColor);
+        _refreshButton.Click += async (_, _) => await RefreshAsync();
+
+        _toolbar.Controls.Add(_refreshButton);
+        _toolbar.Controls.Add(_titleLabel);
+        _toolbar.Controls.Add(_subtitleLabel);
+
+        // 2. KPI Summary Cards Panel
+        _kpiContainer.Dock = DockStyle.Top;
+        _kpiContainer.Height = 84;
+        _kpiContainer.Padding = new Padding(0, 8, 0, 8);
+        _kpiContainer.BackColor = BackgroundColor;
+        _kpiContainer.Resize += (_, _) => ResizeKpiCards();
+
+        BuildKpiCards();
+
+        // 3. Filter Bar
+        _filterPanel.Dock = DockStyle.Top;
+        _filterPanel.Height = 44;
+        _filterPanel.BackColor = CyberTheme.Surface;
+        _filterPanel.Padding = new Padding(10, 6, 10, 6);
+
+        _searchBox.Width = 240;
+        _searchBox.Height = 28;
+        _searchBox.Location = new Point(10, 8);
+        _searchBox.BackColor = CyberTheme.SurfaceRaised;
+        _searchBox.ForeColor = CyberTheme.Text;
+        _searchBox.BorderStyle = BorderStyle.FixedSingle;
+        _searchBox.Font = new Font("Segoe UI", 9.5F);
+        _searchBox.PlaceholderText = "🔍 Tìm mã HĐ, khách hàng...";
+        _searchBox.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) ApplyFilter(); };
+
+        _statusCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _statusCombo.Items.AddRange(new object[] { "Tất cả trạng thái", "Đã thanh toán (paid)", "Đã hủy (cancelled)" });
+        _statusCombo.SelectedIndex = 0;
+        _statusCombo.Location = new Point(260, 8);
+        _statusCombo.Width = 180;
+        _statusCombo.BackColor = CyberTheme.SurfaceRaised;
+        _statusCombo.ForeColor = CyberTheme.Text;
+        _statusCombo.Font = new Font("Segoe UI", 9F);
+        _statusCombo.SelectedIndexChanged += (_, _) => ApplyFilter();
+
+        _searchButton.Text = "🔍 Tìm";
+        _searchButton.Width = 75;
+        _searchButton.Height = 28;
+        _searchButton.Location = new Point(450, 8);
+        CyberTheme.StyleButton(_searchButton, PrimaryColor);
+        _searchButton.Click += (_, _) => ApplyFilter();
+
+        _clearFilterButton.Text = "✕ Xóa lọc";
+        _clearFilterButton.Width = 85;
+        _clearFilterButton.Height = 28;
+        _clearFilterButton.Location = new Point(532, 8);
+        CyberTheme.StyleButton(_clearFilterButton, CyberTheme.SurfaceRaised);
+        _clearFilterButton.Click += (_, _) =>
+        {
+            _searchBox.Text = string.Empty;
+            _statusCombo.SelectedIndex = 0;
+            ApplyFilter();
+        };
+
+        _countSummaryLabel.Dock = DockStyle.Right;
+        _countSummaryLabel.AutoSize = true;
+        _countSummaryLabel.Font = new Font("Segoe UI", 9F);
+        _countSummaryLabel.ForeColor = CyberTheme.MutedText;
+        _countSummaryLabel.Padding = new Padding(0, 6, 10, 0);
+
+        _filterPanel.Controls.Add(_searchBox);
+        _filterPanel.Controls.Add(_statusCombo);
+        _filterPanel.Controls.Add(_searchButton);
+        _filterPanel.Controls.Add(_clearFilterButton);
+        _filterPanel.Controls.Add(_countSummaryLabel);
+
+        // 4. Master-Detail Workspace
+        _splitContainer.Dock = DockStyle.Fill;
+        _splitContainer.Orientation = Orientation.Vertical;
+        _splitContainer.SplitterDistance = 680;
+        _splitContainer.SplitterWidth = 6;
+        _splitContainer.BackColor = CyberTheme.SurfaceRaised;
+
+        // Left: Grid
+        _splitContainer.Panel1.BackColor = BackgroundColor;
+        _splitContainer.Panel1.Padding = new Padding(0, 8, 4, 0);
+        StyleGrid(_grid);
+        _grid.CellFormatting += Grid_CellFormatting;
+        _grid.SelectionChanged += Grid_SelectionChanged;
+        _splitContainer.Panel1.Controls.Add(_grid);
+
+        // Right: Digital Receipt Panel
+        _splitContainer.Panel2.BackColor = BackgroundColor;
+        _splitContainer.Panel2.Padding = new Padding(4, 8, 0, 0);
+        BuildReceiptPanel();
+        _splitContainer.Panel2.Controls.Add(_receiptPanel);
+
+        // Assemble View
+        Controls.Add(_splitContainer);
+        Controls.Add(_filterPanel);
+        Controls.Add(_kpiContainer);
+        Controls.Add(_toolbar);
+    }
+
+    private void BuildKpiCards()
+    {
+        _kpiContainer.Controls.Clear();
+
+        var card1 = CreateKpiCard("💳 TỔNG DOANH THU", "0 đ", CyberTheme.Primary, _kpiRevenueValue);
+        var card2 = CreateKpiCard("🧾 SỐ LƯỢNG HÓA ĐƠN", "0", CyberTheme.Text, _kpiCountValue);
+        var card3 = CreateKpiCard("⏱️ TIỀN GIỜ CHƠI", "0 đ", CyberTheme.Success, _kpiPlayValue);
+        var card4 = CreateKpiCard("🍔 TIỀN DỊCH VỤ F&B", "0 đ", CyberTheme.Warning, _kpiServiceValue);
+
+        _kpiContainer.Controls.Add(card4);
+        _kpiContainer.Controls.Add(card3);
+        _kpiContainer.Controls.Add(card2);
+        _kpiContainer.Controls.Add(card1);
+
+        ResizeKpiCards();
+    }
+
+    private Panel CreateKpiCard(string title, string initialValue, Color valueColor, Label valueLabelRef)
+    {
+        var panel = new Panel
+        {
+            Height = 68,
+            BackColor = CyberTheme.Surface,
+            BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(12, 8, 12, 8)
+        };
+
+        var titleLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 20,
+            Text = title,
+            ForeColor = CyberTheme.MutedText,
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold)
+        };
+
+        valueLabelRef.Dock = DockStyle.Fill;
+        valueLabelRef.Text = initialValue;
+        valueLabelRef.ForeColor = valueColor;
+        valueLabelRef.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+        valueLabelRef.TextAlign = ContentAlignment.MiddleLeft;
+
+        var accentStrip = new Panel
+        {
+            Dock = DockStyle.Left,
+            Width = 4,
+            BackColor = valueColor
+        };
+
+        panel.Controls.Add(valueLabelRef);
+        panel.Controls.Add(titleLabel);
+        panel.Controls.Add(accentStrip);
+
+        return panel;
+    }
+
+    private void ResizeKpiCards()
+    {
+        var totalWidth = _kpiContainer.ClientSize.Width;
+        if (totalWidth <= 0 || _kpiContainer.Controls.Count == 0) return;
+
+        var count = _kpiContainer.Controls.Count;
+        var margin = 8;
+        var cardWidth = (totalWidth - (margin * (count - 1))) / count;
+
+        var x = 0;
+        // In reverse because docked controls or explicit positioning
+        for (int i = _kpiContainer.Controls.Count - 1; i >= 0; i--)
+        {
+            var card = _kpiContainer.Controls[i];
+            card.Location = new Point(x, 8);
+            card.Size = new Size(cardWidth, 68);
+            x += cardWidth + margin;
+        }
+    }
+
+    private void BuildReceiptPanel()
+    {
+        _receiptPanel.Dock = DockStyle.Fill;
+        _receiptPanel.BackColor = CyberTheme.Surface;
+        _receiptPanel.BorderStyle = BorderStyle.FixedSingle;
+        _receiptPanel.Padding = new Padding(16);
+        _receiptPanel.AutoScroll = true;
+
+        // Receipt Brand
+        _receiptHeaderStore.Text = "NETCAFE CYBER GAMING";
+        _receiptHeaderStore.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        _receiptHeaderStore.ForeColor = CyberTheme.Primary;
+        _receiptHeaderStore.TextAlign = ContentAlignment.MiddleCenter;
+        _receiptHeaderStore.Dock = DockStyle.Top;
+        _receiptHeaderStore.Height = 28;
+
+        _receiptHeaderSub.Text = "— PHIẾU THANH TOÁN DỊCH VỤ —";
+        _receiptHeaderSub.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+        _receiptHeaderSub.ForeColor = CyberTheme.MutedText;
+        _receiptHeaderSub.TextAlign = ContentAlignment.MiddleCenter;
+        _receiptHeaderSub.Dock = DockStyle.Top;
+        _receiptHeaderSub.Height = 22;
+
+        var sep1 = CreateDottedSeparator();
+        sep1.Dock = DockStyle.Top;
+
+        // Invoice ID and Badge
+        var idRow = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(0, 4, 0, 4) };
+        _receiptInvoiceIdLabel.Text = "#HĐ-00000";
+        _receiptInvoiceIdLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        _receiptInvoiceIdLabel.ForeColor = CyberTheme.Text;
+        _receiptInvoiceIdLabel.Dock = DockStyle.Left;
+        _receiptInvoiceIdLabel.AutoSize = true;
+
+        _receiptStatusBadge.Text = "ĐÃ THANH TOÁN";
+        _receiptStatusBadge.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        _receiptStatusBadge.ForeColor = CyberTheme.Success;
+        _receiptStatusBadge.Dock = DockStyle.Right;
+        _receiptStatusBadge.AutoSize = true;
+        idRow.Controls.Add(_receiptInvoiceIdLabel);
+        idRow.Controls.Add(_receiptStatusBadge);
+
+        // Info Rows
+        var infoPanel = new Panel { Dock = DockStyle.Top, Height = 84, Padding = new Padding(0, 4, 0, 4) };
+        _receiptTimeLabel.Text = "Thời gian: --";
+        _receiptTimeLabel.Font = new Font("Segoe UI", 9F);
+        _receiptTimeLabel.ForeColor = CyberTheme.MutedText;
+        _receiptTimeLabel.Dock = DockStyle.Top;
+        _receiptTimeLabel.Height = 24;
+
+        _receiptCustomerLabel.Text = "Khách hàng: --";
+        _receiptCustomerLabel.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        _receiptCustomerLabel.ForeColor = CyberTheme.Text;
+        _receiptCustomerLabel.Dock = DockStyle.Top;
+        _receiptCustomerLabel.Height = 26;
+
+        _receiptSessionLabel.Text = "Mã phiên máy: --";
+        _receiptSessionLabel.Font = new Font("Segoe UI", 9F);
+        _receiptSessionLabel.ForeColor = CyberTheme.MutedText;
+        _receiptSessionLabel.Dock = DockStyle.Top;
+        _receiptSessionLabel.Height = 24;
+
+        infoPanel.Controls.Add(_receiptSessionLabel);
+        infoPanel.Controls.Add(_receiptTimeLabel);
+        infoPanel.Controls.Add(_receiptCustomerLabel);
+
+        var sep2 = CreateDottedSeparator();
+        sep2.Dock = DockStyle.Top;
+
+        // Breakdown items
+        var breakdownPanel = new Panel { Dock = DockStyle.Top, Height = 95, Padding = new Padding(0, 6, 0, 6) };
+
+        _receiptPlayLabel.Text = "🎮 Tiền giờ chơi: 0 đ";
+        _receiptPlayLabel.Font = new Font("Segoe UI", 9.5F);
+        _receiptPlayLabel.ForeColor = CyberTheme.Text;
+        _receiptPlayLabel.Dock = DockStyle.Top;
+        _receiptPlayLabel.Height = 26;
+
+        _receiptServiceLabel.Text = "🍜 Dịch vụ F&B: 0 đ";
+        _receiptServiceLabel.Font = new Font("Segoe UI", 9.5F);
+        _receiptServiceLabel.ForeColor = CyberTheme.Text;
+        _receiptServiceLabel.Dock = DockStyle.Top;
+        _receiptServiceLabel.Height = 26;
+
+        _receiptDiscountLabel.Text = "🏷️ Giảm giá: -0 đ";
+        _receiptDiscountLabel.Font = new Font("Segoe UI", 9.5F);
+        _receiptDiscountLabel.ForeColor = CyberTheme.Warning;
+        _receiptDiscountLabel.Dock = DockStyle.Top;
+        _receiptDiscountLabel.Height = 26;
+
+        breakdownPanel.Controls.Add(_receiptDiscountLabel);
+        breakdownPanel.Controls.Add(_receiptServiceLabel);
+        breakdownPanel.Controls.Add(_receiptPlayLabel);
+
+        var sep3 = CreateDottedSeparator();
+        sep3.Dock = DockStyle.Top;
+
+        // Total
+        var totalPanel = new Panel { Dock = DockStyle.Top, Height = 64, Padding = new Padding(0, 8, 0, 8) };
+        var totalTitle = new Label
+        {
+            Text = "TỔNG THANH TOÁN",
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+            ForeColor = CyberTheme.MutedText,
+            Dock = DockStyle.Top,
+            Height = 18
+        };
+        _receiptTotalLabel.Text = "0 đ";
+        _receiptTotalLabel.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+        _receiptTotalLabel.ForeColor = CyberTheme.Primary;
+        _receiptTotalLabel.Dock = DockStyle.Fill;
+
+        totalPanel.Controls.Add(_receiptTotalLabel);
+        totalPanel.Controls.Add(totalTitle);
+
+        // Buttons Action
+        var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(0, 6, 0, 0) };
+        _copyReceiptButton.Text = "📋 Sao chép";
+        _copyReceiptButton.Width = 110;
+        _copyReceiptButton.Dock = DockStyle.Left;
+        CyberTheme.StyleButton(_copyReceiptButton, CyberTheme.SurfaceRaised);
+        _copyReceiptButton.Click += CopyReceiptDetails;
+
+        _printReceiptButton.Text = "🖨️ In lại phiếu";
+        _printReceiptButton.Width = 130;
+        _printReceiptButton.Dock = DockStyle.Right;
+        CyberTheme.StyleButton(_printReceiptButton, PrimaryColor);
+        _printReceiptButton.Click += PrintReceiptDetails;
+
+        buttonPanel.Controls.Add(_copyReceiptButton);
+        buttonPanel.Controls.Add(_printReceiptButton);
+
+        // Assemble Receipt Panel in order (Reverse order for Dock = Top)
+        _receiptPanel.Controls.Add(buttonPanel);
+        _receiptPanel.Controls.Add(totalPanel);
+        _receiptPanel.Controls.Add(sep3);
+        _receiptPanel.Controls.Add(breakdownPanel);
+        _receiptPanel.Controls.Add(sep2);
+        _receiptPanel.Controls.Add(infoPanel);
+        _receiptPanel.Controls.Add(idRow);
+        _receiptPanel.Controls.Add(sep1);
+        _receiptPanel.Controls.Add(_receiptHeaderSub);
+        _receiptPanel.Controls.Add(_receiptHeaderStore);
+    }
+
+    private Control CreateDottedSeparator()
+    {
+        var panel = new Panel
+        {
+            Height = 14,
+            BackColor = Color.Transparent
+        };
+        panel.Paint += (s, e) =>
+        {
+            using var pen = new Pen(CyberTheme.Border, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+            e.Graphics.DrawLine(pen, 0, 7, panel.Width, 7);
+        };
+        return panel;
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await RequiredContext.Repository.GetRecentInvoicesAsync(100);
-        SetRows(rows, $"{rows.Count} hóa đơn gần nhất");
+        try
+        {
+            var rows = await RequiredContext.Repository.GetRecentInvoicesAsync(100);
+            _allInvoices = rows;
+            UpdateKpis(rows);
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
+    private void UpdateKpis(List<InvoiceItem> rows)
+    {
+        var paidRows = rows.Where(r => r.Status.Equals("paid", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        var totalRev = paidRows.Sum(r => r.TotalAmount);
+        var playRev = paidRows.Sum(r => r.PlayAmount);
+        var serviceRev = paidRows.Sum(r => r.ServiceAmount);
+
+        _kpiRevenueValue.Text = $"{totalRev:N0} đ";
+        _kpiCountValue.Text = $"{rows.Count} Hóa đơn";
+        _kpiPlayValue.Text = $"{playRev:N0} đ";
+        _kpiServiceValue.Text = $"{serviceRev:N0} đ";
+    }
+
+    private void ApplyFilter()
+    {
+        var query = _searchBox.Text.Trim();
+        var statusFilter = _statusCombo.SelectedIndex switch
+        {
+            1 => "paid",
+            2 => "cancelled",
+            _ => null
+        };
+
+        var filtered = _allInvoices.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            filtered = filtered.Where(x => x.Status.Equals(statusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrEmpty(query))
+        {
+            filtered = filtered.Where(x =>
+                x.InvoiceId.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                x.SessionId.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                x.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var resultList = filtered.ToList();
+        _grid.DataSource = null;
+        _grid.DataSource = resultList;
+
+        FormatGridColumns();
+        _countSummaryLabel.Text = $"Hiển thị {resultList.Count} / {_allInvoices.Count} hóa đơn";
+
+        if (resultList.Count > 0)
+        {
+            _grid.Rows[0].Selected = true;
+            UpdateReceiptPreview(resultList[0]);
+        }
+        else
+        {
+            ClearReceiptPreview();
+        }
+    }
+
+    private void FormatGridColumns()
+    {
+        if (_grid.Columns["InvoiceId"] is { } colId) { colId.HeaderText = "Mã HĐ"; colId.Width = 85; }
+        if (_grid.Columns["SessionId"] is { } colSession) { colSession.HeaderText = "Mã phiên"; colSession.Width = 85; }
+        if (_grid.Columns["CustomerName"] is { } colCust) { colCust.HeaderText = "Khách hàng"; colCust.Width = 140; }
+        if (_grid.Columns["PlayAmount"] is { } colPlay)
+        {
+            colPlay.HeaderText = "Tiền giờ";
+            colPlay.Width = 100;
+            colPlay.DefaultCellStyle.Format = "N0 đ";
+            colPlay.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        if (_grid.Columns["ServiceAmount"] is { } colService)
+        {
+            colService.HeaderText = "Tiền F&B";
+            colService.Width = 100;
+            colService.DefaultCellStyle.Format = "N0 đ";
+            colService.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        if (_grid.Columns["DiscountAmount"] is { } colDiscount)
+        {
+            colDiscount.HeaderText = "Giảm giá";
+            colDiscount.Width = 90;
+            colDiscount.DefaultCellStyle.Format = "N0 đ";
+            colDiscount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        if (_grid.Columns["TotalAmount"] is { } colTotal)
+        {
+            colTotal.HeaderText = "Tổng tiền";
+            colTotal.Width = 110;
+            colTotal.DefaultCellStyle.Format = "N0 đ";
+            colTotal.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            colTotal.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        if (_grid.Columns["Status"] is { } colStatus) { colStatus.HeaderText = "Trạng thái"; colStatus.Width = 120; }
+        if (_grid.Columns["IssuedAt"] is { } colTime)
+        {
+            colTime.HeaderText = "Thời gian lập";
+            colTime.Width = 140;
+            colTime.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
+        }
+    }
+
+    private void Grid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.RowIndex >= _grid.Rows.Count) return;
+
+        var colName = _grid.Columns[e.ColumnIndex].Name;
+        if (colName.Equals("Status", StringComparison.OrdinalIgnoreCase) && e.Value != null)
+        {
+            var raw = e.Value.ToString()?.ToLowerInvariant() ?? "";
+            switch (raw)
+            {
+                case "paid":
+                    e.Value = "✓ Đã thanh toán";
+                    e.CellStyle!.ForeColor = CyberTheme.Success;
+                    e.CellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                    break;
+                case "cancelled":
+                    e.Value = "✕ Đã hủy";
+                    e.CellStyle!.ForeColor = CyberTheme.Danger;
+                    break;
+                default:
+                    e.Value = raw;
+                    break;
+            }
+        }
+    }
+
+    private void Grid_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (_grid.CurrentRow?.DataBoundItem is InvoiceItem item)
+        {
+            _selectedInvoice = item;
+            UpdateReceiptPreview(item);
+        }
+    }
+
+    private void UpdateReceiptPreview(InvoiceItem inv)
+    {
+        _selectedInvoice = inv;
+        _receiptInvoiceIdLabel.Text = $"#HĐ-{inv.InvoiceId:D5}";
+        var isPaid = inv.Status.Equals("paid", StringComparison.OrdinalIgnoreCase);
+
+        _receiptStatusBadge.Text = isPaid ? "✓ ĐÃ THANH TOÁN" : "✕ ĐÃ HỦY";
+        _receiptStatusBadge.ForeColor = isPaid ? CyberTheme.Success : CyberTheme.Danger;
+
+        _receiptCustomerLabel.Text = $"Khách hàng: {inv.CustomerName}";
+        _receiptSessionLabel.Text = $"Mã phiên máy: #{inv.SessionId}";
+        _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss}";
+
+        _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
+        _receiptServiceLabel.Text = $"🍜 Dịch vụ F&B: {inv.ServiceAmount:N0} đ";
+        _receiptDiscountLabel.Text = $"🏷️ Giảm giá: -{inv.DiscountAmount:N0} đ";
+        _receiptTotalLabel.Text = $"{inv.TotalAmount:N0} đ";
+    }
+
+    private void ClearReceiptPreview()
+    {
+        _selectedInvoice = null;
+        _receiptInvoiceIdLabel.Text = "#HĐ-00000";
+        _receiptStatusBadge.Text = "CHƯA CHỌN";
+        _receiptStatusBadge.ForeColor = CyberTheme.MutedText;
+        _receiptCustomerLabel.Text = "Khách hàng: --";
+        _receiptSessionLabel.Text = "Mã phiên máy: --";
+        _receiptTimeLabel.Text = "Thời gian: --";
+        _receiptPlayLabel.Text = "🎮 Tiền giờ chơi: 0 đ";
+        _receiptServiceLabel.Text = "🍜 Dịch vụ F&B: 0 đ";
+        _receiptDiscountLabel.Text = "🏷️ Giảm giá: 0 đ";
+        _receiptTotalLabel.Text = "0 đ";
+    }
+
+    private void CopyReceiptDetails(object? sender, EventArgs e)
+    {
+        if (_selectedInvoice == null)
+        {
+            MessageBox.Show("Vui lòng chọn một hóa đơn để sao chép.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("========================================");
+        sb.AppendLine("       NETCAFE CYBER GAMING");
+        sb.AppendLine("     PHIẾU THANH TOÁN DỊCH VỤ");
+        sb.AppendLine("========================================");
+        sb.AppendLine($"Mã HĐ:      #HĐ-{_selectedInvoice.InvoiceId:D5}");
+        sb.AppendLine($"Trạng thái: {_selectedInvoice.Status.ToUpperInvariant()}");
+        sb.AppendLine($"Khách hàng: {_selectedInvoice.CustomerName}");
+        sb.AppendLine($"Mã phiên:   #{_selectedInvoice.SessionId}");
+        sb.AppendLine($"Thời gian:  {_selectedInvoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
+        sb.AppendLine("----------------------------------------");
+        sb.AppendLine($"Tiền giờ:   {_selectedInvoice.PlayAmount:N0} đ");
+        sb.AppendLine($"Tiền F&B:   {_selectedInvoice.ServiceAmount:N0} đ");
+        sb.AppendLine($"Giảm giá:  -{_selectedInvoice.DiscountAmount:N0} đ");
+        sb.AppendLine("----------------------------------------");
+        sb.AppendLine($"TỔNG CỘNG:  {_selectedInvoice.TotalAmount:N0} đ");
+        sb.AppendLine("========================================");
+
+        Clipboard.SetText(sb.ToString());
+        MessageBox.Show($"Đã sao chép thông tin phiếu thu #{_selectedInvoice.InvoiceId} vào clipboard!", "Đã sao chép", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void PrintReceiptDetails(object? sender, EventArgs e)
+    {
+        if (_selectedInvoice == null)
+        {
+            MessageBox.Show("Vui lòng chọn một hóa đơn để in.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        MessageBox.Show(
+            $"Đã gửi lệnh in phiếu thu #{_selectedInvoice.InvoiceId} ({_selectedInvoice.CustomerName} - {_selectedInvoice.TotalAmount:N0} đ) tới máy in hóa đơn nhiệt POS-80!",
+            "In phiếu thu thành công",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
 }

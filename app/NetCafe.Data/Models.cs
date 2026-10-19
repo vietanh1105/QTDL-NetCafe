@@ -172,4 +172,16 @@ namespace NetCafe.Data
         public decimal TotalSpent { get; set; }
         public DateTime? LastPlayedAt { get; set; }
     }
+
+    public class KitchenOrderItem
+    {
+        public long OrderId { get; set; }
+        public long SessionId { get; set; }
+        public string ComputerCode { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string ItemsSummary { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public string Status { get; set; } = "placed";
+        public DateTime OrderedAt { get; set; }
+    }
 }

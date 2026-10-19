@@ -87,8 +87,7 @@ public partial class MainForm : Form
         AddNavigationSeparator("VẬN HÀNH");
         AddView("Computers", "Máy trạm", new ComputersView());
         AddView("Customers", "Hội viên", new CustomersView());
-        AddView("Booking", "Đặt máy", new BookingView());
-        AddView("Orders", "F&B Dịch vụ", new OrdersView());
+        AddView("Orders", "Đặt món", new OrdersView());
         AddView("Invoices", "Hóa đơn", new InvoicesView());
         AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
         AddView("Reports", "Báo cáo", new ReportsView());
