@@ -7,7 +7,7 @@ public partial class OrdersView : AdminCardViewBase
     public OrdersView()
     {
         InitializeComponent();
-        SetTitle("Dịch vụ và F&B", "Stock chỉ thay đổi qua trigger database; không cập nhật tồn kho từ UI.");
+        SetTitle("Dịch vụ ăn uống (F&B)", "Tồn kho được trừ tự động qua trigger CSDL khi đặt món.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -17,10 +17,10 @@ public partial class OrdersView : AdminCardViewBase
             rows,
             product => new AdminCardModel(
                 product.ProductName,
-                $"{product.Sku} · {product.CategoryName}",
-                $"Giá: {product.UnitPrice:N0} đ\nTồn kho: {product.StockQty:N0}",
-                product.StockQty > 0 ? "Đang bán" : "Hết hàng",
+                $"Mã SKU: {product.Sku} · {product.CategoryName}",
+                $"Đơn giá: {product.UnitPrice:N0} đ\nTồn kho: {product.StockQty:N0}",
+                product.StockQty > 0 ? "Đang kinh doanh" : "Hết hàng",
                 product.StockQty > 0 ? CyberTheme.Success : CyberTheme.Danger),
-            $"{rows.Count} sản phẩm đang bán");
+            $"{rows.Count} sản phẩm trong thực đơn");
     }
 }

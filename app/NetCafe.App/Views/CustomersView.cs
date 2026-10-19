@@ -19,20 +19,20 @@ public partial class CustomersView : AdminCardViewBase
     public CustomersView()
     {
         InitializeComponent();
-        SetTitle("Hội viên và ví", "Tìm kiếm không dấu; top-up dùng function database và ghi payment.");
-        _searchBox.Width = 190;
-        _searchBox.PlaceholderText = "Tên / SĐT";
+        SetTitle("Hội viên & Ví tiền", "Tìm kiếm không dấu; nạp tiền qua hàm CSDL và tự động ghi nhận thanh toán.");
+        _searchBox.Width = 200;
+        _searchBox.PlaceholderText = "Tìm theo tên / SĐT...";
         _topUpBox.Width = 100;
         _topUpBox.Text = "50000";
-        _topUpButton.Text = "Nạp ví";
-        _topUpButton.Width = 80;
+        _topUpButton.Text = "Nạp tiền";
+        _topUpButton.Width = 85;
         _topUpButton.BackColor = Color.FromArgb(16, 185, 129);
         _topUpButton.ForeColor = Color.White;
         _topUpButton.FlatStyle = FlatStyle.Flat;
         _topUpButton.FlatAppearance.BorderSize = 0;
-        ConfigureActionButton(_createButton, "Thêm", Color.FromArgb(37, 99, 235));
-        ConfigureActionButton(_editButton, "Sửa", Color.FromArgb(71, 85, 105));
-        ConfigureActionButton(_toggleButton, "Bật/tắt", Color.FromArgb(234, 88, 12));
+        ConfigureActionButton(_createButton, "Thêm mới", Color.FromArgb(37, 99, 235));
+        ConfigureActionButton(_editButton, "Chỉnh sửa", Color.FromArgb(71, 85, 105));
+        ConfigureActionButton(_toggleButton, "Khóa/Mở", Color.FromArgb(234, 88, 12));
         ConfigureActionButton(_resetButton, "Đổi mật khẩu", Color.FromArgb(124, 58, 237));
         Toolbar.Controls.Add(_resetButton);
         Toolbar.Controls.Add(_toggleButton);
@@ -57,12 +57,23 @@ public partial class CustomersView : AdminCardViewBase
         var rows = await RequiredContext.Repository.GetCustomersAsync(_searchBox.Text);
         SetCards(
             rows,
-            customer => new AdminCardModel(
-                customer.FullName,
-                $"@{customer.Username} | {customer.Phone}",
-                $"Số dư: {customer.Balance:N0} đ\nĐiểm: {customer.LoyaltyPoints:N0}",
-                customer.IsActive ? $"Đang hoạt động · {customer.MembershipTier}" : "Đã khóa",
-                customer.IsActive ? CyberTheme.Success : CyberTheme.Danger),
+            customer =>
+            {
+                var tierText = customer.MembershipTier?.ToLowerInvariant() switch
+                {
+                    "vip" => "Hạng VIP",
+                    "diamond" => "Hạng Kim Cương",
+                    "standard" or "regular" => "Hạng Chuẩn",
+                    _ => string.IsNullOrWhiteSpace(customer.MembershipTier) ? "Hạng Chuẩn" : customer.MembershipTier
+                };
+
+                return new AdminCardModel(
+                    customer.FullName,
+                    $"@{customer.Username} | {customer.Phone}",
+                    $"Số dư ví: {customer.Balance:N0} đ\nĐiểm thưởng: {customer.LoyaltyPoints:N0}",
+                    customer.IsActive ? $"Đang hoạt động · {tierText}" : "Đã khóa tài khoản",
+                    customer.IsActive ? CyberTheme.Success : CyberTheme.Danger);
+            },
             $"{rows.Count} hội viên");
     }
 
@@ -70,7 +81,7 @@ public partial class CustomersView : AdminCardViewBase
     {
         if (RequiredContext.CurrentEmployeeId <= 0)
         {
-            ReportError(new InvalidOperationException("Role hiện tại chưa ánh xạ employee_id; không thể ghi nhận nạp ví."));
+            ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể ghi nhận nạp ví."));
             return;
         }
 
@@ -147,7 +158,7 @@ public partial class CustomersView : AdminCardViewBase
     private static void ConfigureActionButton(Button button, string text, Color color)
     {
         button.Text = text;
-        button.Width = text.Length > 5 ? 105 : 72;
+        button.Width = text.Length > 5 ? 105 : 78;
         button.BackColor = color;
         button.ForeColor = Color.White;
         button.FlatStyle = FlatStyle.Flat;
@@ -170,17 +181,17 @@ internal sealed class CustomerEditorDialog : Form
 
     public CustomerEditorDialog(NetCafe.Data.CustomerItem? customer)
     {
-        Text = customer is null ? "Thêm hội viên" : "Sửa hội viên";
+        Text = customer is null ? "Thêm hội viên" : "Chỉnh sửa hội viên";
         Width = 380;
         Height = customer is null ? 330 : 260;
         StartPosition = FormStartPosition.CenterParent;
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = customer is null ? 6 : 4 };
-        AddField(layout, "Họ tên", _fullName, 0);
-        AddField(layout, "Điện thoại", _phone, 1);
+        AddField(layout, "Họ và tên", _fullName, 0);
+        AddField(layout, "Số điện thoại", _phone, 1);
         AddField(layout, "Email", _email, 2);
         if (customer is null)
         {
-            AddField(layout, "Username", _username, 3);
+            AddField(layout, "Tên đăng nhập", _username, 3);
             AddField(layout, "Mật khẩu", _password, 4);
             _password.UseSystemPasswordChar = true;
         }

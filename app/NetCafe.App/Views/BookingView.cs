@@ -7,7 +7,7 @@ public partial class BookingView : AdminCardViewBase
     public BookingView()
     {
         InitializeComponent();
-        SetTitle("Đặt máy trước", "EXCLUDE USING gist là rào chắn cuối cùng cho khoảng thời gian giao nhau.");
+        SetTitle("Đặt máy trước", "Ràng buộc EXCLUDE GiST trong CSDL ngăn chặn tuyệt đối trùng lặp thời gian đặt máy.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -15,14 +15,26 @@ public partial class BookingView : AdminCardViewBase
         var rows = await RequiredContext.Repository.GetBookingsAsync(cancellationToken);
         SetCards(
             rows,
-            booking => new AdminCardModel(
-                $"{booking.CustomerName} · {booking.ComputerCode}",
-                $"{booking.BookedFrom:dd/MM HH:mm} → {booking.BookedTo:HH:mm}",
-                $"Booking #{booking.BookingId}",
-                booking.Status,
-                booking.Status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)
-                    ? CyberTheme.Success
-                    : CyberTheme.Warning),
-            $"{rows.Count} booking");
+            booking =>
+            {
+                var statusText = booking.Status.ToLowerInvariant() switch
+                {
+                    "confirmed" => "Đã xác nhận",
+                    "pending" => "Chờ duyệt",
+                    "cancelled" => "Đã hủy",
+                    "completed" => "Hoàn thành",
+                    _ => booking.Status
+                };
+
+                return new AdminCardModel(
+                    $"{booking.CustomerName} · {booking.ComputerCode}",
+                    $"{booking.BookedFrom:dd/MM HH:mm} → {booking.BookedTo:HH:mm}",
+                    $"Mã đặt #{booking.BookingId}",
+                    statusText,
+                    booking.Status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)
+                        ? CyberTheme.Success
+                        : CyberTheme.Warning);
+            },
+            $"{rows.Count} lượt đặt máy");
     }
 }

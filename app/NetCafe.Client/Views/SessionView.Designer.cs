@@ -25,7 +25,7 @@ public partial class SessionView
         _costLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
         _statusLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = Color.DimGray, TextAlign = ContentAlignment.MiddleLeft };
         _foodButton = new Button { Text = "Gọi món", Dock = DockStyle.Fill, Height = 42, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _supportButton = new Button { Text = "Gọi hỗ trợ", Dock = DockStyle.Fill, Height = 42, BackColor = Color.FromArgb(14, 116, 144), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        _supportButton = new Button { Text = "Yêu cầu hỗ trợ", Dock = DockStyle.Fill, Height = 42, BackColor = Color.FromArgb(14, 116, 144), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         _logoutButton = new Button { Text = "Đăng xuất", Dock = DockStyle.Fill, Height = 42, BackColor = Color.Firebrick, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         _foodButton.FlatAppearance.BorderSize = 0;
         _supportButton.FlatAppearance.BorderSize = 0;
@@ -45,11 +45,11 @@ public partial class SessionView
         {
             content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         }
-        content.Controls.Add(CreateCard("Thông tin khách và máy", _customerLabel), 0, 0);
-        content.Controls.Add(CreateCard("Phiên hiện tại", _sessionLabel), 0, 1);
-        content.Controls.Add(CreateCard("Số dư ví", _balanceLabel), 0, 2);
-        content.Controls.Add(CreateCard("Thời gian và chi phí", _costLabel), 0, 3);
-        content.Controls.Add(CreateCard("Heartbeat", _statusLabel), 0, 4);
+        content.Controls.Add(CreateCard("Khách hàng và máy trạm", _customerLabel), 0, 0);
+        content.Controls.Add(CreateCard("Phiên chơi hiện tại", _sessionLabel), 0, 1);
+        content.Controls.Add(CreateCard("Số dư tài khoản", _balanceLabel), 0, 2);
+        content.Controls.Add(CreateCard("Thời gian & Chi phí", _costLabel), 0, 3);
+        content.Controls.Add(CreateCard("Trạng thái tín hiệu máy", _statusLabel), 0, 4);
 
         var actionRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 52, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
         actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
@@ -59,7 +59,7 @@ public partial class SessionView
         actionRow.Controls.Add(_supportButton, 1, 0);
         actionRow.Controls.Add(_logoutButton, 2, 0);
         content.Controls.Add(actionRow, 0, 5);
-        content.Controls.Add(new Label { Text = "Số dư được kiểm tra ở database; nếu không đủ, phiên sẽ tự đóng.", Dock = DockStyle.Top, Height = 34, ForeColor = Color.DimGray, Padding = new Padding(2, 8, 2, 0) }, 0, 6);
+        content.Controls.Add(new Label { Text = "Số dư tài khoản được kiểm tra liên tục; phiên sẽ tự động kết thúc nếu hết tiền.", Dock = DockStyle.Top, Height = 34, ForeColor = Color.DimGray, Padding = new Padding(2, 8, 2, 0) }, 0, 6);
         _scrollPanel.Controls.Add(content);
         Controls.Add(_scrollPanel);
         Dock = DockStyle.Fill;

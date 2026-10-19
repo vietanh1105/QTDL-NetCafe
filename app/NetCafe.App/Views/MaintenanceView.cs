@@ -7,7 +7,7 @@ public partial class MaintenanceView : AdminCardViewBase
     public MaintenanceView()
     {
         InitializeComponent();
-        SetTitle("Bảo trì", "Status machine được đồng bộ bởi hr.fn_trg_sync_computer_maintenance.");
+        SetTitle("Bảo trì thiết bị", "Trạng thái máy được đồng bộ tự động qua trigger CSDL.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -16,12 +16,22 @@ public partial class MaintenanceView : AdminCardViewBase
         var maintenanceRows = rows.Where(row => row.ComputerStatus is "maintenance" or "broken").ToList();
         SetCards(
             maintenanceRows,
-            computer => new AdminCardModel(
-                $"{computer.ComputerCode} · {computer.ComputerName}",
-                computer.RoomName,
-                $"IP: {computer.IpAddress}\nHeartbeat: {computer.LastHeartbeatAt?.ToLocalTime():dd/MM HH:mm:ss}",
-                computer.ComputerStatus,
-                computer.ComputerStatus == "broken" ? CyberTheme.Danger : CyberTheme.Warning),
+            computer =>
+            {
+                var statusText = computer.ComputerStatus switch
+                {
+                    "maintenance" => "Đang bảo trì",
+                    "broken" => "Hỏng hóc",
+                    _ => computer.ComputerStatus
+                };
+
+                return new AdminCardModel(
+                    $"{computer.ComputerCode} · {computer.ComputerName}",
+                    $"Phòng: {computer.RoomName}",
+                    $"Địa chỉ IP: {computer.IpAddress}\nTín hiệu cuối: {computer.LastHeartbeatAt?.ToLocalTime():dd/MM HH:mm:ss}",
+                    statusText,
+                    computer.ComputerStatus == "broken" ? CyberTheme.Danger : CyberTheme.Warning);
+            },
             $"{maintenanceRows.Count} máy đang bảo trì hoặc hỏng");
     }
 }

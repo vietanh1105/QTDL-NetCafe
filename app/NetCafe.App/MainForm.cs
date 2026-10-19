@@ -12,6 +12,7 @@ public partial class MainForm : Form
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Dictionary<string, IAdminView> _views = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _viewLabels = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Button> _navigationButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pendingNotificationChannels = new(StringComparer.OrdinalIgnoreCase);
     private DbRepository _repository = null!;
@@ -20,6 +21,7 @@ public partial class MainForm : Form
     private string _currentUser = string.Empty;
     private int _currentEmployeeId;
     private IAdminView? _activeView;
+    private string _activeKey = string.Empty;
     private bool _loadingRole;
     private bool _reconcileAvailable;
     private bool _databaseContractReady;
@@ -86,15 +88,15 @@ public partial class MainForm : Form
         AddView("Computers", "Máy trạm", new ComputersView());
         AddView("Customers", "Hội viên", new CustomersView());
         AddView("Booking", "Đặt máy", new BookingView());
-        AddView("Orders", "F&B", new OrdersView());
+        AddView("Orders", "F&B Dịch vụ", new OrdersView());
         AddView("Invoices", "Hóa đơn", new InvoicesView());
         AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
         AddView("Reports", "Báo cáo", new ReportsView());
         AddView("Employees", "Nhân viên", new EmployeesView());
         AddView("Maintenance", "Bảo trì", new MaintenanceView());
         AddNavigationSeparator("HỖ TRỢ VÀ HỆ THỐNG");
-        AddView("AiCenter", "AI Center", new AiCenterView());
-        AddView("SupportQueue", "Support queue", new SupportQueueView());
+        AddView("AiCenter", "Trung tâm AI", new AiCenterView());
+        AddView("SupportQueue", "Hàng đợi hỗ trợ", new SupportQueueView());
         AddView("Settings", "Cài đặt", new SettingsView());
         ApplyContext();
         SwitchView("Computers");
@@ -103,6 +105,7 @@ public partial class MainForm : Form
     private void AddView(string key, string label, IAdminView view)
     {
         _views.Add(key, view);
+        _viewLabels[key] = label;
         if (view is not Control control)
         {
             throw new InvalidOperationException($"View {key} không phải Control.");
@@ -132,14 +135,14 @@ public partial class MainForm : Form
         };
         button.MouseEnter += (_, _) =>
         {
-            if (!string.Equals(_activeViewLabel.Text, $"Đang mở: {key}", StringComparison.Ordinal))
+            if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
                 button.BackColor = Color.FromArgb(239, 246, 255);
             }
         };
         button.MouseLeave += (_, _) =>
         {
-            if (!string.Equals(_activeViewLabel.Text, $"Đang mở: {key}", StringComparison.Ordinal))
+            if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
                 button.BackColor = Color.White;
             }
@@ -168,6 +171,7 @@ public partial class MainForm : Form
             return;
         }
 
+        _activeKey = key;
         foreach (var candidate in _views.Values)
         {
             if (candidate is Control control)
@@ -182,7 +186,8 @@ public partial class MainForm : Form
             item.Value.ForeColor = selected ? Color.FromArgb(30, 64, 175) : Color.FromArgb(51, 65, 85);
         }
         _activeView = view;
-        _activeViewLabel.Text = $"Đang mở: {key}";
+        var displayTitle = _viewLabels.TryGetValue(key, out var label) ? label : key;
+        _activeViewLabel.Text = $"Đang mở: {displayTitle}";
     }
 
     private async Task StartAsync()
@@ -336,7 +341,7 @@ public partial class MainForm : Form
             if (error.SqlState == "42883")
             {
                 _reconcileAvailable = false;
-                _dbStatusLabel.Text = "Migration 08 chưa có: reconcile tạm dừng";
+                _dbStatusLabel.Text = "Bản cập nhật 08 chưa có: tạm dừng đồng bộ phiên";
                 return;
             }
             ShowError(exception);
@@ -351,7 +356,7 @@ public partial class MainForm : Form
             var password = AppConfig.GetConfiguredRolePassword(user);
             if (string.IsNullOrWhiteSpace(password))
             {
-                ShowError(new InvalidOperationException($"Role {user} chưa có credential cấu hình."));
+                ShowError(new InvalidOperationException($"Vai trò {user} chưa được cấu hình thông tin đăng nhập."));
                 return;
             }
             var nextRepository = new DbRepository(AppConfig.GetConnectionString(user, password));
@@ -380,7 +385,7 @@ public partial class MainForm : Form
 
     private async Task RestartListenerAsync()
     {
-        _listenerStatus = "Đang lắng nghe";
+        _listenerStatus = "Đang hoạt động";
         UpdateHeaderStatus();
         _repository.OnNotificationReceived -= HandleNotification;
         _repository.OnNotificationReceived += HandleNotification;
@@ -418,11 +423,11 @@ public partial class MainForm : Form
     {
         if (!string.IsNullOrWhiteSpace(notice))
         {
-            _dbStatusLabel.Text = $"{notice} | Listener: {_listenerStatus}";
+            _dbStatusLabel.Text = $"{notice} | Bộ lắng nghe CSDL: {_listenerStatus}";
             return;
         }
 
-        var status = $"{_runtimeSummary} | Nhân viên: {_currentEmployeeId} | Listener: {_listenerStatus}";
+        var status = $"{_runtimeSummary} | Nhân viên: {_currentEmployeeId} | Bộ lắng nghe CSDL: {_listenerStatus}";
         if (!_databaseContractReady && !string.IsNullOrWhiteSpace(_runtimeContractStatus))
         {
             status += $" | {_runtimeContractStatus}";

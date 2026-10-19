@@ -17,7 +17,7 @@ public partial class MainForm
         _stationLabel = new Label();
         _contentPanel = new Panel();
         SuspendLayout();
-        Text = "NetCafe Station";
+        Text = "NetCafe - Máy Trạm";
         Size = new Size(450, 1350);
         MinimumSize = new Size(450, 500);
         MaximumSize = new Size(450, Screen.PrimaryScreen?.WorkingArea.Height ?? 1350);

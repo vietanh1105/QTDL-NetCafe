@@ -39,7 +39,7 @@ public partial class MainForm
         _timer = new System.Windows.Forms.Timer();
 
         SuspendLayout();
-        Text = "NetCafe Admin";
+        Text = "NetCafe - Quản Trị Hệ Thống";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 700);
         Size = new Size(1440, 900);
@@ -54,17 +54,17 @@ public partial class MainForm
         _titleLabel.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
         _titleLabel.ForeColor = Color.White;
         _titleLabel.Location = new Point(18, 10);
-        _titleLabel.Text = "NETCAFE ADMIN";
+        _titleLabel.Text = "NETCAFE QUẢN TRỊ";
 
         _activeViewLabel.AutoSize = true;
         _activeViewLabel.ForeColor = Color.FromArgb(219, 234, 254);
         _activeViewLabel.Location = new Point(20, 43);
-        _activeViewLabel.Text = "Đang mở: Computers";
+        _activeViewLabel.Text = "Đang mở: Máy trạm";
 
         _dbStatusLabel.AutoSize = true;
         _dbStatusLabel.ForeColor = Color.White;
         _dbStatusLabel.Location = new Point(330, 16);
-        _dbStatusLabel.Text = "Role: postgres";
+        _dbStatusLabel.Text = "Vai trò: postgres";
 
         _roleCombo.DropDownStyle = ComboBoxStyle.DropDownList;
         _roleCombo.Location = new Point(660, 14);

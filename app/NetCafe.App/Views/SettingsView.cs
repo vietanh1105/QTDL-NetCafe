@@ -23,11 +23,11 @@ public partial class SettingsView : AdminViewBase
     public override Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var context = RequiredContext;
-        _details.Text = $"Role hiện tại: {context.CurrentUser}\n" +
-                        $"Employee ID: {context.CurrentEmployeeId}\n" +
-                        $"{context.ConnectionSummary}\n" +
-                        $"Quyền session/customer: {(context.CanManageSessions ? "có" : "không")} / {(context.CanManageCustomers ? "có" : "không")}\n" +
-                        "Migration chính: chỉ bổ sung 08_station_customer, không reset/seed/ETL.";
+        _details.Text = $"Vai trò hiện tại: {context.CurrentUser}\n" +
+                        $"Mã nhân viên: {context.CurrentEmployeeId}\n" +
+                        $"Thông tin kết nối: {context.ConnectionSummary}\n" +
+                        $"Quyền quản lý phiên / hội viên: {(context.CanManageSessions ? "Có" : "Không")} / {(context.CanManageCustomers ? "Có" : "Không")}\n" +
+                        "Cập nhật hệ thống: Bản cập nhật 08_station_customer hoạt động đầy đủ.";
         return Task.CompletedTask;
     }
 }

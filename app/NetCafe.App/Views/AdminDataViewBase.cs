@@ -43,6 +43,7 @@ public abstract class AdminDataViewBase : AdminViewBase
         RefreshButton.Click += async (_, _) => await RefreshAsync();
 
         StyleGrid(Grid);
+        Grid.CellFormatting += HandleGridCellFormatting;
         Controls.Add(Grid);
         Controls.Add(InfoLabel);
         Controls.Add(Toolbar);
@@ -59,6 +60,152 @@ public abstract class AdminDataViewBase : AdminViewBase
     protected void SetRows<T>(IEnumerable<T> rows, string info)
     {
         Grid.DataSource = rows.ToList();
+        LocalizeGridHeaders(Grid);
         InfoLabel.Text = info;
+    }
+
+    private static readonly Dictionary<string, string> ColumnHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["InvoiceId"] = "Mã hóa đơn",
+        ["SessionId"] = "Mã phiên",
+        ["CustomerName"] = "Khách hàng",
+        ["PlayAmount"] = "Tiền giờ",
+        ["ServiceAmount"] = "Tiền F&B",
+        ["DiscountAmount"] = "Giảm giá",
+        ["TotalAmount"] = "Tổng tiền",
+        ["Status"] = "Trạng thái",
+        ["IssuedAt"] = "Thời gian lập",
+        ["Report"] = "Loại báo cáo",
+        ["Subject"] = "Đối tượng",
+        ["Value"] = "Giá trị",
+        ["Detail"] = "Chi tiết",
+        ["ServiceRequestId"] = "Mã yêu cầu",
+        ["ComputerCode"] = "Mã máy",
+        ["RequestType"] = "Loại yêu cầu",
+        ["Message"] = "Nội dung",
+        ["CreatedAt"] = "Thời gian gửi",
+        ["Module"] = "Mô-đun",
+        ["Key"] = "Mã tham chiếu",
+        ["Summary"] = "Nội dung tóm tắt",
+        ["AlertId"] = "Mã cảnh báo",
+        ["CandidateId"] = "Mã trùng lặp",
+        ["ComputerId"] = "Mã máy",
+        ["ComputerName"] = "Tên máy",
+        ["RoomName"] = "Phòng",
+        ["TypeName"] = "Loại máy",
+        ["HourlyRate"] = "Giá giờ",
+        ["ComputerStatus"] = "Trạng thái máy",
+        ["IpAddress"] = "Địa chỉ IP",
+        ["Balance"] = "Số dư ví",
+        ["LoyaltyPoints"] = "Điểm tích lũy",
+        ["MembershipTier"] = "Hạng hội viên",
+        ["IsActive"] = "Kích hoạt",
+        ["Phone"] = "Số điện thoại",
+        ["Email"] = "Email",
+        ["Username"] = "Tên đăng nhập",
+        ["FullName"] = "Họ và tên",
+        ["EmployeeId"] = "Mã nhân viên",
+        ["EmpRole"] = "Vai trò",
+        ["DefaultShift"] = "Ca làm việc",
+        ["DbUsername"] = "Tài khoản CSDL",
+        ["RevenueDate"] = "Ngày doanh thu",
+        ["TotalInvoices"] = "Tổng hóa đơn",
+        ["TotalPlayAmount"] = "Tổng tiền giờ",
+        ["TotalServiceAmount"] = "Tổng tiền F&B",
+        ["TotalDiscountAmount"] = "Tổng giảm giá",
+        ["NetRevenue"] = "Doanh thu thuần",
+        ["TotalSessions"] = "Tổng số phiên",
+        ["TotalHoursPlayed"] = "Tổng giờ chơi",
+        ["TotalPlayRevenue"] = "Doanh thu giờ chơi",
+        ["TotalSpent"] = "Tổng chi tiêu",
+        ["LastPlayedAt"] = "Lần chơi gần nhất"
+    };
+
+    private static void LocalizeGridHeaders(DataGridView grid)
+    {
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            if (ColumnHeaders.TryGetValue(column.Name, out var viHeader) ||
+                ColumnHeaders.TryGetValue(column.DataPropertyName, out viHeader))
+            {
+                column.HeaderText = viHeader;
+            }
+        }
+    }
+
+    private static void HandleGridCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.Value is null || sender is not DataGridView grid)
+        {
+            return;
+        }
+
+        var colName = grid.Columns[e.ColumnIndex].DataPropertyName;
+
+        if (e.Value is decimal amount && (colName.EndsWith("Amount", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Rate", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Balance", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Spent", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Revenue", StringComparison.OrdinalIgnoreCase)))
+        {
+            e.Value = $"{amount:N0} đ";
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (e.Value is DateTime dt)
+        {
+            e.Value = dt.ToString("dd/MM/yyyy HH:mm");
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (e.Value is DateTimeOffset dto)
+        {
+            e.Value = dto.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (e.Value is string text)
+        {
+            var localized = text.ToLowerInvariant() switch
+            {
+                "paid" => "Đã thanh toán",
+                "unpaid" => "Chưa thanh toán",
+                "refunded" => "Đã hoàn tiền",
+                "cancelled" => "Đã hủy",
+                "available" => "Sẵn sàng",
+                "in_use" => "Đang sử dụng",
+                "maintenance" => "Bảo trì",
+                "broken" => "Hỏng",
+                "new" => "Mới tiếp nhận",
+                "acknowledged" => "Đang xử lý",
+                "resolved" => "Đã giải quyết",
+                "pending" => "Chờ duyệt",
+                "confirmed" => "Đã xác nhận",
+                "active" => "Hoạt động",
+                "finished" => "Đã kết thúc",
+                "readonly" => "Chỉ đọc",
+                "reviewed" => "Đã xem",
+                "merged" => "Đã gộp",
+                "ignored" => "Đã bỏ qua",
+                "regular" => "Thành viên",
+                "standard" => "Chuẩn",
+                "vip" => "VIP",
+                "diamond" => "Kim cương",
+                "general" => "Hỗ trợ chung",
+                "hardware" => "Phần cứng",
+                "software" => "Phần mềm",
+                "billing" => "Nạp tiền/Thanh toán",
+                _ => null
+            };
+
+            if (localized is not null)
+            {
+                e.Value = localized;
+                e.FormattingApplied = true;
+            }
+        }
     }
 }

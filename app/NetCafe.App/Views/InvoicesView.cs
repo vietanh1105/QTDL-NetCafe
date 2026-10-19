@@ -7,7 +7,7 @@ public partial class InvoicesView : AdminDataViewBase
     public InvoicesView()
     {
         InitializeComponent();
-        SetTitle("Hóa đơn và sổ quỹ", "Dữ liệu hiển thị theo role hiện tại; cashier bị RLS lọc theo cashier_id.");
+        SetTitle("Hóa đơn & Sổ quỹ", "Dữ liệu phân quyền theo vai trò; thu ngân chỉ xem hóa đơn trong ca.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)

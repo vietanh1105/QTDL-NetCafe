@@ -33,7 +33,7 @@ public partial class ProductCardControl : UserControl
         _product = product;
         _nameLabel.Text = product.ProductName;
         _priceLabel.Text = $"{product.UnitPrice:N0} đ";
-        _stockLabel.Text = product.StockQty > 0 ? $"Còn {product.StockQty}" : "Hết món";
+        _stockLabel.Text = product.StockQty > 0 ? $"Còn lại: {product.StockQty} phần" : "Tạm hết món";
         _quantityBox.Minimum = 1;
         _quantityBox.Maximum = Math.Max(1, product.StockQty);
         _quantityBox.Value = 1;

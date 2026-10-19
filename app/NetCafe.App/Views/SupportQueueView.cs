@@ -8,14 +8,14 @@ namespace NetCafe.App.Views;
 
 public partial class SupportQueueView : AdminDataViewBase
 {
-    private readonly Button _acknowledgeButton = CreateActionButton("Acknowledge");
-    private readonly Button _resolveButton = CreateActionButton("Resolve");
-    private readonly Button _cancelButton = CreateActionButton("Cancel");
+    private readonly Button _acknowledgeButton = CreateActionButton("Tiếp nhận");
+    private readonly Button _resolveButton = CreateActionButton("Hoàn thành");
+    private readonly Button _cancelButton = CreateActionButton("Hủy yêu cầu");
 
     public SupportQueueView()
     {
         InitializeComponent();
-        SetTitle("Support queue", "Station ghi request qua function; Admin xử lý lifecycle new → acknowledged → resolved.");
+        SetTitle("Hàng đợi hỗ trợ", "Máy trạm gửi yêu cầu qua hàm CSDL; Quản trị viên xử lý theo quy trình: Mới → Tiếp nhận → Hoàn thành.");
         Toolbar.Controls.Add(_cancelButton);
         Toolbar.Controls.Add(_resolveButton);
         Toolbar.Controls.Add(_acknowledgeButton);
@@ -34,7 +34,7 @@ public partial class SupportQueueView : AdminDataViewBase
     {
         if (RequiredContext.CurrentEmployeeId <= 0)
         {
-            ReportError(new InvalidOperationException("Role hiện tại chưa ánh xạ employee_id; không thể xử lý support queue."));
+            ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể xử lý hàng đợi hỗ trợ."));
             return;
         }
 

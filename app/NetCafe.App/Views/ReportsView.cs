@@ -7,7 +7,7 @@ public partial class ReportsView : AdminDataViewBase
     public ReportsView()
     {
         InitializeComponent();
-        SetTitle("Báo cáo", "Chọn report trong database; view ẩn không tự refresh.");
+        SetTitle("Báo cáo & Thống kê", "Dữ liệu tổng hợp từ các view báo cáo trong CSDL.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -17,21 +17,21 @@ public partial class ReportsView : AdminDataViewBase
         var customers = await RequiredContext.Repository.GetTopCustomersAsync(cancellationToken);
         var rows = new List<ReportRow>();
         rows.AddRange(revenue.Select(item => new ReportRow(
-            "Doanh thu ngày",
-            item.RevenueDate.ToString("yyyy-MM-dd"),
-            $"{item.NetRevenue:N0} VND",
-            $"{item.TotalInvoices} invoice")));
+            "Doanh thu theo ngày",
+            item.RevenueDate.ToString("dd/MM/yyyy"),
+            $"{item.NetRevenue:N0} đ",
+            $"{item.TotalInvoices} hóa đơn")));
         rows.AddRange(usage.Select(item => new ReportRow(
-            "Hiệu suất máy",
+            "Hiệu suất máy trạm",
             item.ComputerCode,
             $"{item.TotalHoursPlayed:N2} giờ",
-            $"{item.TotalSessions} phiên")));
+            $"{item.TotalSessions} phiên chơi")));
         rows.AddRange(customers.Select(item => new ReportRow(
-            "Top khách hàng",
+            "Khách hàng tiêu biểu",
             item.FullName,
-            $"{item.TotalSpent:N0} VND",
-            $"{item.TotalSessions} phiên")));
-        SetRows(rows, $"Reporting views: {revenue.Count} ngày, {usage.Count} máy, {customers.Count} khách.");
+            $"{item.TotalSpent:N0} đ",
+            $"{item.TotalSessions} phiên chơi")));
+        SetRows(rows, $"Báo cáo: {revenue.Count} ngày doanh thu, {usage.Count} máy trạm, {customers.Count} khách hàng tiêu biểu.");
     }
 
     private sealed record ReportRow(string Report, string Subject, string Value, string Detail);

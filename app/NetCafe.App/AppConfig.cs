@@ -103,8 +103,8 @@ namespace NetCafe.App
         public static string ConnectionSummary(string? user = null)
         {
             var effectiveUser = user ?? Username;
-            var source = string.IsNullOrWhiteSpace(LoadedEnvFile) ? "default/environment" : LoadedEnvFile;
-            return $"Host={Host}:{Port} | Database={Database} | User={effectiveUser} | SSL={SslMode} | Source={source}";
+            var source = string.IsNullOrWhiteSpace(LoadedEnvFile) ? "Mặc định / Biến môi trường" : LoadedEnvFile;
+            return $"Máy chủ={Host}:{Port} | CSDL={Database} | Người dùng={effectiveUser} | SSL={SslMode} | Nguồn={source}";
         }
 
         public static string GetConnectionString(string? user = null, string? pwd = null)

@@ -40,7 +40,7 @@ public partial class FoodOrderView
         };
         _refreshOrdersButton = new Button
         {
-            Text = "Cập nhật đơn",
+            Text = "Làm mới đơn",
             Width = 132,
             Height = 34,
             BackColor = Color.FromArgb(37, 99, 235),
@@ -50,8 +50,8 @@ public partial class FoodOrderView
         _backButton = new Button { Text = "Quay lại", Width = 112, Height = 34 };
         _refreshOrdersButton.FlatAppearance.BorderSize = 0;
         _messageLabel = new Label { Dock = DockStyle.Top, Height = 38, ForeColor = Color.FromArgb(30, 64, 175), Padding = new Padding(4, 8, 4, 0) };
-        var title = new Label { Text = "Menu gọi món", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI", 14F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
-        var ordersTitle = new Label { Text = "Đơn đã gọi", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
+        var title = new Label { Text = "Thực đơn món ăn & đồ uống", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI", 14F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
+        var ordersTitle = new Label { Text = "Danh sách đơn đã gọi", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(4, 4, 4, 4) };
         actions.Controls.Add(_refreshOrdersButton);
         actions.Controls.Add(_backButton);

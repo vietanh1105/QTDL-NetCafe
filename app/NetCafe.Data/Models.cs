@@ -39,9 +39,9 @@ namespace NetCafe.Data
             && HasCustomerMenuContract
             && HasStationLogoutContract;
         public string ContractStatus => IsStationContractReady
-            ? "Migration 08 đầy đủ"
-            : "Migration 08 chưa đầy đủ: thiếu contract station";
-        public string Summary => $"{Host} | {Database} | {User} | PostgreSQL {ServerVersion}";
+            ? "Bản cập nhật 08 đầy đủ"
+            : "Bản cập nhật 08 chưa đầy đủ: thiếu cấu trúc máy trạm";
+        public string Summary => $"Máy chủ: {Host} | CSDL: {Database} | Người dùng: {User} | PostgreSQL {ServerVersion}";
     }
 
     public class SqlLogEntry

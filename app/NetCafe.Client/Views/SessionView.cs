@@ -35,15 +35,22 @@ public partial class SessionView : UserControl
 
     public void SetSession(NetCafe.Data.StationLoginResult session)
     {
-        _customerLabel.Text = $"Khách: {session.CustomerName} | Máy: {session.ComputerCode}";
-        _sessionLabel.Text = $"Session #{session.SessionId} | Giá giờ: {session.HourlyRate:N0} đ";
+        _customerLabel.Text = $"Khách hàng: {session.CustomerName} | Máy: {session.ComputerCode}";
+        _sessionLabel.Text = $"Phiên #{session.SessionId} | Giá giờ: {session.HourlyRate:N0} đ";
         _balanceLabel.Text = $"Số dư: {session.Balance:N0} đ";
     }
 
     public void SetHeartbeat(NetCafe.Data.StationHeartbeatResult result)
     {
+        var statusText = result.SessionStatus.ToLowerInvariant() switch
+        {
+            "active" => "Đang hoạt động",
+            "finished" => "Đã kết thúc",
+            _ => result.SessionStatus
+        };
+
         _balanceLabel.Text = $"Số dư: {result.BalanceRemaining:N0} đ";
-        _costLabel.Text = $"Dự kiến: {result.ProjectedTotalAmount:N0} đ (giờ {result.ProjectedPlayAmount:N0} + F&B {result.ProjectedServiceAmount:N0})";
-        _statusLabel.Text = $"Heartbeat: {result.LastHeartbeatAt:HH:mm:ss} | {result.SessionStatus}";
+        _costLabel.Text = $"Tạm tính: {result.ProjectedTotalAmount:N0} đ (Tiền giờ: {result.ProjectedPlayAmount:N0} đ + F&B: {result.ProjectedServiceAmount:N0} đ)";
+        _statusLabel.Text = $"Tín hiệu: {result.LastHeartbeatAt:HH:mm:ss} | {statusText}";
     }
 }

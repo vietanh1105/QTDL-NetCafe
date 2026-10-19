@@ -39,15 +39,24 @@ public sealed class ComputerActionDialog : Form
         var details = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoScroll = true, BackColor = Color.White, Padding = new Padding(14) };
         details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
         details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58F));
+        var statusText = _computer.ComputerStatus switch
+        {
+            "available" => "Sẵn sàng",
+            "in_use" => "Đang sử dụng",
+            "maintenance" => "Đang bảo trì",
+            "broken" => "Hỏng hóc",
+            _ => _computer.ComputerStatus
+        };
+
         AddDetail(details, "Mã máy", _computer.ComputerCode);
-        AddDetail(details, "Trạng thái", _computer.ComputerStatus);
-        AddDetail(details, "Khách", string.IsNullOrWhiteSpace(_computer.CurrentCustomerName) ? "Chưa có" : _computer.CurrentCustomerName);
-        AddDetail(details, "Session ID", _computer.CurrentSessionId?.ToString() ?? "—");
-        AddDetail(details, "Đã chơi", _computer.PlayedMinutes is null ? "—" : $"{_computer.PlayedMinutes:N0} phút");
+        AddDetail(details, "Trạng thái", statusText);
+        AddDetail(details, "Khách hàng", string.IsNullOrWhiteSpace(_computer.CurrentCustomerName) ? "Chưa có" : _computer.CurrentCustomerName);
+        AddDetail(details, "Mã phiên", _computer.CurrentSessionId?.ToString() ?? "Chưa có");
+        AddDetail(details, "Thời gian chơi", _computer.PlayedMinutes is null ? "Chưa có" : $"{_computer.PlayedMinutes:N0} phút");
         AddDetail(details, "Tiền giờ", _computer.CurrentPlayAmount is null ? EstimatePlayAmount() : $"{_computer.CurrentPlayAmount:N0} đ");
-        AddDetail(details, "F&B", _computer.CurrentServiceAmount is null ? "Chưa có dữ liệu" : $"{_computer.CurrentServiceAmount:N0} đ");
-        AddDetail(details, "Số dư", _computer.CurrentBalance is null ? "Chưa có dữ liệu" : $"{_computer.CurrentBalance:N0} đ");
-        AddDetail(details, "Heartbeat", _computer.LastHeartbeatAt?.ToLocalTime().ToString("dd/MM HH:mm:ss") ?? "Chưa có dữ liệu");
+        AddDetail(details, "Dịch vụ F&B", _computer.CurrentServiceAmount is null ? "0 đ" : $"{_computer.CurrentServiceAmount:N0} đ");
+        AddDetail(details, "Số dư tài khoản", _computer.CurrentBalance is null ? "Chưa có dữ liệu" : $"{_computer.CurrentBalance:N0} đ");
+        AddDetail(details, "Tín hiệu máy", _computer.LastHeartbeatAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa có dữ liệu");
         root.Controls.Add(details, 0, 0);
         var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Padding = new Padding(0, 8, 0, 0) };
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
@@ -55,7 +64,7 @@ public sealed class ComputerActionDialog : Form
         _closeButton.Text = "Đăng xuất máy";
         _closeButton.BackColor = Color.Firebrick;
         _closeButton.ForeColor = Color.White;
-        _customerButton.Text = "Mở hội viên";
+        _customerButton.Text = "Xem hội viên";
         _maintenanceButton.Text = "Đưa vào bảo trì";
         _refreshButton.Text = "Làm mới";
         foreach (var button in new[] { _closeButton, _customerButton, _maintenanceButton, _refreshButton })
@@ -90,7 +99,7 @@ public sealed class ComputerActionDialog : Form
         table.Controls.Add(new Label { Text = value, AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Padding = new Padding(0, 4, 0, 4) }, 1, row);
     }
 
-    private string EstimatePlayAmount() => _computer.PlayedMinutes is null ? "—" : $"{_computer.HourlyRate * _computer.PlayedMinutes.Value / 60:N0} đ";
+    private string EstimatePlayAmount() => _computer.PlayedMinutes is null ? "Chưa có" : $"{_computer.HourlyRate * _computer.PlayedMinutes.Value / 60:N0} đ";
 
     private async Task CloseSessionAsync()
     {
@@ -102,7 +111,7 @@ public sealed class ComputerActionDialog : Form
         try
         {
             await _context.Repository.CloseSessionAndPayAsync(_computer.CurrentSessionId.Value, _context.CurrentEmployeeId);
-            _messageLabel.Text = "Đã đăng xuất máy và tạo hóa đơn/payment.";
+            _messageLabel.Text = "Đã đăng xuất máy và tạo hóa đơn thanh toán thành công.";
             await _context.RefreshComputersAsync();
             _closeButton.Enabled = false;
         }
@@ -118,7 +127,7 @@ public sealed class ComputerActionDialog : Form
         try
         {
             await _context.Repository.SetComputerStatusAsync(_computer.ComputerId, "maintenance");
-            _messageLabel.Text = "Đã chuyển máy sang bảo trì.";
+            _messageLabel.Text = "Đã chuyển máy sang trạng thái bảo trì.";
             await _context.RefreshComputersAsync();
         }
         catch (Exception exception)
@@ -130,6 +139,6 @@ public sealed class ComputerActionDialog : Form
     private async Task RefreshAsync()
     {
         await _context.RefreshComputersAsync();
-        _messageLabel.Text = "Đã yêu cầu cập nhật trạng thái.";
+        _messageLabel.Text = "Đã cập nhật trạng thái mới nhất.";
     }
 }

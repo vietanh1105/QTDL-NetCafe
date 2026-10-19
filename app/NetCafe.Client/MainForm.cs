@@ -44,10 +44,10 @@ public partial class MainForm : Form
             SessionId = _session?.SessionId ?? 0,
             BalanceRemaining = 0,
             LastHeartbeatAt = DateTimeOffset.Now,
-            SessionStatus = $"Lỗi heartbeat: {exception.Message}"
+            SessionStatus = $"Lỗi tín hiệu máy: {exception.Message}"
         }));
         ShowView(_loginView);
-        _stationLabel.Text = $"Station: {_config.ComputerCode}";
+        _stationLabel.Text = $"Máy trạm: {_config.ComputerCode}";
     }
 
     private async Task LoginAsync(string username, string password)
@@ -75,7 +75,7 @@ public partial class MainForm : Form
             _sessionController.Stop();
             _session = null;
             ShowView(_loginView);
-            _loginView.ShowError("Phiên đã tự đăng xuất vì số dư không còn đủ.");
+            _loginView.ShowError("Phiên đã tự động đăng xuất do số dư tài khoản không đủ.");
         }
     }
 
@@ -96,7 +96,7 @@ public partial class MainForm : Form
             _sessionController.Stop();
             _session = null;
             ShowView(_loginView);
-            _loginView.ShowError($"Đã đăng xuất và tạo hóa đơn #{invoiceId}.");
+            _loginView.ShowError($"Đã đăng xuất máy và tạo hóa đơn #{invoiceId}.");
         }
         catch (Exception exception)
         {
@@ -138,7 +138,7 @@ public partial class MainForm : Form
         try
         {
             var orderId = await _repository.CustomerPlaceOrderAsync(_session.SessionId, _session.CustomerId, productId, quantity);
-            _foodOrderView.ShowMessage($"Đã gửi đơn #{orderId}; tồn kho và ví được database kiểm tra.");
+            _foodOrderView.ShowMessage($"Đã gửi đơn #{orderId} thành công!");
             await RefreshFoodOrdersAsync();
         }
         catch (Exception exception)
@@ -168,7 +168,7 @@ public partial class MainForm : Form
         {
             var requestId = await _repository.CreateServiceRequestAsync(
                 _session.SessionId, _session.CustomerId, _session.ComputerId, type, message);
-            _supportRequestView.ShowMessage($"Đã gửi yêu cầu hỗ trợ #{requestId}.");
+            _supportRequestView.ShowMessage($"Đã gửi yêu cầu hỗ trợ #{requestId} thành công.");
         }
         catch (Exception exception)
         {

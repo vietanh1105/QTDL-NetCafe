@@ -74,6 +74,15 @@ public partial class FoodOrderView : UserControl
     private static Control CreateOrderCard(CustomerOrderStatus order)
     {
         var status = order.Status.ToLowerInvariant();
+        var statusText = status switch
+        {
+            "placed" => "Đã gửi đơn",
+            "preparing" => "Đang chế biến",
+            "ready" => "Sẵn sàng phục vụ",
+            "served" => "Đã phục vụ",
+            "cancelled" => "Đã hủy",
+            _ => order.Status
+        };
         var accent = status switch
         {
             "placed" => Color.FromArgb(37, 99, 235),
@@ -102,7 +111,7 @@ public partial class FoodOrderView : UserControl
         {
             AutoSize = true,
             Location = new Point(12, 31),
-            Text = status,
+            Text = statusText,
             ForeColor = accent
         };
         var total = new Label

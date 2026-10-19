@@ -17,21 +17,21 @@ public partial class AiCenterView : AdminDataViewBase
     public AiCenterView()
     {
         InitializeComponent();
-        SetTitle("AI Center", "Security, index, duplicate, anomaly và promotion đều chạy trong PostgreSQL.");
-        _runAllButton.Text = "Chạy 5 module";
-        _runAllButton.Width = 120;
+        SetTitle("Trung tâm AI & Tự động hóa", "Bảo mật, chỉ mục, phát hiện trùng lặp, dị thường và khuyến mãi chạy trực tiếp trong CSDL PostgreSQL.");
+        _runAllButton.Text = "Chạy cả 5 mô-đun";
+        _runAllButton.Width = 135;
         _runAllButton.BackColor = PrimaryColor;
         _runAllButton.ForeColor = Color.White;
         _runAllButton.FlatStyle = FlatStyle.Flat;
         _runAllButton.FlatAppearance.BorderSize = 0;
         _runAllButton.Click += async (_, _) => await RunAllAsync();
-        ConfigureButton(_runIndexButton, "Chạy index");
-        ConfigureButton(_runDuplicateButton, "Chạy duplicate");
-        ConfigureButton(_runAnomalyButton, "Chạy anomaly");
-        ConfigureButton(_runPromotionButton, "Chạy promotion");
+        ConfigureButton(_runIndexButton, "Tối ưu chỉ mục");
+        ConfigureButton(_runDuplicateButton, "Tìm trùng lặp");
+        ConfigureButton(_runAnomalyButton, "Phát hiện dị thường");
+        ConfigureButton(_runPromotionButton, "Gợi ý khuyến mãi");
         ConfigureButton(_reviewAlertButton, "Đã xem cảnh báo");
-        ConfigureButton(_mergeDuplicateButton, "Đánh dấu merged");
-        ConfigureButton(_ignoreDuplicateButton, "Đánh dấu ignored");
+        ConfigureButton(_mergeDuplicateButton, "Đánh dấu đã gộp");
+        ConfigureButton(_ignoreDuplicateButton, "Đánh dấu bỏ qua");
         _runIndexButton.Click += async (_, _) => await RunModuleAsync("index");
         _runDuplicateButton.Click += async (_, _) => await RunModuleAsync("duplicate");
         _runAnomalyButton.Click += async (_, _) => await RunModuleAsync("anomaly");
@@ -58,12 +58,12 @@ public partial class AiCenterView : AdminDataViewBase
         var promotions = await RequiredContext.Repository.GetPromotionSuggestionsAsync(cancellationToken);
 
         var rows = new List<AiModuleRow>();
-        rows.AddRange(alerts.Select(item => new AiModuleRow("Security Alert", item.AlertId.ToString(), item.Reason, item.Status, item.AlertId, null)));
-        rows.AddRange(indexes.Select(item => new AiModuleRow("Index Recommendation", item.RecommendationId.ToString(), item.SuggestedSql, "readonly", null, null)));
-        rows.AddRange(duplicates.Select(item => new AiModuleRow("Duplicate Customer", item.CandidateId.ToString(), item.Reason, item.Status, null, item.CandidateId)));
-        rows.AddRange(anomalies.Select(item => new AiModuleRow("Anomaly Detection", item.FlagId.ToString(), $"{item.AnomalyType}: z={item.ZScore}", item.Status, null, null)));
-        rows.AddRange(promotions.Select(item => new AiModuleRow("Promotion Suggestion", item.SuggestionId.ToString(), item.Details, item.SuggestionType, null, null)));
-        SetRows(rows, $"5 module PostgreSQL: {alerts.Count} alert, {indexes.Count} index, {duplicates.Count} duplicate, {anomalies.Count} anomaly, {promotions.Count} promotion.");
+        rows.AddRange(alerts.Select(item => new AiModuleRow("Cảnh báo bảo mật", item.AlertId.ToString(), item.Reason, item.Status, item.AlertId, null)));
+        rows.AddRange(indexes.Select(item => new AiModuleRow("Đề xuất chỉ mục", item.RecommendationId.ToString(), item.SuggestedSql, "Chỉ đọc", null, null)));
+        rows.AddRange(duplicates.Select(item => new AiModuleRow("Hội viên trùng lặp", item.CandidateId.ToString(), item.Reason, item.Status, null, item.CandidateId)));
+        rows.AddRange(anomalies.Select(item => new AiModuleRow("Phát hiện dị thường", item.FlagId.ToString(), $"{item.AnomalyType}: z={item.ZScore}", item.Status, null, null)));
+        rows.AddRange(promotions.Select(item => new AiModuleRow("Gợi ý khuyến mãi", item.SuggestionId.ToString(), item.Details, item.SuggestionType, null, null)));
+        SetRows(rows, $"5 mô-đun PostgreSQL: {alerts.Count} cảnh báo, {indexes.Count} chỉ mục, {duplicates.Count} trùng lặp, {anomalies.Count} dị thường, {promotions.Count} khuyến mãi.");
     }
 
     private async Task RunAllAsync()

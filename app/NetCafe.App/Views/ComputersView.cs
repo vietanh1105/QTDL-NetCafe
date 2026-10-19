@@ -13,7 +13,7 @@ public partial class ComputersView : AdminDataViewBase
     public ComputersView()
     {
         InitializeComponent();
-        SetTitle("Sơ đồ máy trạm", "Heartbeat/reconcile được xử lý ở database; card chỉ cập nhật theo ComputerId.");
+        SetTitle("Sơ đồ máy trạm", "Tín hiệu máy và đồng bộ phiên được xử lý ở CSDL; sơ đồ cập nhật theo thời gian thực.");
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -40,7 +40,7 @@ public partial class ComputersView : AdminDataViewBase
         }
 
         RebuildGridPositions();
-        SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy | cập nhật {DateTime.Now:HH:mm:ss} | card chỉ cập nhật theo ComputerId");
+        SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy trạm | Cập nhật lúc {DateTime.Now:HH:mm:ss}");
     }
 
     private void RebuildGridPositions()
