@@ -19,32 +19,14 @@ ORDER BY table_schema;
 -- Kiểm tra 4 extensions mở rộng đã kích hoạt:
 SELECT extname, extversion 
 FROM pg_extension 
-WHERE extname IN ('pgcrypto', 'btree_gist', 'pg_trgm', 'unaccent');
+WHERE extname IN ('pgcrypto', 'pg_trgm', 'unaccent');
 
 
 -- ----------------------------------------------------------------------------
 -- PHẦN 1.2: CHỨNG MINH RÀNG BUỘC TOÀN VẸN VÀ BẢO ĐẢM CHẤT LƯỢNG DỮ LIỆU
 -- ----------------------------------------------------------------------------
 
--- [DEMO C1]: CHỐNG ĐẶT TRÙNG GIỜ MÁY TÍNH (EXCLUDE USING GIST VỚI BTREE_GIST)
--- Tình huống: Máy PC001 đã có người đặt từ 14:00 đến 16:00.
--- Hệ thống tự động chặn khách đặt đè vào lúc 15:00 - 17:00 ngay tại tầng CSDL.
-SELECT booking_id, computer_id, booked_from, booked_to, status 
-FROM core.booking 
-WHERE computer_id = 1;
-
--- Thử đặt đè vào khung giờ trên -> CSDL ném lỗi vi phạm exclusion constraint:
-DO $$
-BEGIN
-    INSERT INTO core.booking (customer_id, computer_id, booked_from, booked_to, status)
-    VALUES (2, 1, '2026-10-10 15:00:00+07', '2026-10-10 17:00:00+07', 'confirmed');
-    RAISE EXCEPTION 'LỖI: Ràng buộc không chặn được đặt trùng!';
-EXCEPTION WHEN exclusion_violation THEN
-    RAISE NOTICE '>>> THÀNH CÔNG: PostgreSQL đã kích hoạt EXCLUDE USING GIST ngăn chặn đặt trùng máy thành công!';
-END $$;
-
-
--- [DEMO C2]: RÀNG BUỘC CHECK SỐ TIỀN KHÔNG ÂM (CK_INVOICE_TOTAL_AMOUNT)
+-- [DEMO C1]: RÀNG BUỘC CHECK SỐ TIỀN KHÔNG ÂM (CK_INVOICE_TOTAL_AMOUNT)
 -- Thử cố tình tạo hóa đơn tổng tiền âm:
 DO $$
 BEGIN
@@ -57,7 +39,7 @@ EXCEPTION WHEN check_violation THEN
 END $$;
 
 
--- [DEMO C3]: RÀNG BUỘC BẤT BIẾN CÔNG THỨC HÓA ĐƠN (CK_INVOICE_FORMULA)
+-- [DEMO C2]: RÀNG BUỘC BẤT BIẾN CÔNG THỨC HÓA ĐƠN (CK_INVOICE_FORMULA)
 -- total_amount PHẢI = play_amount + service_amount + surcharge - discount_amount
 DO $$
 BEGIN
@@ -70,7 +52,7 @@ EXCEPTION WHEN check_violation THEN
 END $$;
 
 
--- [DEMO C4]: RÀNG BUỘC CHECK THỜI LƯỢNG PHIÊN CHƠI (CK_SESSION_TIME_ORDER)
+-- [DEMO C3]: RÀNG BUỘC CHECK THỜI LƯỢNG PHIÊN CHƠI (CK_SESSION_TIME_ORDER)
 -- Giờ kết thúc phiên end_time phải lớn hơn giờ bắt đầu start_time:
 DO $$
 BEGIN

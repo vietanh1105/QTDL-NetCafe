@@ -27,6 +27,7 @@ public partial class MainForm : Form
     private bool _databaseContractReady;
     private string _runtimeSummary = "CSDL chưa kiểm tra";
     private string _runtimeContractStatus = string.Empty;
+    private DatabaseRuntimeInfo? _runtimeInfo;
     private string _listenerStatus = "Chưa khởi động";
     private readonly System.Windows.Forms.Timer _notificationDebounceTimer = new() { Interval = 250 };
 
@@ -43,16 +44,17 @@ public partial class MainForm : Form
 
     private void InitializeShell()
     {
-        _roleCombo.Items.AddRange(AppConfig.GetConfiguredRoles().Cast<object>().ToArray());
+        var roleOptions = AppConfig.GetConfiguredRoles().Select(CreateRoleOption).Cast<object>().ToArray();
+        _roleCombo.Items.AddRange(roleOptions);
         if (_roleCombo.Items.Count > 0)
         {
-            _roleCombo.SelectedItem = _roleCombo.Items.Contains(_currentUser) ? _currentUser : _roleCombo.Items[0];
+            _roleCombo.SelectedItem = roleOptions.FirstOrDefault(option => option is RoleOption item && item.User.Equals(_currentUser, StringComparison.OrdinalIgnoreCase)) ?? roleOptions[0];
         }
         _roleCombo.SelectedIndexChanged += async (_, _) =>
         {
-            if (!_loadingRole && _roleCombo.SelectedItem is string user)
+            if (!_loadingRole && _roleCombo.SelectedItem is RoleOption option)
             {
-                await SwitchRoleAsync(user);
+                await SwitchRoleAsync(option.User);
             }
         };
 
@@ -94,9 +96,9 @@ public partial class MainForm : Form
         AddView("Employees", "Nhân viên", new EmployeesView());
         AddView("Maintenance", "Bảo trì", new MaintenanceView());
         AddNavigationSeparator("HỖ TRỢ VÀ HỆ THỐNG");
-        AddView("AiCenter", "Trung tâm AI", new AiCenterView());
-        AddView("SupportQueue", "Hàng đợi hỗ trợ", new SupportQueueView());
-        AddView("Settings", "Cài đặt", new SettingsView());
+        AddView("AiCenter", "Phân tích dữ liệu", new AiCenterView());
+        AddView("SupportQueue", "Yêu cầu hỗ trợ", new SupportQueueView());
+        AddView("Settings", "Thông tin hệ thống", new SettingsView());
         ApplyContext();
         SwitchView("Computers");
     }
@@ -214,6 +216,7 @@ public partial class MainForm : Form
             CurrentEmployeeId = _currentEmployeeId,
             ConnectionSummary = AppConfig.ConnectionSummary(_currentUser),
             ListenerStatus = _listenerStatus,
+            RuntimeInfo = _runtimeInfo,
             CanManageCustomers = _currentEmployeeId > 0,
             CanManageSessions = _currentEmployeeId > 0
         };
@@ -238,6 +241,7 @@ public partial class MainForm : Form
         try
         {
             var runtime = await _repository.GetDatabaseRuntimeInfoAsync(_lifetimeCancellation.Token);
+            _runtimeInfo = runtime;
             _runtimeSummary = runtime.Summary;
             _runtimeContractStatus = runtime.ContractStatus;
             _databaseContractReady = runtime.IsStationContractReady;
@@ -443,6 +447,25 @@ public partial class MainForm : Form
         _errorBanner.Visible = true;
     }
 
+    private static RoleOption CreateRoleOption(string user)
+    {
+        var role = user.ToLowerInvariant() switch
+        {
+            "nv_manager" => "role_manager",
+            "nv_thao" => "role_cashier",
+            "nv_hung" => "role_technician",
+            _ => "role_admin"
+        };
+        var label = role switch
+        {
+            "role_manager" => "Vai trò demo: Quản lý",
+            "role_cashier" => "Vai trò demo: Thu ngân",
+            "role_technician" => "Vai trò demo: Kỹ thuật viên",
+            _ => "Vai trò demo: Siêu quản trị"
+        };
+        return new RoleOption(user, $"{label} ({role})");
+    }
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _timer.Stop();
@@ -454,4 +477,9 @@ public partial class MainForm : Form
         _lifetimeCancellation.Dispose();
         base.OnFormClosing(e);
     }
+}
+
+internal sealed record RoleOption(string User, string Display)
+{
+    public override string ToString() => Display;
 }

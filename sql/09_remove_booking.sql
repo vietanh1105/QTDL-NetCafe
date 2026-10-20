@@ -18,7 +18,45 @@ BEGIN
     FROM pg_depend AS d
     WHERE d.refobjid = v_booking
       AND d.deptype = 'n'
-      AND NOT (d.classid = 'pg_class'::regclass AND d.objid = v_booking);
+      AND NOT (
+          (d.classid = 'pg_class'::regclass AND d.objid = v_booking)
+          OR (
+              d.classid = 'pg_constraint'::regclass
+              AND EXISTS (
+                  SELECT 1
+                  FROM pg_constraint AS c
+                  WHERE c.oid = d.objid
+                    AND c.conrelid = v_booking
+              )
+          )
+          OR (
+              d.classid = 'pg_class'::regclass
+              AND EXISTS (
+                  SELECT 1
+                  FROM pg_index AS i
+                  WHERE i.indexrelid = d.objid
+                    AND i.indrelid = v_booking
+              )
+          )
+          OR (
+              d.classid = 'pg_trigger'::regclass
+              AND EXISTS (
+                  SELECT 1
+                  FROM pg_trigger AS t
+                  WHERE t.oid = d.objid
+                    AND t.tgrelid = v_booking
+              )
+          )
+          OR (
+              d.classid = 'pg_rewrite'::regclass
+              AND EXISTS (
+                  SELECT 1
+                  FROM pg_rewrite AS r
+                  WHERE r.oid = d.objid
+                    AND r.ev_class = v_booking
+              )
+          )
+      );
 
     IF v_dependency IS NOT NULL THEN
         RAISE EXCEPTION 'core.booking còn dependency ngoài phạm vi: %', v_dependency

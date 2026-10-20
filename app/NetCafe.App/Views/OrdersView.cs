@@ -1,8 +1,9 @@
-// Trách nhiệm: menu món ăn, tồn kho F&B và hàng đợi bếp làm đơn đặt từ máy trạm.
-// Liên kết: inventory.product, inventory.food_order và sp_place_order.
+// Trách nhiệm: menu gọi món, tồn kho F&B và hàng đợi bếp từ máy trạm.
+// Liên kết: inventory.product, inventory.food_order, sp_update_order_status và sp_receive_stock.
 
 using System.Drawing;
 using System.Windows.Forms;
+using NetCafe.App.Controls;
 using NetCafe.Data;
 
 namespace NetCafe.App.Views;
@@ -20,6 +21,8 @@ public partial class OrdersView : AdminViewBase
     private readonly Panel _menuHeaderPanel = new();
     private readonly Label _menuTitleLabel = new();
     private readonly Label _menuCountLabel = new();
+    private readonly ComboBox _categoryCombo = new();
+    private readonly Button _receiveStockButton = new();
     private readonly FlowLayoutPanel _cardsPanel = new();
 
     // Kitchen Queue section (Bottom)
@@ -32,6 +35,8 @@ public partial class OrdersView : AdminViewBase
     private readonly DataGridView _kitchenGrid = new();
 
     private List<KitchenOrderItem> _currentKitchenOrders = new();
+    private List<ProductItem> _allProducts = new();
+    private ProductItem? _selectedProduct;
 
     public OrdersView()
     {
@@ -51,7 +56,7 @@ public partial class OrdersView : AdminViewBase
         _toolbar.BackColor = CyberTheme.Surface;
         _toolbar.Padding = new Padding(12, 6, 12, 6);
 
-        _titleLabel.Text = "🍽️ Đặt món & Bếp F&B";
+        _titleLabel.Text = "🍽️ Gọi món & Bếp F&B";
         _titleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         _titleLabel.ForeColor = CyberTheme.Text;
         _titleLabel.AutoSize = true;
@@ -101,6 +106,22 @@ public partial class OrdersView : AdminViewBase
         _menuCountLabel.Dock = DockStyle.Right;
         _menuCountLabel.AutoSize = true;
 
+        _categoryCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _categoryCombo.Width = 125;
+        _categoryCombo.Items.AddRange(new object[] { "Tất cả", "Đồ uống", "Món ăn", "Thẻ game" });
+        _categoryCombo.SelectedIndex = 0;
+        _categoryCombo.Dock = DockStyle.Right;
+        _categoryCombo.SelectedIndexChanged += (_, _) => ApplyProductFilter();
+
+        _receiveStockButton.Text = "Nhập hàng";
+        _receiveStockButton.Width = 98;
+        _receiveStockButton.Height = 26;
+        _receiveStockButton.Dock = DockStyle.Right;
+        CyberTheme.StyleButton(_receiveStockButton, CyberTheme.Success);
+        _receiveStockButton.Click += async (_, _) => await ReceiveStockAsync();
+
+        _menuHeaderPanel.Controls.Add(_receiveStockButton);
+        _menuHeaderPanel.Controls.Add(_categoryCombo);
         _menuHeaderPanel.Controls.Add(_menuTitleLabel);
         _menuHeaderPanel.Controls.Add(_menuCountLabel);
 
@@ -182,7 +203,8 @@ public partial class OrdersView : AdminViewBase
 
             await Task.WhenAll(productsTask, kitchenOrdersTask);
 
-            PopulateProducts(productsTask.Result);
+            _allProducts = productsTask.Result;
+            ApplyProductFilter();
             PopulateKitchenOrders(kitchenOrdersTask.Result);
         }
         catch (Exception ex)
@@ -204,8 +226,29 @@ public partial class OrdersView : AdminViewBase
         }
     }
 
-    private void PopulateProducts(List<ProductItem> products)
+    private void ApplyProductFilter()
     {
+        var selectedCategory = _categoryCombo.SelectedItem?.ToString();
+        var products = string.IsNullOrWhiteSpace(selectedCategory) || selectedCategory == "Tất cả"
+            ? _allProducts
+            : _allProducts.Where(product => MatchesCategory(product.CategoryName, selectedCategory)).ToList();
+        PopulateProducts(products);
+    }
+
+    private static bool MatchesCategory(string categoryName, string displayCategory)
+    {
+        return displayCategory switch
+        {
+            "Đồ uống" => categoryName.Contains("Uống", StringComparison.OrdinalIgnoreCase),
+            "Món ăn" => categoryName.Contains("Ăn", StringComparison.OrdinalIgnoreCase),
+            "Thẻ game" => categoryName.Contains("Thẻ", StringComparison.OrdinalIgnoreCase),
+            _ => string.Equals(categoryName, displayCategory, StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private void PopulateProducts(IReadOnlyList<ProductItem> products)
+    {
+        _selectedProduct = null;
         _cardsPanel.SuspendLayout();
         _cardsPanel.Controls.Clear();
 
@@ -228,7 +271,7 @@ public partial class OrdersView : AdminViewBase
         var card = new Panel
         {
             Width = 270,
-            Height = 135,
+            Height = 204,
             Margin = new Padding(0, 0, 10, 10),
             Padding = new Padding(12),
             BackColor = CyberTheme.Surface,
@@ -240,6 +283,15 @@ public partial class OrdersView : AdminViewBase
             Dock = DockStyle.Left,
             Width = 5,
             BackColor = accentColor
+        };
+
+        var image = new PictureBox
+        {
+            Dock = DockStyle.Top,
+            Height = 98,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.White,
+            Image = AdminProductImageCatalog.Load(product.Sku)
         };
 
         var title = new Label
@@ -280,13 +332,74 @@ public partial class OrdersView : AdminViewBase
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
 
+        card.Tag = product;
         card.Controls.Add(priceStock);
         card.Controls.Add(status);
         card.Controls.Add(category);
         card.Controls.Add(title);
+        card.Controls.Add(image);
         card.Controls.Add(accent);
 
+        WireProductCardClick(card);
+
         return card;
+    }
+
+    private void WireProductCardClick(Control control)
+    {
+        control.Click += (_, _) => SelectProduct(control);
+        foreach (Control child in control.Controls)
+        {
+            WireProductCardClick(child);
+        }
+    }
+
+    private void SelectProduct(Control control)
+    {
+        var card = control;
+        while (card.Parent is not null && !ReferenceEquals(card.Parent, _cardsPanel))
+        {
+            card = card.Parent;
+        }
+
+        _selectedProduct = card.Tag as ProductItem;
+        foreach (Control candidate in _cardsPanel.Controls)
+        {
+            candidate.BackColor = ReferenceEquals(candidate, card)
+                ? CyberTheme.SurfaceRaised
+                : CyberTheme.Surface;
+        }
+    }
+
+    private async Task ReceiveStockAsync()
+    {
+        if (_selectedProduct is null)
+        {
+            MessageBox.Show(FindForm(), "Hãy chọn một card sản phẩm trước khi nhập hàng.", "Chưa chọn sản phẩm", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (RequiredContext.CurrentEmployeeId <= 0)
+        {
+            ReportError(new InvalidOperationException("Vai trò hiện tại chưa ánh xạ employee_id."));
+            return;
+        }
+
+        using var dialog = new StockReceiveDialog(_selectedProduct.ProductName);
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var stock = await RequiredContext.Repository.ReceiveStockAsync(_selectedProduct.ProductId, dialog.Quantity);
+            MessageBox.Show(FindForm(), $"Đã nhập {dialog.Quantity:N0} sản phẩm. Tồn kho mới: {stock:N0}.", "Nhập hàng thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
     }
 
     private void ResizeCards()
@@ -446,5 +559,43 @@ public partial class OrdersView : AdminViewBase
         {
             ReportError(ex);
         }
+    }
+}
+
+internal sealed class StockReceiveDialog : Form
+{
+    private readonly NumericUpDown _quantityBox = new();
+    public int Quantity => (int)_quantityBox.Value;
+
+    public StockReceiveDialog(string productName)
+    {
+        Text = $"Nhập hàng - {productName}";
+        Width = 340;
+        Height = 170;
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(12),
+            ColumnCount = 2,
+            RowCount = 2
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
+        layout.Controls.Add(new Label { Text = "Số lượng nhập", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+        _quantityBox.Minimum = 1;
+        _quantityBox.Maximum = 100000;
+        _quantityBox.Value = 10;
+        _quantityBox.Dock = DockStyle.Fill;
+        layout.Controls.Add(_quantityBox, 1, 0);
+        var save = new Button { Text = "Xác nhận", DialogResult = DialogResult.OK, Dock = DockStyle.Fill };
+        CyberTheme.StyleButton(save, CyberTheme.Success);
+        layout.Controls.Add(save, 1, 1);
+        Controls.Add(layout);
+        AcceptButton = save;
     }
 }

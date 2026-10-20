@@ -73,15 +73,20 @@ UNION ALL SELECT 'gaming_session', count(*) FROM core.gaming_session;
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -Atc $countSql | Set-Content -LiteralPath (Join-Path $backupDir 'row-count-before.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Preflight row-count failed; migration was not started.' }
 
-$migrationPath = Join-Path $repoRoot 'sql\08_station_customer.sql'
-$migrationText = Get-Content -Raw -LiteralPath $migrationPath
-foreach ($forbiddenToken in @('DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM')) {
-    if ($migrationText -match [regex]::Escape($forbiddenToken)) {
-        throw "Migration 08 bị chặn vì chứa thao tác phá hủy: $forbiddenToken"
+$migrationPaths = @(
+    (Join-Path $repoRoot 'sql\08_station_customer.sql'),
+    (Join-Path $repoRoot 'sql\10_admin_operations.sql')
+)
+foreach ($migrationPath in $migrationPaths) {
+    $migrationText = Get-Content -Raw -LiteralPath $migrationPath
+    foreach ($forbiddenToken in @('DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM')) {
+        if ($migrationText -match [regex]::Escape($forbiddenToken)) {
+            throw "Migration bị chặn vì chứa thao tác phá hủy: $forbiddenToken ($migrationPath)"
+        }
     }
+    & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -f $migrationPath
+    if ($LASTEXITCODE -ne 0) { throw "Migration thất bại: $migrationPath; không chạy reset/seed." }
 }
-& $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -f $migrationPath
-if ($LASTEXITCODE -ne 0) { throw 'Migration 08 failed; inspect psql output and do not run reset/seed.' }
 
 $quotedRole = '"' + $stationRole.Replace('"', '""') + '"'
 $escapedStationPassword = $config['STATION_DB_PASSWORD'].Replace("'", "''")
@@ -118,10 +123,10 @@ DECLARE
     v_missing_columns TEXT;
 BEGIN
     IF current_database() <> 'netcafe_db' THEN
-        RAISE EXCEPTION 'Verification đang chạy sai database.';
+        RAISE EXCEPTION 'Verification is running against the wrong database.';
     END IF;
     IF to_regclass('reporting.vw_computer_grid') IS NULL THEN
-        RAISE EXCEPTION 'Thiếu reporting.vw_computer_grid sau migration.';
+        RAISE EXCEPTION 'Missing reporting.vw_computer_grid after migration.';
     END IF;
     SELECT string_agg(required_column, ', ' ORDER BY required_column)
     INTO v_missing_columns
@@ -139,17 +144,23 @@ BEGIN
           AND c.column_name = required.required_column
     );
     IF v_missing_columns IS NOT NULL THEN
-        RAISE EXCEPTION 'View thiếu cột: %', v_missing_columns;
+        RAISE EXCEPTION 'View is missing columns: %', v_missing_columns;
     END IF;
     IF to_regprocedure('inventory.fn_customer_menu_v2()') IS NULL
        OR to_regprocedure('core.sp_customer_login(character varying,text,character varying)') IS NULL
        OR to_regprocedure('core.sp_station_heartbeat(bigint,integer,integer)') IS NULL
        OR to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NULL
-       OR to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NULL THEN
-        RAISE EXCEPTION 'Thiếu function trong contract station sau migration.';
+       OR to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NULL
+       OR to_regprocedure('inventory.sp_receive_stock(integer,integer)') IS NULL
+       OR to_regprocedure('inventory.sp_update_order_status(bigint,character varying,integer)') IS NULL
+       OR to_regprocedure('core.sp_update_service_request_status(bigint,character varying,integer)') IS NULL
+       OR to_regprocedure('billing.sp_void_invoice(bigint,integer)') IS NULL
+       OR to_regprocedure('reporting.sp_refresh_materialized_views()') IS NULL
+       OR to_regprocedure('hr.sp_create_maintenance(integer,integer,text)') IS NULL THEN
+        RAISE EXCEPTION 'Station contract function is missing after migration.';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'role_station') THEN
-        RAISE EXCEPTION 'Thiếu role_station sau migration.';
+        RAISE EXCEPTION 'role_station is missing after migration.';
     END IF;
     IF NOT EXISTS (
         SELECT 1
@@ -159,7 +170,7 @@ BEGIN
         WHERE member_role.rolname = '__STATION_ROLE__'
           AND parent_role.rolname = 'role_station'
     ) THEN
-        RAISE EXCEPTION 'Role __STATION_ROLE__ chưa được cấp role_station.';
+        RAISE EXCEPTION 'Station runtime role has not been granted role_station.';
     END IF;
 END $$;
 SELECT to_regclass('core.service_request'),
@@ -178,4 +189,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Verification sau migration thất bại.' }
 
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -Atc $countSql | Set-Content -LiteralPath (Join-Path $backupDir 'row-count-after.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Row-count sau migration thất bại.' }
-Write-Host "Migration 08 hoàn tất trên $dbName. Backup và evidence: $backupDir" -ForegroundColor Green
+Write-Host "Station and Admin migrations completed on $dbName. Backup and evidence: $backupDir" -ForegroundColor Green

@@ -3,7 +3,7 @@
 
 namespace NetCafe.App.Views;
 
-public partial class AiCenterView : AdminDataViewBase
+public partial class AiCenterView : AdminCardViewBase
 {
     private readonly Button _runAllButton = new();
     private readonly Button _runIndexButton = new();
@@ -17,7 +17,7 @@ public partial class AiCenterView : AdminDataViewBase
     public AiCenterView()
     {
         InitializeComponent();
-        SetTitle("Trung tâm AI & Tự động hóa", "Bảo mật, chỉ mục, phát hiện trùng lặp, dị thường và khuyến mãi chạy trực tiếp trong CSDL PostgreSQL.");
+        SetTitle("Phân tích và cảnh báo dữ liệu", "Năm mô-đun PL/pgSQL chạy trong PostgreSQL; mỗi card có trạng thái, mô tả và nút xử lý riêng.");
         _runAllButton.Text = "Chạy cả 5 mô-đun";
         _runAllButton.Width = 135;
         _runAllButton.BackColor = PrimaryColor;
@@ -63,7 +63,7 @@ public partial class AiCenterView : AdminDataViewBase
         rows.AddRange(duplicates.Select(item => new AiModuleRow("Hội viên trùng lặp", item.CandidateId.ToString(), item.Reason, item.Status, null, item.CandidateId)));
         rows.AddRange(anomalies.Select(item => new AiModuleRow("Phát hiện dị thường", item.FlagId.ToString(), $"{item.AnomalyType}: z={item.ZScore}", item.Status, null, null)));
         rows.AddRange(promotions.Select(item => new AiModuleRow("Gợi ý khuyến mãi", item.SuggestionId.ToString(), item.Details, item.SuggestionType, null, null)));
-        SetRows(rows, $"5 mô-đun PostgreSQL: {alerts.Count} cảnh báo, {indexes.Count} chỉ mục, {duplicates.Count} trùng lặp, {anomalies.Count} dị thường, {promotions.Count} khuyến mãi.");
+        SetCards(rows, BuildCard, $"5 mô-đun PostgreSQL: {alerts.Count} cảnh báo, {indexes.Count} chỉ mục, {duplicates.Count} trùng lặp, {anomalies.Count} dị thường, {promotions.Count} khuyến mãi.");
     }
 
     private async Task RunAllAsync()
@@ -94,7 +94,7 @@ public partial class AiCenterView : AdminDataViewBase
 
     private async Task UpdateSelectedAsync(string status)
     {
-        if (Grid.CurrentRow?.DataBoundItem is not AiModuleRow row)
+        if (SelectedItem is not AiModuleRow row)
         {
             return;
         }
@@ -115,6 +115,23 @@ public partial class AiCenterView : AdminDataViewBase
         {
             ReportError(exception);
         }
+    }
+
+    private static AdminCardModel BuildCard(AiModuleRow row)
+    {
+        var accent = row.Status.ToLowerInvariant() switch
+        {
+            "new" => CyberTheme.Warning,
+            "reviewed" or "merged" or "ignored" => CyberTheme.Success,
+            "chỉ đọc" => CyberTheme.Primary,
+            _ => CyberTheme.MutedText
+        };
+        return new AdminCardModel(
+            $"{row.Module} · {row.Key}",
+            "Phân tích dữ liệu PostgreSQL",
+            row.Summary,
+            row.Status,
+            accent);
     }
 
     private static void ConfigureButton(Button button, string text)

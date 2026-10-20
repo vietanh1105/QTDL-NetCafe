@@ -1,3 +1,5 @@
+<!-- Trách nhiệm: cấu hình WinForms Admin và copy ảnh sản phẩm dùng chung từ NetCafe.Client. -->
+<!-- Liên kết: NetCafe.Data, Assets/Products và các Views Admin. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
@@ -6,6 +8,12 @@
 
   <ItemGroup>
     <PackageReference Include="Guna.UI2.WinForms" Version="2.0.4.8" />
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="QuestPDF" Version="2025.7.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\NetCafe.Client\Assets\Products\*.png" Link="Assets\Products\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

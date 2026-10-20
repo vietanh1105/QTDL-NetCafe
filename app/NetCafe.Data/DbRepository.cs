@@ -235,7 +235,7 @@ namespace NetCafe.Data
         public async Task<List<EmployeeItem>> GetEmployeesAsync()
         {
             var sw = Stopwatch.StartNew();
-            var sql = "SELECT employee_id, full_name, username, db_username, emp_role, default_shift FROM hr.employee WHERE is_active = TRUE ORDER BY employee_id;";
+            var sql = "SELECT employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active FROM hr.employee WHERE is_active = TRUE ORDER BY employee_id;";
             try
             {
                 await using var conn = new NpgsqlConnection(_connectionString);
@@ -249,10 +249,13 @@ namespace NetCafe.Data
                     {
                         EmployeeId = reader.GetInt32(0),
                         FullName = reader.GetString(1),
-                        Username = reader.GetString(2),
-                        DbUsername = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        EmpRole = reader.GetString(4),
-                        DefaultShift = reader.GetString(5)
+                        Phone = reader.GetString(2),
+                        Username = reader.GetString(3),
+                        DbUsername = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        EmpRole = reader.GetString(5),
+                        DefaultShift = reader.GetString(6),
+                        HiredDate = reader.GetDateTime(7),
+                        IsActive = reader.GetBoolean(8)
                     });
                 }
                 sw.Stop();
@@ -439,7 +442,7 @@ namespace NetCafe.Data
         public async Task UpdateFoodOrderStatusAsync(long orderId, string status, int employeeId = 0)
         {
             var sw = Stopwatch.StartNew();
-            var sql = "UPDATE inventory.food_order SET status = @status, employee_id = CASE WHEN @empId > 0 THEN @empId ELSE employee_id END WHERE order_id = @orderId;";
+            var sql = "SELECT inventory.sp_update_order_status(@orderId, @status, @empId);";
             try
             {
                 await using var conn = new NpgsqlConnection(_connectionString);

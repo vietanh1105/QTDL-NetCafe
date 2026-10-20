@@ -112,22 +112,69 @@ namespace NetCafe.Data
         public long InvoiceId { get; set; }
         public long SessionId { get; set; }
         public string CustomerName { get; set; } = string.Empty;
+        public string ComputerCode { get; set; } = string.Empty;
         public decimal PlayAmount { get; set; }
         public decimal ServiceAmount { get; set; }
         public decimal DiscountAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = "paid";
         public DateTime IssuedAt { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+    }
+
+    public sealed record InvoiceDetailItem
+    {
+        public long InvoiceId { get; init; }
+        public long SessionId { get; init; }
+        public string CustomerName { get; init; } = string.Empty;
+        public string Username { get; init; } = string.Empty;
+        public string ComputerCode { get; init; } = string.Empty;
+        public DateTime? SessionStart { get; init; }
+        public DateTime? SessionEnd { get; init; }
+        public decimal PlayAmount { get; init; }
+        public decimal ServiceAmount { get; init; }
+        public decimal DiscountAmount { get; init; }
+        public decimal TotalAmount { get; init; }
+        public string Status { get; init; } = string.Empty;
+        public DateTime IssuedAt { get; init; }
+        public string PaymentMethod { get; init; } = string.Empty;
+        public IReadOnlyList<InvoiceLineItem> Lines { get; init; } = Array.Empty<InvoiceLineItem>();
+    }
+
+    public sealed class InvoiceLineItem
+    {
+        public string ProductName { get; init; } = string.Empty;
+        public int Quantity { get; init; }
+        public decimal UnitPrice { get; init; }
+        public decimal LineTotal => Quantity * UnitPrice;
     }
 
     public class EmployeeItem
     {
         public int EmployeeId { get; set; }
         public string FullName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string? DbUsername { get; set; }
         public string EmpRole { get; set; } = string.Empty;
         public string DefaultShift { get; set; } = string.Empty;
+        public decimal? Salary { get; set; }
+        public DateTime? HiredDate { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    public sealed class MaintenanceItem
+    {
+        public int MaintenanceId { get; init; }
+        public int ComputerId { get; init; }
+        public string ComputerCode { get; init; } = string.Empty;
+        public int TechnicianId { get; init; }
+        public string TechnicianName { get; init; } = string.Empty;
+        public string IssueDescription { get; init; } = string.Empty;
+        public DateTime StartedAt { get; init; }
+        public DateTime? FinishedAt { get; init; }
+        public decimal Cost { get; init; }
+        public string Status { get; init; } = string.Empty;
     }
 
     public class DailyRevenueItem

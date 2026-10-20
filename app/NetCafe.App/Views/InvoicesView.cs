@@ -1,9 +1,10 @@
-// Trách nhiệm: hóa đơn và sổ quỹ doanh thu; thiết kế UX/UI hiện đại với Dashboard KPI và Chi tiết phiếu thu.
-// Liên kết: billing.invoice, billing.payment và DbRepository.
+// Trách nhiệm: đối soát hóa đơn, void có audit và xuất PDF/Excel từ DTO đã lọc.
+// Liên kết: billing.invoice, billing.payment, ExportService và DbRepository.
 
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
+using NetCafe.App.Services;
 using NetCafe.Data;
 
 namespace NetCafe.App.Views;
@@ -50,8 +51,11 @@ public partial class InvoicesView : AdminViewBase
     private readonly Label _receiptTotalLabel = new();
     private readonly Button _printReceiptButton = new();
     private readonly Button _copyReceiptButton = new();
+    private readonly Button _voidInvoiceButton = new();
+    private readonly Button _exportExcelButton = new();
 
     private List<InvoiceItem> _allInvoices = new();
+    private List<InvoiceItem> _filteredInvoices = new();
     private InvoiceItem? _selectedInvoice;
 
     public InvoicesView()
@@ -120,7 +124,7 @@ public partial class InvoicesView : AdminViewBase
         _searchBox.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) ApplyFilter(); };
 
         _statusCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-        _statusCombo.Items.AddRange(new object[] { "Tất cả trạng thái", "Đã thanh toán (paid)", "Đã hủy (cancelled)" });
+        _statusCombo.Items.AddRange(new object[] { "Tất cả trạng thái", "Đã thanh toán (paid)", "Chưa thanh toán (unpaid)", "Đã hủy (void)" });
         _statusCombo.SelectedIndex = 0;
         _statusCombo.Location = new Point(260, 8);
         _statusCombo.Width = 180;
@@ -148,6 +152,13 @@ public partial class InvoicesView : AdminViewBase
             ApplyFilter();
         };
 
+        _exportExcelButton.Text = "📊 Xuất Excel";
+        _exportExcelButton.Width = 108;
+        _exportExcelButton.Height = 28;
+        _exportExcelButton.Dock = DockStyle.Right;
+        CyberTheme.StyleButton(_exportExcelButton, CyberTheme.Success);
+        _exportExcelButton.Click += async (_, _) => await ExportExcelAsync();
+
         _countSummaryLabel.Dock = DockStyle.Right;
         _countSummaryLabel.AutoSize = true;
         _countSummaryLabel.Font = new Font("Segoe UI", 9F);
@@ -159,6 +170,7 @@ public partial class InvoicesView : AdminViewBase
         _filterPanel.Controls.Add(_searchButton);
         _filterPanel.Controls.Add(_clearFilterButton);
         _filterPanel.Controls.Add(_countSummaryLabel);
+        _filterPanel.Controls.Add(_exportExcelButton);
 
         // 4. Master-Detail Workspace
         _splitContainer.Dock = DockStyle.Fill;
@@ -173,6 +185,7 @@ public partial class InvoicesView : AdminViewBase
         StyleGrid(_grid);
         _grid.CellFormatting += Grid_CellFormatting;
         _grid.SelectionChanged += Grid_SelectionChanged;
+        _grid.CellDoubleClick += async (_, _) => await ShowInvoiceDetailAsync();
         _splitContainer.Panel1.Controls.Add(_grid);
 
         // Right: Digital Receipt Panel
@@ -380,20 +393,32 @@ public partial class InvoicesView : AdminViewBase
         totalPanel.Controls.Add(totalTitle);
 
         // Buttons Action
-        var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(0, 6, 0, 0) };
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            Padding = new Padding(0, 6, 0, 0),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
         _copyReceiptButton.Text = "📋 Sao chép";
         _copyReceiptButton.Width = 110;
         _copyReceiptButton.Dock = DockStyle.Left;
         CyberTheme.StyleButton(_copyReceiptButton, CyberTheme.SurfaceRaised);
         _copyReceiptButton.Click += CopyReceiptDetails;
 
-        _printReceiptButton.Text = "🖨️ In lại phiếu";
-        _printReceiptButton.Width = 130;
-        _printReceiptButton.Dock = DockStyle.Right;
+        _printReceiptButton.Text = "📄 Xuất PDF";
+        _printReceiptButton.Width = 112;
         CyberTheme.StyleButton(_printReceiptButton, PrimaryColor);
-        _printReceiptButton.Click += PrintReceiptDetails;
+        _printReceiptButton.Click += async (_, _) => await ExportPdfAsync();
+
+        _voidInvoiceButton.Text = "🚫 Hủy hóa đơn";
+        _voidInvoiceButton.Width = 126;
+        CyberTheme.StyleButton(_voidInvoiceButton, CyberTheme.Danger);
+        _voidInvoiceButton.Click += async (_, _) => await VoidSelectedInvoiceAsync();
 
         buttonPanel.Controls.Add(_copyReceiptButton);
+        buttonPanel.Controls.Add(_voidInvoiceButton);
         buttonPanel.Controls.Add(_printReceiptButton);
 
         // Assemble Receipt Panel in order (Reverse order for Dock = Top)
@@ -428,9 +453,9 @@ public partial class InvoicesView : AdminViewBase
     {
         try
         {
-            var rows = await RequiredContext.Repository.GetRecentInvoicesAsync(100);
-            _allInvoices = rows;
-            UpdateKpis(rows);
+            var rows = await RequiredContext.Repository.GetInvoicesAsync(cancellationToken: cancellationToken);
+            _allInvoices = rows.ToList();
+            UpdateKpis(_allInvoices);
             ApplyFilter();
         }
         catch (Exception ex)
@@ -459,7 +484,8 @@ public partial class InvoicesView : AdminViewBase
         var statusFilter = _statusCombo.SelectedIndex switch
         {
             1 => "paid",
-            2 => "cancelled",
+            2 => "unpaid",
+            3 => "void",
             _ => null
         };
 
@@ -479,6 +505,7 @@ public partial class InvoicesView : AdminViewBase
         }
 
         var resultList = filtered.ToList();
+        _filteredInvoices = resultList;
         _grid.DataSource = null;
         _grid.DataSource = resultList;
 
@@ -554,9 +581,13 @@ public partial class InvoicesView : AdminViewBase
                     e.CellStyle!.ForeColor = CyberTheme.Success;
                     e.CellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
                     break;
-                case "cancelled":
+                case "void":
                     e.Value = "✕ Đã hủy";
                     e.CellStyle!.ForeColor = CyberTheme.Danger;
+                    break;
+                case "unpaid":
+                    e.Value = "○ Chưa thanh toán";
+                    e.CellStyle!.ForeColor = CyberTheme.Warning;
                     break;
                 default:
                     e.Value = raw;
@@ -578,14 +609,22 @@ public partial class InvoicesView : AdminViewBase
     {
         _selectedInvoice = inv;
         _receiptInvoiceIdLabel.Text = $"#HĐ-{inv.InvoiceId:D5}";
-        var isPaid = inv.Status.Equals("paid", StringComparison.OrdinalIgnoreCase);
-
-        _receiptStatusBadge.Text = isPaid ? "✓ ĐÃ THANH TOÁN" : "✕ ĐÃ HỦY";
-        _receiptStatusBadge.ForeColor = isPaid ? CyberTheme.Success : CyberTheme.Danger;
+        _receiptStatusBadge.Text = inv.Status.ToLowerInvariant() switch
+        {
+            "paid" => "✓ ĐÃ THANH TOÁN",
+            "unpaid" => "○ CHƯA THANH TOÁN",
+            _ => "✕ ĐÃ HỦY"
+        };
+        _receiptStatusBadge.ForeColor = inv.Status.ToLowerInvariant() switch
+        {
+            "paid" => CyberTheme.Success,
+            "unpaid" => CyberTheme.Warning,
+            _ => CyberTheme.Danger
+        };
 
         _receiptCustomerLabel.Text = $"Khách hàng: {inv.CustomerName}";
-        _receiptSessionLabel.Text = $"Mã phiên máy: #{inv.SessionId}";
-        _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss}";
+        _receiptSessionLabel.Text = $"Máy {inv.ComputerCode} · Phiên #{inv.SessionId}";
+        _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss} · {inv.PaymentMethod}";
 
         _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
         _receiptServiceLabel.Text = $"🍜 Dịch vụ F&B: {inv.ServiceAmount:N0} đ";
@@ -638,18 +677,130 @@ public partial class InvoicesView : AdminViewBase
         MessageBox.Show($"Đã sao chép thông tin phiếu thu #{_selectedInvoice.InvoiceId} vào clipboard!", "Đã sao chép", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    private void PrintReceiptDetails(object? sender, EventArgs e)
+    private async Task ExportPdfAsync()
     {
         if (_selectedInvoice == null)
         {
-            MessageBox.Show("Vui lòng chọn một hóa đơn để in.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Vui lòng chọn một hóa đơn để xuất PDF.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        MessageBox.Show(
-            $"Đã gửi lệnh in phiếu thu #{_selectedInvoice.InvoiceId} ({_selectedInvoice.CustomerName} - {_selectedInvoice.TotalAmount:N0} đ) tới máy in hóa đơn nhiệt POS-80!",
-            "In phiếu thu thành công",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "PDF (*.pdf)|*.pdf",
+            FileName = $"hoa-don-{_selectedInvoice.InvoiceId}.pdf"
+        };
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var detail = await RequiredContext.Repository.GetInvoiceDetailAsync(_selectedInvoice.InvoiceId);
+            if (detail is null)
+            {
+                throw new InvalidOperationException("Không tìm thấy chi tiết hóa đơn để xuất PDF.");
+            }
+            ExportService.ExportInvoicePdf(detail, dialog.FileName);
+            MessageBox.Show(FindForm(), $"Đã xuất PDF: {dialog.FileName}", "Xuất PDF thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "Excel (*.xlsx)|*.xlsx",
+            FileName = "danh-sach-hoa-don.xlsx"
+        };
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            ExportService.ExportInvoicesExcel(_filteredInvoices, dialog.FileName);
+            MessageBox.Show(FindForm(), $"Đã xuất Excel: {dialog.FileName}", "Xuất Excel thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task VoidSelectedInvoiceAsync()
+    {
+        if (_selectedInvoice is null)
+        {
+            return;
+        }
+        if (!_selectedInvoice.Status.Equals("paid", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(FindForm(), "Chỉ hóa đơn paid mới được hủy.", "Không thể hủy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (RequiredContext.CurrentEmployeeId <= 0)
+        {
+            ReportError(new InvalidOperationException("Role hiện tại chưa ánh xạ employee_id; không thể hủy hóa đơn."));
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            FindForm(),
+            "Cảnh báo: hành vi hủy hóa đơn sẽ được ghi vào nhật ký kiểm toán và AI Security Alert. Bạn có chắc chắn muốn hủy?",
+            "Xác nhận hủy hóa đơn",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+        if (confirm != DialogResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await RequiredContext.Repository.VoidInvoiceAsync(_selectedInvoice.InvoiceId, RequiredContext.CurrentEmployeeId);
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+    }
+
+    private async Task ShowInvoiceDetailAsync()
+    {
+        if (_selectedInvoice is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var detail = await RequiredContext.Repository.GetInvoiceDetailAsync(_selectedInvoice.InvoiceId);
+            if (detail is null)
+            {
+                return;
+            }
+            var lines = detail.Lines.Count == 0
+                ? "Không có món F&B."
+                : string.Join(Environment.NewLine, detail.Lines.Select(line => $"- {line.ProductName} x{line.Quantity}: {line.LineTotal:N0} đ"));
+            MessageBox.Show(
+                FindForm(),
+                $"Hóa đơn #{detail.InvoiceId}\nKhách: {detail.CustomerName} (@{detail.Username})\nMáy: {detail.ComputerCode}\nPhiên: {detail.SessionStart:dd/MM/yyyy HH:mm} → {detail.SessionEnd:dd/MM/yyyy HH:mm}\n\nMón đã gọi:\n{lines}\n\nTổng: {detail.TotalAmount:N0} đ",
+                "Chi tiết hóa đơn",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
     }
 }

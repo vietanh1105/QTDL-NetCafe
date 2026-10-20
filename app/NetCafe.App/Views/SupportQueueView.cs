@@ -6,7 +6,7 @@ using NetCafe.Data;
 
 namespace NetCafe.App.Views;
 
-public partial class SupportQueueView : AdminDataViewBase
+public partial class SupportQueueView : AdminCardViewBase
 {
     private readonly Button _acknowledgeButton = CreateActionButton("Tiếp nhận");
     private readonly Button _resolveButton = CreateActionButton("Hoàn thành");
@@ -15,7 +15,7 @@ public partial class SupportQueueView : AdminDataViewBase
     public SupportQueueView()
     {
         InitializeComponent();
-        SetTitle("Hàng đợi hỗ trợ", "Máy trạm gửi yêu cầu qua hàm CSDL; Quản trị viên xử lý theo quy trình: Mới → Tiếp nhận → Hoàn thành.");
+        SetTitle("Yêu cầu hỗ trợ", "Máy trạm gửi yêu cầu qua PostgreSQL NOTIFY; chọn card để xử lý theo luồng Mới → Tiếp nhận → Hoàn thành.");
         Toolbar.Controls.Add(_cancelButton);
         Toolbar.Controls.Add(_resolveButton);
         Toolbar.Controls.Add(_acknowledgeButton);
@@ -27,7 +27,7 @@ public partial class SupportQueueView : AdminDataViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetServiceRequestsAsync(cancellationToken);
-        SetRows(rows, $"{rows.Count} yêu cầu hỗ trợ");
+        SetCards(rows, BuildCard, $"{rows.Count} yêu cầu hỗ trợ; {rows.Count(row => row.Status == "new")} yêu cầu mới.");
     }
 
     private async Task ChangeStatusAsync(string status)
@@ -38,7 +38,7 @@ public partial class SupportQueueView : AdminDataViewBase
             return;
         }
 
-        if (Grid.CurrentRow?.DataBoundItem is not ServiceRequestItem request)
+        if (SelectedItem is not ServiceRequestItem request)
         {
             return;
         }
@@ -53,6 +53,25 @@ public partial class SupportQueueView : AdminDataViewBase
         {
             ReportError(exception);
         }
+    }
+
+    private static AdminCardModel BuildCard(ServiceRequestItem request)
+    {
+        var (status, accent) = request.Status switch
+        {
+            "new" => ("🔴 Mới tiếp nhận", CyberTheme.Danger),
+            "acknowledged" => ("🟡 Đang xử lý", CyberTheme.Warning),
+            "resolved" => ("🟢 Hoàn thành", CyberTheme.Success),
+            "cancelled" => ("⚪ Đã hủy", CyberTheme.MutedText),
+            _ => (request.Status, CyberTheme.Primary)
+        };
+
+        return new AdminCardModel(
+            $"#{request.ServiceRequestId} · {request.ComputerCode}",
+            $"{request.CustomerName} · {request.RequestType}",
+            $"{request.Message}\nGửi lúc: {request.CreatedAt.LocalDateTime:dd/MM HH:mm:ss}",
+            status,
+            accent);
     }
 
     private static Button CreateActionButton(string text)

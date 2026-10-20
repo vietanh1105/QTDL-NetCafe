@@ -20,6 +20,7 @@ obj/
 # Backup & scratch
 backup/*.dump
 backup/main-migration-*/
+backup/booking-removal-*/
 scratch/
 
 # Temporary office files & OS files

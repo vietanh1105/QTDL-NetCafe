@@ -126,6 +126,15 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
 
+-- Manager được quản lý dữ liệu vận hành nhưng không được đọc/sửa salary hoặc password_hash.
+REVOKE ALL ON hr.employee FROM role_manager;
+GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
+    ON hr.employee TO role_manager;
+GRANT INSERT (full_name, phone, username, db_username, password_hash, emp_role, default_shift, hired_date, is_active)
+    ON hr.employee TO role_manager;
+GRANT UPDATE (full_name, phone, db_username, emp_role, default_shift, hired_date, is_active)
+    ON hr.employee TO role_manager;
+
 -- 5.7. COLUMN-LEVEL SECURITY: Bảo vệ cột lương (salary) và password_hash
 -- Thu ngân, nhân viên, kỹ thuật viên CHỈ được SELECT các cột không nhạy cảm của employee:
 REVOKE ALL ON hr.employee FROM role_cashier, role_staff, role_technician;
@@ -137,6 +146,7 @@ CREATE OR REPLACE VIEW hr.vw_employee_public AS
 SELECT employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active
 FROM hr.employee;
 GRANT SELECT ON hr.vw_employee_public TO role_cashier, role_staff, role_technician;
+GRANT SELECT ON hr.vw_employee_public TO role_manager;
 
 -- Cấp quyền trên hr.maintenance cho kỹ thuật viên
 GRANT SELECT, UPDATE ON hr.maintenance TO role_technician;

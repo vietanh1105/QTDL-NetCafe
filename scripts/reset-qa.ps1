@@ -1,4 +1,4 @@
-# Mục đích: reset duy nhất database QA netcafe_qa rồi áp dụng schema/migration/seed.
+﻿# Mục đích: reset duy nhất database QA netcafe_qa rồi áp dụng schema/migration/seed.
 # Không nhận tên database production; không gọi sql/00_create_database.sql vì file đó dành cho demo netcafe_db.
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -45,7 +45,8 @@ $files = @(
     "sql/05_indexes_partition.sql",
     "sql/06_seed_base.sql",
     "sql/07_ai_modules.sql",
-    "sql/08_station_customer.sql"
+    "sql/08_station_customer.sql",
+    "sql/10_admin_operations.sql"
 )
 
 foreach ($relativePath in $files) {
@@ -100,7 +101,7 @@ CREATE TABLE IF NOT EXISTS core.qa_reset_marker (
     reset_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 INSERT INTO core.qa_reset_marker (marker_id, schema_version)
-VALUES (1, '08_station_customer')
+VALUES (1, '10_admin_operations')
 ON CONFLICT (marker_id) DO UPDATE SET schema_version = EXCLUDED.schema_version, reset_at = clock_timestamp();
 "@
 if ($LASTEXITCODE -ne 0) { throw "QA marker failed" }

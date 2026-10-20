@@ -1,3 +1,6 @@
+# Trách nhiệm: tạo báo cáo kiến trúc NetCafe theo contract hiện hành, không còn nghiệp vụ Đặt máy.
+# Liên kết: sql/netcafe_full.sql, docs và evidence của các gate CSDL.
+
 import os
 import sys
 import docx
@@ -265,18 +268,17 @@ def build_report():
     p.paragraph_format.line_spacing = 1.15
     p.paragraph_format.space_after = Pt(8)
 
-    doc.add_heading("1.1. Danh mục 10 chức năng nghiệp vụ cốt lõi", level=2)
+    doc.add_heading("1.1. Danh mục 9 chức năng nghiệp vụ cốt lõi", level=2)
     biz_funcs = [
         ("1. Quản lý máy tính", "Mã máy, tên máy, phòng/khu vực, loại cấu hình, IP/MAC, trạng thái (trống, đang chơi, bảo trì, hỏng), giá tiền/giờ."),
         ("2. Quản lý khách hàng", "Mã khách, họ tên, số điện thoại, tài khoản, mật khẩu băm bcrypt, số dư ví, điểm tích lũy, phân hạng hội viên (Regular, Silver, Gold, VIP)."),
         ("3. Quản lý phiên chơi", "Bảng trọng tâm hệ thống: khách hàng, máy trạm, thời điểm bắt đầu/kết thúc, thời lượng, đơn giá áp dụng, tiền giờ, trạng thái."),
-        ("4. Đặt máy trước (Booking)", "Khách, máy, khung giờ đặt (booked_from đến booked_to), chống đặt trùng thời gian bằng thuật toán khóa phạm vi EXCLUDE gist."),
-        ("5. Dịch vụ F&B & Kho", "Danh mục món, sản phẩm đồ ăn/uống, quản lý đơn gọi món theo phiên chơi, trừ tồn kho tự động qua Trigger."),
-        ("6. Hóa đơn & Thanh toán", "Tổng kết phiên chơi: Tiền giờ + Dịch vụ F&B + Phụ phí - Giảm giá = Tổng tiền. Thanh toán qua ví hội viên hoặc tiền mặt/chuyển khoản."),
-        ("7. Quản trị nhân sự", "Phân quyền 5 vai trò (Admin, Manager, Cashier, Staff, Technician), ca làm việc, bảo vệ mức lương tuyệt đối."),
-        ("8. Bảo trì phòng máy", "Ghi nhận máy lỗi, kỹ thuật viên phụ trách, chi phí, linh kiện thay thế lưu dạng JSONB linh hoạt."),
-        ("9. Khuyến mãi & Ưu đãi", "Mã giảm giá, Happy Hour khung giờ đêm, ưu đãi theo hạng thành viên Gold/VIP, lưu điều kiện áp dụng JSONB."),
-        ("10. Báo cáo & Thống kê", "Doanh thu theo ngày/tháng, công suất sử dụng máy, phân tích RFM top khách hàng chi tiêu qua Materialized Views.")
+        ("4. Dịch vụ F&B & Kho", "Danh mục món, sản phẩm đồ ăn/uống, quản lý đơn gọi món theo phiên chơi, trừ tồn kho tự động qua Trigger."),
+        ("5. Hóa đơn & Thanh toán", "Tổng kết phiên chơi: Tiền giờ + Dịch vụ F&B + Phụ phí - Giảm giá = Tổng tiền. Thanh toán qua ví hội viên hoặc tiền mặt/chuyển khoản."),
+        ("6. Quản trị nhân sự", "Phân quyền 5 vai trò (Admin, Manager, Cashier, Staff, Technician), ca làm việc, bảo vệ mức lương tuyệt đối."),
+        ("7. Bảo trì phòng máy", "Ghi nhận máy lỗi, kỹ thuật viên phụ trách, chi phí, linh kiện thay thế lưu dạng JSONB linh hoạt."),
+        ("8. Khuyến mãi & Ưu đãi", "Mã giảm giá, Happy Hour khung giờ đêm, ưu đãi theo hạng thành viên Gold/VIP, lưu điều kiện áp dụng JSONB."),
+        ("9. Báo cáo & Thống kê", "Doanh thu theo ngày/tháng, công suất sử dụng máy, phân tích RFM top khách hàng chi tiêu qua Materialized Views.")
     ]
     tbl_bf = doc.add_table(rows=len(biz_funcs) + 1, cols=2)
     tbl_bf.cell(0, 0).paragraphs[0].add_run("Chức năng Nghiệp vụ")
@@ -296,7 +298,7 @@ def build_report():
     p.paragraph_format.line_spacing = 1.15
 
     schemas_info = [
-        ("core", "Chứa các thực thể nền tảng: room, computer_type, computer, customer, gaming_session, booking."),
+        ("core", "Chứa các thực thể nền tảng: room, computer_type, computer, customer, gaming_session và yêu cầu hỗ trợ."),
         ("inventory", "Quản lý chuỗi cung ứng dịch vụ: product_category, product, food_order, food_order_detail."),
         ("billing", "Quản lý dòng tiền và hóa đơn: promotion, invoice, invoice_promotion, payment."),
         ("hr", "Quản lý nhân viên và kỹ thuật bảo trì: employee, maintenance."),
@@ -366,24 +368,23 @@ def build_report():
     )
     p.paragraph_format.line_spacing = 1.15
 
-    doc.add_heading("2.2. Ma trận Ràng buộc Toàn vẹn (17 Test Cases PASS)", level=2)
+    doc.add_heading("2.2. Ma trận Ràng buộc Toàn vẹn (16 Test Cases PASS)", level=2)
     p = doc.add_paragraph(
-        "Hệ thống đã trải qua bộ kiểm thử tự động gồm 17 bài test ràng buộc toàn vẹn nghiêm ngặt trong file tests/verify.sql. "
-        "Kết quả chạy thực tế trên máy chủ PostgreSQL 17 đạt tỷ lệ chính xác 17/17 (100% PASS - Ghi nhận tại evidence/test_verify.log):"
+        "Hệ thống đã trải qua bộ kiểm thử tự động gồm 16 bài test ràng buộc toàn vẹn nghiêm ngặt trong file tests/verify.sql. "
+        "Kết quả chạy thực tế trên máy chủ PostgreSQL 17 đạt tỷ lệ chính xác 16/16 (100% PASS - Ghi nhận tại evidence/test_verify.log):"
     )
     p.paragraph_format.line_spacing = 1.15
 
     constraints_summary = [
-        ("C1: ex_booking_no_overlap", "core.booking", "EXCLUDE USING gist (computer_id WITH =, tstzrange(from,to) WITH &&)", "PASS", "Chặn 100% đặt trùng giờ máy tính"),
-        ("C2: ck_invoice_total_amount", "billing.invoice", "CHECK (total_amount >= 0)", "PASS", "Chặn số tiền hóa đơn âm"),
-        ("C3: ck_invoice_formula", "billing.invoice", "CHECK (total = play + service + surcharge - discount)", "PASS", "Bảo đảm công thức toán học bất biến"),
-        ("C4: ck_session_time_order", "core.gaming_session", "CHECK (end_time IS NULL OR end_time > start_time)", "PASS", "Chặn giờ kết thúc trước giờ bắt đầu"),
-        ("C5: ck_session_status_time", "core.gaming_session", "CHECK ((status='active') = (end_time IS NULL))", "PASS", "Đồng bộ tuyệt đối trạng thái và thời gian"),
-        ("C6: ck_customer_balance", "core.customer", "CHECK (balance >= 0)", "PASS", "Ngăn chặn số dư tài khoản âm"),
-        ("C7: ck_customer_phone_format", "core.customer", "CHECK (phone ~ '^0[35789][0-9]{8}$')", "PASS", "Bảo đảm định dạng SĐT di động Việt Nam"),
-        ("C8: ck_payment_kind_invoice", "billing.payment", "CHECK ((kind='invoice' AND id IS NOT NULL) OR ...)", "PASS", "Khớp loại thanh toán và ID hóa đơn"),
-        ("C9: uq_computer_ip", "core.computer", "UNIQUE (ip_address)", "PASS", "Chặn trùng lặp IP trong mạng LAN"),
-        ("C10: uq_computer_mac", "core.computer", "UNIQUE (mac_address)", "PASS", "Chặn trùng lặp địa chỉ MAC card mạng")
+        ("C1: ck_invoice_total_amount", "billing.invoice", "CHECK (total_amount >= 0)", "PASS", "Chặn số tiền hóa đơn âm"),
+        ("C2: ck_invoice_formula", "billing.invoice", "CHECK (total = play + service + surcharge - discount)", "PASS", "Bảo đảm công thức toán học bất biến"),
+        ("C3: ck_session_time_order", "core.gaming_session", "CHECK (end_time IS NULL OR end_time > start_time)", "PASS", "Chặn giờ kết thúc trước giờ bắt đầu"),
+        ("C4: ck_session_status_time", "core.gaming_session", "CHECK ((status='active') = (end_time IS NULL))", "PASS", "Đồng bộ tuyệt đối trạng thái và thời gian"),
+        ("C5: ck_customer_balance", "core.customer", "CHECK (balance >= 0)", "PASS", "Ngăn chặn số dư tài khoản âm"),
+        ("C6: ck_customer_phone_format", "core.customer", "CHECK (phone ~ '^0[35789][0-9]{8}$')", "PASS", "Bảo đảm định dạng SĐT di động Việt Nam"),
+        ("C7: ck_payment_kind_invoice", "billing.payment", "CHECK ((kind='invoice' AND id IS NOT NULL) OR ...)", "PASS", "Khớp loại thanh toán và ID hóa đơn"),
+        ("C8: uq_computer_ip", "core.computer", "UNIQUE (ip_address)", "PASS", "Chặn trùng lặp IP trong mạng LAN"),
+        ("C9: uq_computer_mac", "core.computer", "UNIQUE (mac_address)", "PASS", "Chặn trùng lặp địa chỉ MAC card mạng")
     ]
     tbl_cs = doc.add_table(rows=len(constraints_summary) + 1, cols=5)
     tbl_cs.cell(0, 0).paragraphs[0].add_run("Tên Ràng buộc")
@@ -401,10 +402,9 @@ def build_report():
             tbl_cs.cell(i+1, j).paragraphs[0].add_run(val)
     format_table(tbl_cs)
 
-    add_callout(doc, "Giải thích DBA về EXCLUDE USING GIST", 
-                "Ràng buộc EXCLUDE USING gist (cần extension btree_gist) sử dụng toán tử phạm vi tstzrange và phép toán giao cắt '&&'. "
-                "Cơ chế này khóa phạm vi trực tiếp trên chỉ mục cây GiST ở tầng nhân PostgreSQL, triệt tiêu hoàn toàn race condition "
-                "khi hai khách hàng bấm đặt cùng một máy tại cùng một mili-giây, điều mà UNIQUE thông thường không làm được.")
+    add_callout(doc, "Giải thích DBA về CHECK và khóa ngoại",
+                "Các quy tắc tiền, thời lượng phiên, số dư và liên kết nghiệp vụ được kiểm tra ngay trong PostgreSQL. "
+                "Mọi client dùng chung contract nên không thể ghi dữ liệu lệch quy tắc chỉ vì bỏ qua giao diện.")
 
     doc.add_heading("2.3. Quy trình ETL và 4 Tiêu chí Chất lượng Dữ liệu (DQ Framework)", level=2)
     p = doc.add_paragraph(
@@ -697,7 +697,7 @@ def build_report():
 
     results_matrix = [
         ("1. Kiến trúc CSDL", "1 Database netcafe_db, 8 schemas, 22 bảng, đạt chuẩn 3NF, độc lập locale OS template0.", "ĐẠT 100%"),
-        ("2. Ràng buộc toàn vẹn", "17/17 Test cases PASS, chống đặt trùng máy EXCLUDE gist, bảo vệ công thức hóa đơn.", "ĐẠT 100%"),
+        ("2. Ràng buộc toàn vẹn", "16/16 Test cases PASS, bảo vệ công thức hóa đơn và dữ liệu phiên.", "ĐẠT 100%"),
         ("3. Chất lượng dữ liệu (DQ)", "4 Tiêu chuẩn Sạch - Sống - Đúng - Đủ, luồng ETL tự động hóa, lọc 6.8% dữ liệu bẩn.", "ĐẠT 100%"),
         ("4. Bảo mật CSDL", "RBAC 5 vai trò, Column-Level Security (salary, password), RLS trên 4 bảng.", "ĐẠT 100%"),
         ("5. Tối ưu hóa hiệu năng", "5 loại chỉ mục (B-Tree, Partial, GIN Trigram, GIN JSONB, BRIN), HOT tuning fillfactor.", "ĐẠT 100%"),

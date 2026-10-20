@@ -58,12 +58,7 @@ public partial class DbRepository
         int employeeId,
         CancellationToken cancellationToken = default)
     {
-        const string sql = @"UPDATE core.service_request
-                             SET status = @status,
-                                 handled_by = @employeeId,
-                                 acknowledged_at = CASE WHEN @status = 'acknowledged' THEN clock_timestamp() ELSE acknowledged_at END,
-                                 resolved_at = CASE WHEN @status IN ('resolved', 'cancelled') THEN clock_timestamp() ELSE resolved_at END
-                             WHERE service_request_id = @requestId;";
+        const string sql = "SELECT core.sp_update_service_request_status(@requestId, @status, @employeeId);";
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
