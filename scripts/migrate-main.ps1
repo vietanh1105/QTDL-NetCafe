@@ -1,4 +1,4 @@
-﻿# Trách nhiệm: backup, preflight và chỉ áp dụng migration 08 cho netcafe_db.
+﻿# Trách nhiệm: backup, preflight và áp dụng migration 08 cùng contract Admin cho netcafe_db.
 # Không reset, seed, ETL overwrite hoặc chạy sql/00_create_database.sql trên database chính.
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
