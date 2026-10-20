@@ -1,4 +1,5 @@
-// Designer layout cho card món Station; kích thước được FoodOrderView điều chỉnh theo cột.
+// Designer layout cho card món Station; FoodOrderView điều chỉnh card theo hai cột.
+// Liên kết: ProductCardControl.cs bind SKU, tồn kho và event gọi món.
 
 using System.Drawing;
 using System.Windows.Forms;
@@ -19,30 +20,32 @@ public partial class ProductCardControl
         _productImage = new PictureBox
         {
             Dock = DockStyle.Top,
-            Height = 104,
+            Height = 112,
             SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.White
+            BackColor = StationTheme.SurfaceRaised,
+            Padding = new Padding(8)
         };
         _nameLabel = new Label
         {
             Dock = DockStyle.Top,
-            Height = 36,
+            Height = 34,
             TextAlign = ContentAlignment.MiddleLeft,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            AutoEllipsis = true
+            AutoEllipsis = true,
+            ForeColor = StationTheme.Text
         };
         _priceLabel = new Label
         {
             Dock = DockStyle.Top,
             Height = 24,
-            ForeColor = Color.FromArgb(30, 64, 175),
+            ForeColor = StationTheme.Cyan,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
         _stockLabel = new Label
         {
             Dock = DockStyle.Top,
             Height = 22,
-            ForeColor = Color.DimGray
+            ForeColor = StationTheme.MutedText
         };
         _quantityBox = new NumericUpDown
         {
@@ -56,12 +59,9 @@ public partial class ProductCardControl
         {
             Text = "Đặt món",
             Dock = DockStyle.Fill,
-            Height = 30,
-            BackColor = Color.FromArgb(37, 99, 235),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            Height = 30
         };
-        _orderButton.FlatAppearance.BorderSize = 0;
+        StationTheme.StyleButton(_orderButton, StationTheme.Primary);
 
         var actionPanel = new TableLayoutPanel
         {
@@ -69,25 +69,25 @@ public partial class ProductCardControl
             Height = 34,
             ColumnCount = 2,
             RowCount = 1,
-            Padding = new Padding(0, 2, 0, 0)
+            Padding = new Padding(0, 4, 0, 0)
         };
         actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
         actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         actionPanel.Controls.Add(_quantityBox, 0, 0);
         actionPanel.Controls.Add(_orderButton, 1, 0);
 
-        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), BackColor = StationTheme.Surface };
         body.Controls.Add(actionPanel);
         body.Controls.Add(_stockLabel);
         body.Controls.Add(_priceLabel);
         body.Controls.Add(_nameLabel);
         body.Controls.Add(_productImage);
 
-        BackColor = Color.White;
+        BackColor = StationTheme.Surface;
         BorderStyle = BorderStyle.FixedSingle;
-        Margin = new Padding(6);
-        MinimumSize = new Size(170, 220);
-        Size = new Size(190, 238);
+        Margin = new Padding(5);
+        MinimumSize = new Size(150, 250);
+        Size = new Size(190, 260);
         Controls.Add(body);
     }
 }

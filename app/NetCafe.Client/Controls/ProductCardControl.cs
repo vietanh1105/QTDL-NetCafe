@@ -1,4 +1,4 @@
-// Trách nhiệm: hiển thị một sản phẩm thật của database và phát yêu cầu đặt món.
+// Trách nhiệm: hiển thị sản phẩm thật và phát yêu cầu gọi món.
 // Liên kết: StationModels.CustomerMenuItem, ProductImageCatalog và FoodOrderView.
 
 using NetCafe.Data;
@@ -39,7 +39,7 @@ public partial class ProductCardControl : UserControl
         _quantityBox.Value = 1;
         _quantityBox.Enabled = product.StockQty > 0;
         _orderButton.Enabled = product.StockQty > 0;
-        _orderButton.Text = product.StockQty > 0 ? "Đặt món" : "Hết hàng";
+        _orderButton.Text = product.StockQty > 0 ? "Gọi món" : "Hết hàng";
 
         var nextImage = ProductImageCatalog.Load(product.Sku);
         var previousImage = _productImage.Image;

@@ -1,4 +1,5 @@
-// Trách nhiệm: tạo service request qua core.sp_create_service_request.
+// Trách nhiệm: tạo yêu cầu hỗ trợ qua core.sp_create_service_request.
+// Liên kết: SupportRequestView.Designer.cs cung cấp form và MainForm.cs gửi request.
 
 namespace NetCafe.Client.Views;
 
@@ -12,9 +13,17 @@ public partial class SupportRequestView : UserControl
         InitializeComponent();
         _submitButton.Click += async (_, _) =>
         {
-            if (RequestSubmitted is not null)
+            _submitButton.Enabled = false;
+            try
             {
-                await RequestSubmitted(_typeBox.Text, _messageBox.Text);
+                if (RequestSubmitted is not null)
+                {
+                    await RequestSubmitted(_typeBox.Text, _messageBox.Text.Trim());
+                }
+            }
+            finally
+            {
+                _submitButton.Enabled = true;
             }
         };
         _backButton.Click += (_, _) => BackRequested?.Invoke();

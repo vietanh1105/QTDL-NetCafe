@@ -1,4 +1,5 @@
-// Designer layout cho dashboard session: các card thông tin và hàng thao tác cân đối.
+// Designer layout cho dashboard session: card thông tin rõ ràng và thao tác dễ chạm.
+// Liên kết: SessionView.cs nhận heartbeat từ StationSessionController.
 
 using System.Drawing;
 using System.Windows.Forms;
@@ -19,57 +20,98 @@ public partial class SessionView
 
     private void InitializeComponent()
     {
-        _customerLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
-        _sessionLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-        _balanceLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.DarkGreen, TextAlign = ContentAlignment.MiddleLeft };
-        _costLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-        _statusLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = Color.DimGray, TextAlign = ContentAlignment.MiddleLeft };
-        _foodButton = new Button { Text = "Gọi món", Dock = DockStyle.Fill, Height = 42, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _supportButton = new Button { Text = "Yêu cầu hỗ trợ", Dock = DockStyle.Fill, Height = 42, BackColor = Color.FromArgb(14, 116, 144), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _logoutButton = new Button { Text = "Đăng xuất", Dock = DockStyle.Fill, Height = 42, BackColor = Color.Firebrick, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-        _foodButton.FlatAppearance.BorderSize = 0;
-        _supportButton.FlatAppearance.BorderSize = 0;
-        _logoutButton.FlatAppearance.BorderSize = 0;
+        _customerLabel = CreateValueLabel(12F, StationTheme.Text);
+        _sessionLabel = CreateValueLabel(9F, StationTheme.MutedText);
+        _balanceLabel = CreateValueLabel(17F, StationTheme.Cyan);
+        _costLabel = CreateValueLabel(9F, StationTheme.Text);
+        _statusLabel = CreateValueLabel(8.5F, StationTheme.MutedText);
+        _foodButton = new Button { Text = "Gọi món", Dock = DockStyle.Fill, Height = 44 };
+        _supportButton = new Button { Text = "Hỗ trợ", Dock = DockStyle.Fill, Height = 44 };
+        _logoutButton = new Button { Text = "Đăng xuất", Dock = DockStyle.Fill, Height = 44 };
+        StationTheme.StyleButton(_foodButton, StationTheme.Primary);
+        StationTheme.StyleButton(_supportButton, StationTheme.Purple);
+        StationTheme.StyleButton(_logoutButton, StationTheme.Danger);
 
-        _scrollPanel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.FromArgb(243, 246, 251), Padding = new Padding(14) };
-        var content = new TableLayoutPanel
+        _scrollPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = StationTheme.Background,
+            Padding = new Padding(14, 14, 14, 18)
+        };
+        var content = new Panel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            RowCount = 7,
-            Padding = new Padding(2)
+            BackColor = StationTheme.Background
         };
-        for (var index = 0; index < 7; index++)
+        var heading = new Panel { Dock = DockStyle.Top, Height = 58, Padding = new Padding(2, 0, 2, 8) };
+        heading.Controls.Add(new Label
         {
-            content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        }
-        content.Controls.Add(CreateCard("Khách hàng và máy trạm", _customerLabel), 0, 0);
-        content.Controls.Add(CreateCard("Phiên chơi hiện tại", _sessionLabel), 0, 1);
-        content.Controls.Add(CreateCard("Số dư tài khoản", _balanceLabel), 0, 2);
-        content.Controls.Add(CreateCard("Thời gian & Chi phí", _costLabel), 0, 3);
-        content.Controls.Add(CreateCard("Trạng thái tín hiệu máy", _statusLabel), 0, 4);
-
-        var actionRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 52, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
-        actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
-        actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
-        actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
-        actionRow.Controls.Add(_foodButton, 0, 0);
-        actionRow.Controls.Add(_supportButton, 1, 0);
-        actionRow.Controls.Add(_logoutButton, 2, 0);
-        content.Controls.Add(actionRow, 0, 5);
-        content.Controls.Add(new Label { Text = "Số dư tài khoản được kiểm tra liên tục; phiên sẽ tự động kết thúc nếu hết tiền.", Dock = DockStyle.Top, Height = 34, ForeColor = Color.DimGray, Padding = new Padding(2, 8, 2, 0) }, 0, 6);
+            Text = "PHIÊN ĐANG HOẠT ĐỘNG",
+            Dock = DockStyle.Top,
+            Height = 28,
+            ForeColor = StationTheme.Cyan,
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold)
+        });
+        heading.Controls.Add(new Label
+        {
+            Text = "Theo dõi thời gian, số dư và dịch vụ tại máy",
+            Dock = DockStyle.Bottom,
+            Height = 20,
+            ForeColor = StationTheme.MutedText,
+            Font = new Font("Segoe UI", 8.5F)
+        });
+        content.Controls.Add(new Label
+        {
+            Text = "Số dư được kiểm tra liên tục; phiên sẽ tự động kết thúc khi tài khoản không đủ tiền.",
+            Dock = DockStyle.Top,
+            Height = 40,
+            ForeColor = StationTheme.MutedText,
+            Font = new Font("Segoe UI", 8F),
+            Padding = new Padding(2, 8, 2, 0)
+        });
+        content.Controls.Add(CreateActionRow());
+        content.Controls.Add(StationTheme.CreateCard("Trạng thái tín hiệu máy", _statusLabel, StationTheme.Cyan, 74));
+        content.Controls.Add(StationTheme.CreateCard("Thời gian và chi phí", _costLabel, StationTheme.Warning, 88));
+        content.Controls.Add(StationTheme.CreateCard("Số dư tài khoản", _balanceLabel, StationTheme.Cyan, 86));
+        content.Controls.Add(StationTheme.CreateCard("Phiên chơi hiện tại", _sessionLabel, StationTheme.Primary, 70));
+        content.Controls.Add(StationTheme.CreateCard("Khách hàng và máy trạm", _customerLabel, StationTheme.Purple, 82));
+        content.Controls.Add(heading);
         _scrollPanel.Controls.Add(content);
         Controls.Add(_scrollPanel);
         Dock = DockStyle.Fill;
     }
 
-    private static Panel CreateCard(string title, Control content)
+    private static Label CreateValueLabel(float size, Color color)
     {
-        var card = new Panel { Dock = DockStyle.Top, Height = 72, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(12, 4, 12, 4) };
-        card.Controls.Add(content);
-        card.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 22, ForeColor = Color.FromArgb(30, 64, 175), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-        return card;
+        return new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            ForeColor = color,
+            Font = new Font("Segoe UI", size, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+    }
+
+    private TableLayoutPanel CreateActionRow()
+    {
+        var row = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 54,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 10),
+            Padding = new Padding(0, 0, 0, 10)
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
+        row.Controls.Add(_foodButton, 0, 0);
+        row.Controls.Add(_supportButton, 1, 0);
+        row.Controls.Add(_logoutButton, 2, 0);
+        return row;
     }
 }

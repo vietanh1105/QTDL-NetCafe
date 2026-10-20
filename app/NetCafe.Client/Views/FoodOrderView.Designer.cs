@@ -1,4 +1,5 @@
-// Designer layout cho menu Station: hai cột card, đơn đã gọi nằm bên dưới và cuộn nội bộ.
+// Designer layout cho khu Gọi món: menu hai cột và đơn đã gọi nằm bên dưới.
+// Liên kết: FoodOrderView.cs nạp CustomerMenuItem và CustomerOrderStatus.
 
 using System.Drawing;
 using System.Windows.Forms;
@@ -16,7 +17,13 @@ public partial class FoodOrderView
 
     private void InitializeComponent()
     {
-        _scrollPanel = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.FromArgb(243, 246, 251) };
+        _scrollPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = StationTheme.Background,
+            Padding = new Padding(14, 14, 14, 18)
+        };
         _menuGrid = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -24,7 +31,7 @@ public partial class FoodOrderView
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 2,
             RowCount = 1,
-            Padding = new Padding(4),
+            Padding = new Padding(0, 4, 0, 8),
             GrowStyle = TableLayoutPanelGrowStyle.AddRows
         };
         _menuGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
@@ -36,26 +43,54 @@ public partial class FoodOrderView
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            Padding = new Padding(4)
+            Padding = new Padding(0, 4, 0, 8),
+            BackColor = StationTheme.Background
         };
         _refreshOrdersButton = new Button
         {
             Text = "Làm mới đơn",
             Width = 132,
             Height = 34,
-            BackColor = Color.FromArgb(37, 99, 235),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
         };
-        _backButton = new Button { Text = "Quay lại", Width = 112, Height = 34 };
-        _refreshOrdersButton.FlatAppearance.BorderSize = 0;
-        _messageLabel = new Label { Dock = DockStyle.Top, Height = 38, ForeColor = Color.FromArgb(30, 64, 175), Padding = new Padding(4, 8, 4, 0) };
-        var title = new Label { Text = "Thực đơn món ăn & đồ uống", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI", 14F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
-        var ordersTitle = new Label { Text = "Danh sách đơn đã gọi", Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Padding = new Padding(4, 6, 4, 0) };
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(4, 4, 4, 4) };
+        _backButton = new Button { Text = "Quay lại phiên", Width = 132, Height = 34 };
+        StationTheme.StyleButton(_refreshOrdersButton, StationTheme.Primary);
+        StationTheme.StyleButton(_backButton, StationTheme.SurfaceRaised);
+        _messageLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 38,
+            ForeColor = StationTheme.Cyan,
+            Padding = new Padding(2, 8, 2, 0),
+            AutoEllipsis = true
+        };
+        var title = new Label
+        {
+            Text = "GỌI MÓN  /  THỰC ĐƠN",
+            Dock = DockStyle.Top,
+            Height = 38,
+            ForeColor = StationTheme.Text,
+            Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+            Padding = new Padding(2, 6, 2, 0)
+        };
+        var ordersTitle = new Label
+        {
+            Text = "ĐƠN ĐÃ GỌI",
+            Dock = DockStyle.Top,
+            Height = 34,
+            ForeColor = StationTheme.Text,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Padding = new Padding(2, 6, 2, 0)
+        };
+        var actions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 46,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(0, 4, 0, 4)
+        };
         actions.Controls.Add(_refreshOrdersButton);
         actions.Controls.Add(_backButton);
-        var content = new Panel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(14) };
+        var content = new Panel { Dock = DockStyle.Top, AutoSize = true, BackColor = StationTheme.Background };
         content.Controls.Add(_messageLabel);
         content.Controls.Add(actions);
         content.Controls.Add(_ordersPanel);
