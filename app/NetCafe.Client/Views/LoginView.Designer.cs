@@ -58,74 +58,45 @@ public partial class LoginView
             BackColor = StationTheme.Surface,
             Padding = new Padding(22),
             ColumnCount = 1,
-            RowCount = 10,
-            CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
+            RowCount = 7
         };
         card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         card.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
         card.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
         card.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
         card.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
-        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
-        card.Controls.Add(CreateHeading("NETCAFE", "BẢNG ĐIỀU KHIỂN MÁY TRẠM"), 0, 0);
+        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+        card.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
         card.Controls.Add(new Label
         {
-            Text = "Đăng nhập để bắt đầu phiên chơi",
+            Text = "NETCAFE  /  MÁY TRẠM",
+            Dock = DockStyle.Fill,
+            ForeColor = StationTheme.Text,
+            Font = new Font("Segoe UI", 17F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, 0);
+        card.Controls.Add(new Label
+        {
+            Text = "Đăng nhập tài khoản hội viên để bắt đầu phiên",
             Dock = DockStyle.Fill,
             ForeColor = StationTheme.MutedText,
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, 1);
+        card.Controls.Add(_usernameBox, 0, 2);
+        card.Controls.Add(_passwordBox, 0, 3);
+        card.Controls.Add(_loginButton, 0, 4);
+        card.Controls.Add(_errorLabel, 0, 5);
         card.Controls.Add(new Label
         {
-            Text = "TÀI KHOẢN HỘI VIÊN",
-            Dock = DockStyle.Fill,
-            ForeColor = StationTheme.Cyan,
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleLeft
-        }, 0, 2);
-        card.Controls.Add(new Label { Text = "Tên đăng nhập", Dock = DockStyle.Fill, ForeColor = StationTheme.MutedText, TextAlign = ContentAlignment.BottomLeft }, 0, 3);
-        card.Controls.Add(_usernameBox, 0, 4);
-        card.Controls.Add(new Label { Text = "Mật khẩu", Dock = DockStyle.Fill, ForeColor = StationTheme.MutedText, TextAlign = ContentAlignment.BottomLeft }, 0, 5);
-        card.Controls.Add(_passwordBox, 0, 6);
-        card.Controls.Add(_loginButton, 0, 7);
-        card.Controls.Add(_errorLabel, 0, 8);
-        card.Controls.Add(new Label
-        {
-            Text = "Phiên được tính phí theo thời gian thực. Hãy giữ đủ số dư để tránh tự động đăng xuất.",
+            Text = "Tính phí theo thời gian thực • cần đủ số dư để duy trì phiên",
             Dock = DockStyle.Fill,
             ForeColor = StationTheme.MutedText,
             Font = new Font("Segoe UI", 8F),
             TextAlign = ContentAlignment.MiddleLeft
-        }, 0, 9);
+        }, 0, 6);
         panel.Controls.Add(card);
         Controls.Add(panel);
         Dock = DockStyle.Fill;
-    }
-
-    private static Control CreateHeading(string title, string subtitle)
-    {
-        var panel = new Panel { Dock = DockStyle.Fill };
-        panel.Controls.Add(new Label
-        {
-            Text = subtitle,
-            Dock = DockStyle.Bottom,
-            Height = 18,
-            ForeColor = StationTheme.Cyan,
-            Font = new Font("Segoe UI", 7.5F, FontStyle.Bold)
-        });
-        panel.Controls.Add(new Label
-        {
-            Text = title,
-            Dock = DockStyle.Top,
-            Height = 30,
-            ForeColor = StationTheme.Text,
-            Font = new Font("Segoe UI", 18F, FontStyle.Bold)
-        });
-        return panel;
     }
 }
