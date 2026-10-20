@@ -167,10 +167,23 @@ public abstract class AdminCardViewBase : AdminDataViewBase
 
     private void ResizeCards()
     {
-        var availableWidth = Math.Max(460, CardsPanel.ClientSize.Width - CardsPanel.Padding.Horizontal);
-        var columns = availableWidth >= 1100 ? 4 : availableWidth >= 760 ? 3 : 2;
-        var gap = 16;
-        var cardWidth = Math.Max(220, (availableWidth - (columns - 1) * gap) / columns);
+        const int minimumCardWidth = 220;
+        const int gap = 16;
+        var availableWidth = Math.Max(
+            1,
+            CardsPanel.ClientSize.Width
+            - CardsPanel.Padding.Horizontal
+            - SystemInformation.VerticalScrollBarWidth);
+        var columns = availableWidth >= (minimumCardWidth + gap) * 4
+            ? 4
+            : availableWidth >= (minimumCardWidth + gap) * 3
+                ? 3
+                : availableWidth >= (minimumCardWidth + gap) * 2
+                    ? 2
+                    : 1;
+        var cardWidth = Math.Max(
+            columns == 1 ? 1 : minimumCardWidth,
+            (availableWidth - columns * gap) / columns);
         foreach (Control control in CardsPanel.Controls)
         {
             control.Width = cardWidth;

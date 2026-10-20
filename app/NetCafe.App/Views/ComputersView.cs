@@ -9,6 +9,7 @@ namespace NetCafe.App.Views;
 public partial class ComputersView : AdminDataViewBase
 {
     private readonly Dictionary<int, ComputerCardControl> _cards = new();
+    private bool _isRebuildingGrid;
 
     public ComputersView()
     {
@@ -45,27 +46,51 @@ public partial class ComputersView : AdminDataViewBase
 
     private void RebuildGridPositions()
     {
-        var width = Math.Max(300, _cardsViewport.ClientSize.Width - _cardsViewport.Padding.Horizontal - _cardsGrid.Padding.Horizontal);
-        var columnCount = width >= 1100 ? 4 : width >= 760 ? 3 : 2;
-        _cardsGrid.RowCount = Math.Max(1, (int)Math.Ceiling((double)_cards.Count / columnCount));
-        _cardsGrid.RowStyles.Clear();
-        for (var row = 0; row < _cardsGrid.RowCount; row++)
+        if (_isRebuildingGrid)
         {
-            _cardsGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 206F));
+            return;
         }
 
-        var index = 0;
-        foreach (var card in _cards.Values.OrderBy(item => item.Model?.ComputerId))
+        _isRebuildingGrid = true;
+        try
         {
-            if (!_cardsGrid.Controls.Contains(card))
+            const int minimumCardWidth = 240;
+            const int gap = 16;
+            const int verticalMargin = 12;
+            var availableWidth = Math.Max(
+                1,
+                _cardsGrid.ClientSize.Width
+                - _cardsGrid.Padding.Horizontal
+                - SystemInformation.VerticalScrollBarWidth);
+            var columnCount = availableWidth >= (minimumCardWidth + gap) * 4
+                ? 4
+                : availableWidth >= (minimumCardWidth + gap) * 3
+                    ? 3
+                    : availableWidth >= (minimumCardWidth + gap) * 2
+                        ? 2
+                        : 1;
+            var cardWidth = Math.Max(
+                columnCount == 1 ? 1 : minimumCardWidth,
+                (availableWidth - columnCount * gap) / columnCount);
+
+            _cardsGrid.SuspendLayout();
+            foreach (var card in _cards.Values.OrderBy(item => item.Model?.ComputerId))
             {
-                _cardsGrid.Controls.Add(card);
+                if (!_cardsGrid.Controls.Contains(card))
+                {
+                    _cardsGrid.Controls.Add(card);
+                }
+                card.Width = cardWidth;
+                card.Height = 190;
+                // Hai margin dọc tạo khoảng trống 24px giữa các hàng, giữ rõ viền card.
+                card.Margin = new Padding(0, verticalMargin, gap, verticalMargin);
             }
-            card.Margin = new Padding(6, 6, 6, 10);
-            _cardsGrid.SetCellPosition(card, new TableLayoutPanelCellPosition(index % columnCount, index / columnCount));
-            index++;
+            _cardsGrid.ResumeLayout(true);
         }
-        LayoutCards();
+        finally
+        {
+            _isRebuildingGrid = false;
+        }
     }
 
     private void HandleCardSelected(object? sender, ComputerGridItem computer)
