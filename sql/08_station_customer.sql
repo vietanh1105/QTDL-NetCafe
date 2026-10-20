@@ -645,6 +645,24 @@ CREATE TRIGGER trg_notify_support_queue
     FOR EACH ROW
     EXECUTE FUNCTION core.fn_notify_support_queue();
 
+CREATE OR REPLACE FUNCTION inventory.fn_notify_food_order()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, inventory
+AS $$
+BEGIN
+    PERFORM pg_notify('food_order_changed', COALESCE(NEW.order_id, OLD.order_id)::TEXT);
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_food_order ON inventory.food_order;
+CREATE TRIGGER trg_notify_food_order
+    AFTER INSERT OR UPDATE ON inventory.food_order
+    FOR EACH ROW
+    EXECUTE FUNCTION inventory.fn_notify_food_order();
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'role_station') THEN

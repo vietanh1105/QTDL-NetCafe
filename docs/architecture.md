@@ -25,7 +25,6 @@ flowchart TD
                 T_COMP["computer (Máy trạm)"]
                 T_CUST["customer (Khách hàng)"]
                 T_SESS["gaming_session (Phiên chơi)"]
-                T_BOOK["booking (Đặt máy trước)"]
             end
 
             subgraph InvSchema ["Schema: inventory (Dịch vụ F&B & Kho)"]
@@ -119,12 +118,6 @@ Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sá
    - **Thuộc tính:** `customer_id INT FK`, `computer_id INT FK`, `opened_by INT FK (employee)`, `start_time TIMESTAMPTZ`, `end_time TIMESTAMPTZ NULL`, `status VARCHAR(20) CHECK IN ('active','finished','cancelled')`, `hourly_rate_applied NUMERIC(12,0) CHECK (hourly_rate_applied >= 0)`, `play_amount NUMERIC(12,0) NULL CHECK (play_amount >= 0)`, `game_info JSONB`
    - **Ràng buộc:** `CHECK (end_time IS NULL OR end_time > start_time)`, `CHECK ((status = 'active' AND end_time IS NULL) OR (status <> 'active' AND end_time IS NOT NULL))`
    - *Lý do thiết kế:* Lưu `hourly_rate_applied` tại thời điểm mở máy nhằm bảo toàn dữ liệu lịch sử nếu sau này bảng giá phòng net thay đổi; không lưu cột thời lượng `duration` thừa để tránh vi phạm chuẩn hóa và không đồng bộ, thời lượng được tính tự động bằng hàm/view (`EXTRACT(EPOCH FROM (end_time - start_time))`).
-
-6. **`core.booking` (Đặt máy trước):**
-   - **PK:** `booking_id INT GENERATED ALWAYS AS IDENTITY`
-   - **Thuộc tính:** `customer_id INT FK`, `computer_id INT FK`, `booked_from TIMESTAMPTZ`, `booked_to TIMESTAMPTZ`, `status VARCHAR(20) CHECK IN ('pending','confirmed','checked_in','cancelled','no_show')`, `created_at TIMESTAMPTZ`
-   - **Ràng buộc:** `CHECK (booked_to > booked_from)`, `EXCLUDE USING gist (computer_id WITH =, tstzrange(booked_from, booked_to) WITH &&) WHERE (status IN ('pending', 'confirmed'))`
-   - *Lý do thiết kế:* Khóa loại trừ `EXCLUDE USING gist` (sử dụng extension `btree_gist`) ngăn chặn tuyệt đối tình trạng Overbooking (hai khách đặt cùng 1 máy trong khoảng thời gian giao nhau) ở cấp độ nguyên tử của CSDL.
 
 ---
 
@@ -238,8 +231,6 @@ Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sá
 | **1 - N** | `core.customer` | `core.gaming_session` | `gaming_session.customer_id` FK | Một khách hàng trải qua nhiều phiên chơi. |
 | **1 - N** | `core.computer` | `core.gaming_session` | `gaming_session.computer_id` FK | Một máy phục vụ nhiều phiên chơi theo thời gian. |
 | **1 - N** | `hr.employee` | `core.gaming_session` | `gaming_session.opened_by` FK | Một nhân viên mở nhiều phiên cho khách. |
-| **1 - N** | `core.customer` | `core.booking` | `booking.customer_id` FK | Một khách hàng có thể đặt nhiều lịch chơi. |
-| **1 - N** | `core.computer` | `core.booking` | `booking.computer_id` FK | Một máy có nhiều lịch đặt trước. |
 | **1 - N** | `inventory.product_category` | `inventory.product` | `product.category_id` FK | Một danh mục chứa nhiều sản phẩm. |
 | **1 - N** | `core.gaming_session` | `inventory.food_order` | `food_order.session_id` FK | Một phiên chơi có thể gọi nhiều lượt đồ ăn uống. |
 | **1 - N** | `core.customer` | `billing.invoice` | `invoice.customer_id` FK | Một khách nhận nhiều hóa đơn. |

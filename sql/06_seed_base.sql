@@ -10,7 +10,7 @@
 
 -- 1. XÓA DỮ LIỆU CŨ VÀ RESET IDENTITY SEQUENCES
 TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.invoice,
-         inventory.food_order_detail, inventory.food_order, core.booking,
+         inventory.food_order_detail, inventory.food_order,
          core.gaming_session, inventory.product, inventory.product_category,
          core.customer, core.computer, core.computer_type, core.room,
          hr.employee, billing.promotion RESTART IDENTITY CASCADE;

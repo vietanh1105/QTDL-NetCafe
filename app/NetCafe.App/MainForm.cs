@@ -87,7 +87,7 @@ public partial class MainForm : Form
         AddNavigationSeparator("VẬN HÀNH");
         AddView("Computers", "Máy trạm", new ComputersView());
         AddView("Customers", "Hội viên", new CustomersView());
-        AddView("Orders", "Đặt món", new OrdersView());
+        AddView("Orders", "Gọi món", new OrdersView());
         AddView("Invoices", "Hóa đơn", new InvoicesView());
         AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
         AddView("Reports", "Báo cáo", new ReportsView());
@@ -311,6 +311,7 @@ public partial class MainForm : Form
                 "computer_state_changed" => "Computers",
                 "support_queue_changed" => "SupportQueue",
                 "ai_security_alert" => "AiCenter",
+                "food_order_changed" => "Orders",
                 _ => string.Empty
             };
             if (!string.IsNullOrEmpty(target))
@@ -407,10 +408,11 @@ public partial class MainForm : Form
                 "computer_state_changed" => "Đã cập nhật trạng thái máy",
                 "support_queue_changed" => "Có yêu cầu hỗ trợ mới",
                 "ai_security_alert" => "Có cảnh báo AI mới",
+                "food_order_changed" => "Có đơn món mới hoặc cập nhật",
                 _ => $"Đã nhận thông báo {channel}"
             };
             UpdateHeaderStatus(notice);
-            if (channel is "ai_security_alert" or "computer_state_changed" or "support_queue_changed")
+            if (channel is "ai_security_alert" or "computer_state_changed" or "support_queue_changed" or "food_order_changed")
             {
                 _notificationDebounceTimer.Stop();
                 _notificationDebounceTimer.Start();

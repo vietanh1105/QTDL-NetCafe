@@ -76,18 +76,14 @@ public partial class FoodOrderView : UserControl
         var status = order.Status.ToLowerInvariant();
         var statusText = status switch
         {
-            "placed" => "Đã gửi đơn",
-            "preparing" => "Đang chế biến",
-            "ready" => "Sẵn sàng phục vụ",
+            "placed" => "Chờ chế biến",
             "served" => "Đã phục vụ",
             "cancelled" => "Đã hủy",
             _ => order.Status
         };
         var accent = status switch
         {
-            "placed" => Color.FromArgb(37, 99, 235),
-            "preparing" => Color.FromArgb(234, 88, 12),
-            "ready" => Color.FromArgb(5, 150, 105),
+            "placed" => Color.FromArgb(234, 88, 12),
             "served" => Color.FromArgb(75, 85, 99),
             "cancelled" => Color.FromArgb(185, 28, 28),
             _ => Color.FromArgb(100, 116, 139)

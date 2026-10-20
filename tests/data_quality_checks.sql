@@ -80,7 +80,7 @@ BEGIN
     RAISE NOTICE '[PASS] 2.2. Phân bố thực tế: % phiên chơi diễn ra trong khung giờ cao điểm (18h-23h).', v_cnt;
 
     -- ------------------------------------------------------------------------
-    -- TIÊU CHÍ 3: ĐÚNG (Nhất quán thời gian, chuẩn công thức tài chính, không overbooking)
+    -- TIÊU CHÍ 3: ĐÚNG (Nhất quán thời gian và chuẩn công thức tài chính)
     -- ------------------------------------------------------------------------
     RAISE NOTICE '--- KIỂM TRA TIÊU CHÍ 3: ĐÚNG ---';
 

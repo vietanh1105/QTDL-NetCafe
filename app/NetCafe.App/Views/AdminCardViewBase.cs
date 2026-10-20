@@ -27,7 +27,7 @@ public abstract class AdminCardViewBase : AdminDataViewBase
         CardsPanel.AutoScroll = true;
         CardsPanel.WrapContents = true;
         CardsPanel.FlowDirection = FlowDirection.LeftToRight;
-        CardsPanel.Padding = new Padding(10, 10, 10, 20);
+        CardsPanel.Padding = new Padding(12, 12, 24, 24);
         CardsPanel.BackColor = CyberTheme.Background;
         CardsPanel.Resize += (_, _) => ResizeCards();
         Controls.Add(CardsPanel);
@@ -60,7 +60,7 @@ public abstract class AdminCardViewBase : AdminDataViewBase
         {
             Width = 290,
             Height = 148,
-            Margin = new Padding(0, 0, 12, 12),
+            Margin = new Padding(0, 0, 16, 16),
             Padding = new Padding(14),
             BackColor = CyberTheme.Surface,
             BorderStyle = BorderStyle.FixedSingle
@@ -169,11 +169,12 @@ public abstract class AdminCardViewBase : AdminDataViewBase
     {
         var availableWidth = Math.Max(460, CardsPanel.ClientSize.Width - CardsPanel.Padding.Horizontal);
         var columns = availableWidth >= 1100 ? 4 : availableWidth >= 760 ? 3 : 2;
-        var gap = 12;
+        var gap = 16;
         var cardWidth = Math.Max(220, (availableWidth - (columns - 1) * gap) / columns);
         foreach (Control control in CardsPanel.Controls)
         {
             control.Width = cardWidth;
+            control.Margin = new Padding(0, 0, gap, gap);
         }
     }
 }

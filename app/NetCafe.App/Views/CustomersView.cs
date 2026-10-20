@@ -130,6 +130,12 @@ public partial class CustomersView : AdminCardViewBase
             return;
         }
 
+        if (!customer.IsActive)
+        {
+            MessageBox.Show(FindForm(), "Hội viên đang bị khóa, không thể nạp tiền.", "Tài khoản bị khóa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         using var dialog = new TopUpDialog(customer);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
         {

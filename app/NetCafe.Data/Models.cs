@@ -130,16 +130,6 @@ namespace NetCafe.Data
         public string DefaultShift { get; set; } = string.Empty;
     }
 
-    public class BookingItem
-    {
-        public int BookingId { get; set; }
-        public string CustomerName { get; set; } = string.Empty;
-        public string ComputerCode { get; set; } = string.Empty;
-        public DateTimeOffset BookedFrom { get; set; }
-        public DateTimeOffset BookedTo { get; set; }
-        public string Status { get; set; } = string.Empty;
-    }
-
     public class DailyRevenueItem
     {
         public DateTime RevenueDate { get; set; }

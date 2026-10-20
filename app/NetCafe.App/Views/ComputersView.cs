@@ -51,7 +51,7 @@ public partial class ComputersView : AdminDataViewBase
         _cardsGrid.RowStyles.Clear();
         for (var row = 0; row < _cardsGrid.RowCount; row++)
         {
-            _cardsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _cardsGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 206F));
         }
 
         var index = 0;
@@ -61,6 +61,7 @@ public partial class ComputersView : AdminDataViewBase
             {
                 _cardsGrid.Controls.Add(card);
             }
+            card.Margin = new Padding(6, 6, 6, 10);
             _cardsGrid.SetCellPosition(card, new TableLayoutPanelCellPosition(index % columnCount, index / columnCount));
             index++;
         }

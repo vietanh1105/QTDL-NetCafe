@@ -379,33 +379,6 @@ namespace NetCafe.Data
             }
         }
 
-        public async Task<int> CreateBookingAsync(int customerId, int computerId, DateTime bookedFrom, DateTime bookedTo)
-        {
-            var sw = Stopwatch.StartNew();
-            var sql = "INSERT INTO core.booking (customer_id, computer_id, booked_from, booked_to, status) VALUES (@custId, @compId, @from, @to, 'confirmed') RETURNING booking_id;";
-            try
-            {
-                await using var conn = new NpgsqlConnection(_connectionString);
-                await conn.OpenAsync();
-                await using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("custId", customerId);
-                cmd.Parameters.AddWithValue("compId", computerId);
-                cmd.Parameters.AddWithValue("from", bookedFrom);
-                cmd.Parameters.AddWithValue("to", bookedTo);
-                var result = await cmd.ExecuteScalarAsync();
-                var bookingId = Convert.ToInt32(result);
-                sw.Stop();
-                LogSql(sql, $"custId={customerId}, compId={computerId}, from={bookedFrom:HH:mm}, to={bookedTo:HH:mm}", sw.ElapsedMilliseconds, true, null);
-                return bookingId;
-            }
-            catch (Exception ex)
-            {
-                sw.Stop();
-                LogSql(sql, $"custId={customerId}, compId={computerId}, from={bookedFrom:HH:mm}, to={bookedTo:HH:mm}", sw.ElapsedMilliseconds, false, ex.Message);
-                throw;
-            }
-        }
-
         public async Task<List<KitchenOrderItem>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
         {
             var sw = Stopwatch.StartNew();
@@ -498,7 +471,9 @@ namespace NetCafe.Data
                     OnNotificationReceived?.Invoke(e.Channel, e.Payload);
                 };
 
-                await using var cmd = new NpgsqlCommand("LISTEN ai_security_alert; LISTEN computer_state_changed; LISTEN support_queue_changed;", conn);
+                await using var cmd = new NpgsqlCommand(
+                    "LISTEN ai_security_alert; LISTEN computer_state_changed; LISTEN support_queue_changed; LISTEN food_order_changed;",
+                    conn);
                 await cmd.ExecuteNonQueryAsync(ct);
 
                 while (!ct.IsCancellationRequested)

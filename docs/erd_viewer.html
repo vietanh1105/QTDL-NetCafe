@@ -34,7 +34,7 @@
     </style>
 </head>
 <body>
-    <h1>Sơ đồ Thực thể Quan hệ (ERD) - Hệ thống NetCafe (22 Bảng)</h1>
+    <h1>Sơ đồ Thực thể Quan hệ (ERD) - Hệ thống NetCafe (21 Bảng)</h1>
     <p><em>Môn học: Quản trị Cơ sở Dữ liệu | PostgreSQL 17</em></p>
     <div class="container">
         <pre class="mermaid">
@@ -44,8 +44,6 @@ erDiagram
     CUSTOMER ||--o{ GAMING_SESSION : "plays"
     COMPUTER ||--o{ GAMING_SESSION : "hosts"
     EMPLOYEE ||--o{ GAMING_SESSION : "opened_by"
-    CUSTOMER ||--o{ BOOKING : "books"
-    COMPUTER ||--o{ BOOKING : "reserved_for"
 
     PRODUCT_CATEGORY ||--o{ PRODUCT : "classifies"
     GAMING_SESSION ||--o{ FOOD_ORDER : "orders_food"
@@ -120,16 +118,6 @@ erDiagram
         numeric hourly_rate_applied
         numeric play_amount
         jsonb game_info
-    }
-
-    BOOKING {
-        int booking_id PK
-        int customer_id FK
-        int computer_id FK
-        timestamptz booked_from
-        timestamptz booked_to
-        varchar status
-        timestamptz created_at
     }
 
     PRODUCT_CATEGORY {

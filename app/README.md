@@ -20,7 +20,7 @@ Cửa sổ giao diện WinForms sẽ bật lên ngay lập tức trên màn hìn
 ## 2. NGUYÊN TẮC VÀ ĐẶC ĐIỂM KHI DEMO
 
 1. **Khung báo lỗi đỏ từ PostgreSQL:**  
-   - Bất kỳ thao tác nào vi phạm ràng buộc (chèn SĐT sai regex, đặt máy trùng giờ `EXCLUDE`, gọi món vượt tồn kho `CHECK`, số dư không đủ) sẽ được CSDL chặn đứng.
+   - Bất kỳ thao tác nào vi phạm ràng buộc (chèn SĐT sai regex, gọi món vượt tồn kho `CHECK`, số dư không đủ) sẽ được CSDL chặn đứng.
    - Giao diện bắt đúng đối tượng `PostgresException` và hiển thị chi tiết mã `SQLSTATE`, tên ràng buộc và thông báo lỗi nguyên bản từ PostgreSQL.
 2. **Nhật ký SQL thời gian thực (Chân cửa sổ):**  
    - Mọi thao tác click chuột trên phần mềm đều ghi nhận rõ câu lệnh `SELECT`, `CALL` hay Function kèm tham số và thời gian chạy (ms).

@@ -34,7 +34,7 @@ BEGIN
 
     -- Dọn dẹp dữ liệu cũ để test có thể chạy lại độc lập nhiều lần
     EXECUTE 'TRUNCATE hr.employee, core.room, core.computer_type, core.computer, core.customer, 
-                      core.gaming_session, core.booking, inventory.product_category, inventory.product, 
+                      core.gaming_session, inventory.product_category, inventory.product,
                       inventory.food_order, inventory.food_order_detail, billing.promotion, 
                       billing.invoice, billing.invoice_promotion, billing.payment, hr.maintenance CASCADE';
 
@@ -261,27 +261,7 @@ BEGIN
     END;
 
     -- ------------------------------------------------------------------------
-    -- TEST 14: Đặt trùng máy trong cùng dải thời gian (EXCLUDE USING gist)
-    -- ------------------------------------------------------------------------
-    v_test_count := v_test_count + 1;
-    BEGIN
-        -- Đặt lịch hợp lệ từ 14:00 đến 18:00
-        INSERT INTO core.booking (customer_id, computer_id, booked_from, booked_to, status)
-        VALUES (v_cust_id, v_comp_id, '2026-10-15 14:00:00+07', '2026-10-15 18:00:00+07', 'confirmed');
-
-        -- Cố tình đặt cùng máy từ 16:00 đến 20:00 (Giao nhau từ 16:00 đến 18:00)
-        INSERT INTO core.booking (customer_id, computer_id, booked_from, booked_to, status)
-        VALUES (v_cust_id, v_comp_id, '2026-10-15 16:00:00+07', '2026-10-15 20:00:00+07', 'confirmed');
-
-        RAISE WARNING '[FAIL] Test 14: Đặt trùng dải giờ máy phải bị chặn bởi ex_booking_no_overlap!';
-        v_fail_count := v_fail_count + 1;
-    EXCEPTION WHEN exclusion_violation THEN
-        RAISE NOTICE '[PASS] Test 14: Khóa EXCLUDE USING gist chặn thành công đặt trùng giờ (Overbooking)';
-        v_pass_count := v_pass_count + 1;
-    END;
-
-    -- ------------------------------------------------------------------------
-    -- TEST 15: Công thức tổng tiền hóa đơn không khớp (total <> play + service + surcharge - discount)
+    -- TEST 14: Công thức tổng tiền hóa đơn không khớp (total <> play + service + surcharge - discount)
     -- ------------------------------------------------------------------------
     v_test_count := v_test_count + 1;
     BEGIN
@@ -294,34 +274,34 @@ BEGIN
         INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount)
         VALUES (v_sess_id, v_cust_id, v_emp_id, 30000, 12000, 0, 5000, 50000);
 
-        RAISE WARNING '[FAIL] Test 15: Sai công thức hóa đơn phải bị chặn bởi ck_invoice_formula!';
+        RAISE WARNING '[FAIL] Test 14: Sai công thức hóa đơn phải bị chặn bởi ck_invoice_formula!';
         v_fail_count := v_fail_count + 1;
     EXCEPTION WHEN check_violation THEN
-        RAISE NOTICE '[PASS] Test 15: Chặn thành công sai lệch công thức tổng tiền hóa đơn';
+        RAISE NOTICE '[PASS] Test 14: Chặn thành công sai lệch công thức tổng tiền hóa đơn';
         v_pass_count := v_pass_count + 1;
     END;
 
     -- ------------------------------------------------------------------------
-    -- TEST 16: Ràng buộc đa hình của bảng Payment (kind='invoice' nhưng invoice_id là NULL)
+    -- TEST 15: Ràng buộc đa hình của bảng Payment (kind='invoice' nhưng invoice_id là NULL)
     -- ------------------------------------------------------------------------
     v_test_count := v_test_count + 1;
     BEGIN
         INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id)
         VALUES ('invoice', NULL, v_cust_id, 'cash', 50000, v_emp_id);
 
-        RAISE WARNING '[FAIL] Test 16: kind=invoice mà invoice_id=NULL phải bị chặn!';
+        RAISE WARNING '[FAIL] Test 15: kind=invoice mà invoice_id=NULL phải bị chặn!';
         v_fail_count := v_fail_count + 1;
     EXCEPTION WHEN check_violation THEN
-        RAISE NOTICE '[PASS] Test 16: Chặn thành công giao dịch hóa đơn thiếu invoice_id';
+        RAISE NOTICE '[PASS] Test 15: Chặn thành công giao dịch hóa đơn thiếu invoice_id';
         v_pass_count := v_pass_count + 1;
     END;
 
     -- ------------------------------------------------------------------------
-    -- TEST 17: Ràng buộc quan hệ 1-1 của Invoice (Hai hóa đơn trỏ về cùng một session_id)
+    -- TEST 16: Ràng buộc quan hệ 1-1 của Invoice (Hai hóa đơn trỏ về cùng một session_id)
     -- ------------------------------------------------------------------------
     v_test_count := v_test_count + 1;
     BEGIN
-        -- Tạo 1 phiên finished riêng cho Test 17
+        -- Tạo 1 phiên finished riêng cho Test 16
         INSERT INTO core.gaming_session (customer_id, computer_id, opened_by, start_time, end_time, status, hourly_rate_applied, play_amount)
         VALUES (v_cust_id, v_comp_id, v_emp_id, now() - INTERVAL '1 hour', now(), 'finished', 15000, 15000)
         RETURNING session_id INTO v_sess_id;
@@ -335,10 +315,10 @@ BEGIN
         INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount)
         VALUES (v_sess_id, v_cust_id, v_emp_id, 15000, 0, 0, 0, 15000);
 
-        RAISE WARNING '[FAIL] Test 17: Tạo 2 hóa đơn cho cùng 1 phiên phải bị chặn bởi uq_invoice_session!';
+        RAISE WARNING '[FAIL] Test 16: Tạo 2 hóa đơn cho cùng 1 phiên phải bị chặn bởi uq_invoice_session!';
         v_fail_count := v_fail_count + 1;
     EXCEPTION WHEN unique_violation THEN
-        RAISE NOTICE '[PASS] Test 17: Khóa UNIQUE session_id bảo đảm quan hệ 1-1 giữa phiên chơi và hóa đơn';
+        RAISE NOTICE '[PASS] Test 16: Khóa UNIQUE session_id bảo đảm quan hệ 1-1 giữa phiên chơi và hóa đơn';
         v_pass_count := v_pass_count + 1;
     END;
 

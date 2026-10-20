@@ -68,25 +68,6 @@ public sealed class IntegrationTests
     }
 
     [Fact]
-    public async Task Test_Overbooking_ShouldThrow_ExclusionViolation()
-    {
-        var fixture = await PrepareFixtureAsync();
-        var repository = new DbRepository(_connectionString);
-        var randomDays = Random.Shared.Next(100, 9000);
-        var from = DateTime.Today.AddDays(randomDays).AddHours(10);
-        var to = DateTime.Today.AddDays(randomDays).AddHours(14);
-
-        var firstBooking = await repository.CreateBookingAsync(fixture.CustomerA, fixture.ComputerA, from, to);
-        Assert.True(firstBooking > 0);
-
-        var exception = await Assert.ThrowsAsync<PostgresException>(async () =>
-            await repository.CreateBookingAsync(fixture.CustomerB, fixture.ComputerA, from.AddHours(1), to.AddHours(1)));
-
-        Assert.Equal("23P01", exception.SqlState);
-        Assert.Contains("ex_booking_no_overlap", exception.ConstraintName);
-    }
-
-    [Fact]
     public async Task Test_Oversell_ShouldThrow_CheckViolation()
     {
         var fixture = await PrepareFixtureAsync();
@@ -110,9 +91,7 @@ public sealed class IntegrationTests
         await connection.OpenAsync();
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var usernameA = $"test_xunit_a_{suffix}";
-        var usernameB = $"test_xunit_b_{suffix}";
         var phoneA = $"093{Random.Shared.Next(1000000, 9999999)}";
-        var phoneB = $"093{Random.Shared.Next(1000000, 9999999)}";
         await using var command = new NpgsqlCommand(@"
             INSERT INTO core.customer(full_name, phone, email, username, password_hash, balance)
             VALUES (@nameA, @phoneA, @emailA, @usernameA, public.crypt('Test@123', public.gen_salt('bf')), 80000)
@@ -123,16 +102,6 @@ public sealed class IntegrationTests
         command.Parameters.AddWithValue("usernameA", usernameA);
         var customerA = Convert.ToInt32(await command.ExecuteScalarAsync());
 
-        await using var second = new NpgsqlCommand(@"
-            INSERT INTO core.customer(full_name, phone, email, username, password_hash, balance)
-            VALUES (@nameB, @phoneB, @emailB, @usernameB, public.crypt('Test@123', public.gen_salt('bf')), 80000)
-            RETURNING customer_id;", connection);
-        second.Parameters.AddWithValue("nameB", $"TEST xUnit B {suffix}");
-        second.Parameters.AddWithValue("phoneB", phoneB);
-        second.Parameters.AddWithValue("emailB", $"{usernameB}@example.com");
-        second.Parameters.AddWithValue("usernameB", usernameB);
-        var customerB = Convert.ToInt32(await second.ExecuteScalarAsync());
-
         await using var employee = new NpgsqlCommand("SELECT employee_id FROM hr.employee WHERE is_active = TRUE ORDER BY employee_id LIMIT 1;", connection);
         var employeeId = Convert.ToInt32(await employee.ExecuteScalarAsync());
         await using var computers = new NpgsqlCommand("SELECT computer_id FROM core.computer WHERE status = 'available' ORDER BY computer_id LIMIT 2;", connection);
@@ -140,7 +109,7 @@ public sealed class IntegrationTests
         var computerIds = new List<int>();
         while (await reader.ReadAsync()) computerIds.Add(reader.GetInt32(0));
         if (computerIds.Count < 2) throw new InvalidOperationException("QA cần ít nhất hai máy available cho integration test.");
-        return new TestFixture(customerA, customerB, employeeId, computerIds[0], computerIds[1]);
+        return new TestFixture(customerA, employeeId, computerIds[0]);
     }
 
     private async Task CloseIfStillActiveAsync(DbRepository repository, long sessionId, int employeeId)
@@ -200,5 +169,5 @@ public sealed class IntegrationTests
     }
 
     private sealed record TestConfig(string Database, string ConnectionString);
-    private sealed record TestFixture(int CustomerA, int CustomerB, int EmployeeId, int ComputerA, int ComputerB);
+    private sealed record TestFixture(int CustomerA, int EmployeeId, int ComputerA);
 }

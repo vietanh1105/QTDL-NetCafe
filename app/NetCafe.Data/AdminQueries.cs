@@ -1,5 +1,5 @@
 // Trách nhiệm: query read-only cho các Admin UserControl; không bypass repository.
-// Liên kết: reporting views và core.booking trong PostgreSQL.
+// Liên kết: reporting views và các bảng vận hành trong PostgreSQL.
 
 using Npgsql;
 
@@ -50,34 +50,6 @@ public partial class DbRepository
             TotalSpent = reader.GetDecimal(6),
             LastPlayedAt = reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTime>(7)
         }, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<BookingItem>> GetBookingsAsync(CancellationToken cancellationToken = default)
-    {
-        const string sql = @"SELECT b.booking_id, c.full_name, cp.computer_code,
-                                    b.booked_from, b.booked_to, b.status
-                             FROM core.booking b
-                             JOIN core.customer c ON c.customer_id = b.customer_id
-                             JOIN core.computer cp ON cp.computer_id = b.computer_id
-                             ORDER BY b.booking_id DESC;";
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var result = new List<BookingItem>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            result.Add(new BookingItem
-            {
-                BookingId = reader.GetInt32(0),
-                CustomerName = reader.GetString(1),
-                ComputerCode = reader.GetString(2),
-                BookedFrom = reader.GetFieldValue<DateTimeOffset>(3),
-                BookedTo = reader.GetFieldValue<DateTimeOffset>(4),
-                Status = reader.GetString(5)
-            });
-        }
-        return result;
     }
 
     public async Task UpdateServiceRequestStatusAsync(

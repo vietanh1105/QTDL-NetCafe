@@ -2,7 +2,7 @@
 
 > **Dự án:** Quản trị Cơ sở Dữ liệu Phòng Game/Net (`netcafe_db`)  
 > **Chuẩn mô hình hóa:** ERD Crow's Foot Notation (Mermaid)  
-> **Quy mô:** 22 bảng (16 bảng nghiệp vụ, 6 bảng giám sát & AI)
+> **Quy mô:** 21 bảng (15 bảng nghiệp vụ, 6 bảng giám sát & AI)
 
 ---
 
@@ -17,8 +17,6 @@ erDiagram
     CUSTOMER ||--o{ GAMING_SESSION : "plays"
     COMPUTER ||--o{ GAMING_SESSION : "hosts"
     EMPLOYEE ||--o{ GAMING_SESSION : "opened_by"
-    CUSTOMER ||--o{ BOOKING : "books"
-    COMPUTER ||--o{ BOOKING : "reserved_for"
 
     %% Inventory Schema
     PRODUCT_CATEGORY ||--o{ PRODUCT : "classifies"
@@ -97,16 +95,6 @@ erDiagram
         numeric hourly_rate_applied
         numeric play_amount
         jsonb game_info
-    }
-
-    BOOKING {
-        int booking_id PK
-        int customer_id FK
-        int computer_id FK
-        timestamptz booked_from
-        timestamptz booked_to
-        varchar status
-        timestamptz created_at
     }
 
     PRODUCT_CATEGORY {

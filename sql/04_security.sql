@@ -103,7 +103,7 @@ GRANT USAGE ON SCHEMA core, hr, reporting TO role_technician;
 -- ----------------------------------------------------------------------------
 
 -- 5.1. Quyền trên schema core
-GRANT SELECT, INSERT, UPDATE ON core.computer, core.customer, core.gaming_session, core.booking TO role_cashier;
+GRANT SELECT, INSERT, UPDATE ON core.computer, core.customer, core.gaming_session TO role_cashier;
 GRANT SELECT ON core.room, core.computer_type TO role_cashier, role_staff, role_technician;
 GRANT SELECT ON core.computer, core.gaming_session TO role_staff, role_technician;
 

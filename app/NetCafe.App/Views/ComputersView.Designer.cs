@@ -19,7 +19,7 @@ public partial class ComputersView
             Dock = DockStyle.Fill,
             AutoScroll = true,
             BackColor = Color.FromArgb(243, 246, 251),
-            Padding = new Padding(12, 12, 18, 20)
+            Padding = new Padding(16, 16, 24, 24)
         };
         _cardsGrid = new TableLayoutPanel
         {
@@ -28,7 +28,7 @@ public partial class ComputersView
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 2,
             RowCount = 1,
-            Padding = new Padding(4),
+            Padding = new Padding(0),
             GrowStyle = TableLayoutPanelGrowStyle.AddRows
         };
         _cardsViewport.Resize += (_, _) => LayoutCards();

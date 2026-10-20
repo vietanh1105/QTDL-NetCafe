@@ -21,8 +21,6 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.App/Views/ComputersView.Designer.cs`: metadata Designer của ComputersView.
 - `app/NetCafe.App/Views/CustomersView.cs`: tìm khách, CRUD, reset mật khẩu, bật/tắt và nạp tiền qua repository.
 - `app/NetCafe.App/Views/CustomersView.Designer.cs`: metadata Designer của CustomersView.
-- `app/NetCafe.App/Views/BookingView.cs`: danh sách booking và trạng thái overbooking từ DB.
-- `app/NetCafe.App/Views/BookingView.Designer.cs`: metadata Designer của BookingView.
 - `app/NetCafe.App/Views/OrdersView.cs`: danh sách sản phẩm, giá và tồn kho.
 - `app/NetCafe.App/Views/OrdersView.Designer.cs`: metadata Designer của OrdersView.
 - `app/NetCafe.App/Views/InvoicesView.cs`: danh sách invoice gần nhất và trạng thái thanh toán.
@@ -48,7 +46,7 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.Data/DatabaseMetadataRepository.cs`: preflight host/database/user, migration 08 và function capability.
 - `app/NetCafe.Data/CustomerAdminRepository.cs`: CRUD/reset/kích hoạt khách hàng, hash mật khẩu trong DB.
 - `app/NetCafe.Data/AiRepository.cs`: đọc snapshot AI và chạy module chỉ theo nút Admin.
-- `app/NetCafe.Data/AdminQueries.cs`: booking, support status và ba reporting query.
+- `app/NetCafe.Data/AdminQueries.cs`: support status và ba reporting query.
 - `app/NetCafe.Data/StationRepository.cs`: function calls cho station, reconcile và mapping kết quả station.
 - `app/NetCafe.Data/Models.cs`: DTO Admin và reporting.
 - `app/NetCafe.Data/StationModels.cs`: DTO login, heartbeat, order, support và AI.

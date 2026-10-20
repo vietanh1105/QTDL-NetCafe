@@ -70,7 +70,6 @@ COMMENT ON DATABASE netcafe_db IS 'Database quản lý phòng game/net - Đề t
 -- 1. KHỞI TẠO CÁC EXTENSION CHUẨN CỦA POSTGRESQL 17
 -- ----------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS pgcrypto;      -- Mã hóa mật khẩu, UUID, hàm băm
-CREATE EXTENSION IF NOT EXISTS btree_gist;    -- Ràng buộc loại trừ EXCLUDE trên kiểu vô hướng + dải thời gian
 CREATE EXTENSION IF NOT EXISTS pg_trgm;       -- Tìm kiếm mờ trigram, đo độ tương đồng similarity
 CREATE EXTENSION IF NOT EXISTS unaccent;      -- Bỏ dấu tiếng Việt phục vụ tìm kiếm
 
@@ -124,7 +123,6 @@ COMMENT ON COLUMN hr.employee.salary IS 'Cột nhạy cảm: Bảo vệ bằng C
 -- 4. SCHEMA CORE (Nghiệp vụ phòng máy cốt lõi)
 -- ----------------------------------------------------------------------------
 
-DROP TABLE IF EXISTS core.booking CASCADE;
 DROP TABLE IF EXISTS core.gaming_session CASCADE;
 DROP TABLE IF EXISTS core.computer CASCADE;
 DROP TABLE IF EXISTS core.computer_type CASCADE;
@@ -221,26 +219,6 @@ CREATE TABLE core.gaming_session (
     )
 );
 COMMENT ON TABLE core.gaming_session IS 'Phiên chơi máy: hourly_rate_applied bảo lưu giá tại thời điểm mở phiên';
-
--- 4.6. Đặt máy trước (Booking)
-CREATE TABLE core.booking (
-    booking_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    customer_id INT NOT NULL REFERENCES core.customer(customer_id) ON DELETE RESTRICT,
-    computer_id INT NOT NULL REFERENCES core.computer(computer_id) ON DELETE RESTRICT,
-    booked_from TIMESTAMPTZ NOT NULL,
-    booked_to TIMESTAMPTZ NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT ck_booking_status CHECK (status IN ('pending', 'confirmed', 'checked_in', 'cancelled', 'no_show')),
-    CONSTRAINT ck_booking_time_order CHECK (booked_to > booked_from),
-    -- Khóa loại trừ: Chống 2 khách đặt trùng 1 máy trong cùng dải thời gian
-    CONSTRAINT ex_booking_no_overlap EXCLUDE USING gist (
-        computer_id WITH =,
-        tstzrange(booked_from, booked_to) WITH &&
-    ) WHERE (status IN ('pending', 'confirmed'))
-);
-COMMENT ON TABLE core.booking IS 'Đặt lịch máy trước: Khóa EXCLUDE USING gist ngăn chặn overbooking tại CSDL';
 
 -- ----------------------------------------------------------------------------
 -- 5. SCHEMA INVENTORY (Quản lý F&B, Tồn kho & Đơn gọi món)
@@ -1267,7 +1245,7 @@ GRANT USAGE ON SCHEMA core, hr, reporting TO role_technician;
 -- ----------------------------------------------------------------------------
 
 -- 5.1. Quyền trên schema core
-GRANT SELECT, INSERT, UPDATE ON core.computer, core.customer, core.gaming_session, core.booking TO role_cashier;
+GRANT SELECT, INSERT, UPDATE ON core.computer, core.customer, core.gaming_session TO role_cashier;
 GRANT SELECT ON core.room, core.computer_type TO role_cashier, role_staff, role_technician;
 GRANT SELECT ON core.computer, core.gaming_session TO role_staff, role_technician;
 
@@ -1613,7 +1591,7 @@ COMMENT ON FUNCTION audit.fn_create_monthly_partitions IS 'Tự động tạo pa
 
 -- 1. XÓA DỮ LIỆU CŨ VÀ RESET IDENTITY SEQUENCES
 TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.invoice,
-         inventory.food_order_detail, inventory.food_order, core.booking,
+         inventory.food_order_detail, inventory.food_order,
          core.gaming_session, inventory.product, inventory.product_category,
          core.customer, core.computer, core.computer_type, core.room,
          hr.employee, billing.promotion RESTART IDENTITY CASCADE;

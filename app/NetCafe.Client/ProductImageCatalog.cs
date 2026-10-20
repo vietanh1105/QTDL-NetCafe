@@ -10,10 +10,15 @@ public static class ProductImageCatalog
 {
     private static readonly Dictionary<string, Color> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["NUOC-NGOT"] = Color.FromArgb(239, 68, 68),
-        ["CAFE-DEN"] = Color.FromArgb(120, 53, 15),
+        ["STING-RED"] = Color.FromArgb(220, 38, 38),
+        ["REDBULL"] = Color.FromArgb(30, 64, 175),
+        ["COCA-ZERO"] = Color.FromArgb(15, 23, 42),
+        ["AQUA-500"] = Color.FromArgb(14, 165, 233),
+        ["CF-SUA-DA"] = Color.FromArgb(120, 53, 15),
         ["TRA-DAO"] = Color.FromArgb(234, 88, 12),
         ["MI-TRUNG"] = Color.FromArgb(245, 158, 11),
+        ["COM-XAO-BO"] = Color.FromArgb(161, 98, 7),
+        ["BANH-MI-PATE"] = Color.FromArgb(180, 83, 9),
         ["BIM-BIM-KHOAI"] = Color.FromArgb(250, 204, 21),
     };
 

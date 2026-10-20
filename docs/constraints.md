@@ -31,8 +31,6 @@
 | `core.customer` | `membership_tier` | **CHECK** | `CHECK (membership_tier IN ('regular','silver','gold','vip'))` | Kiểm soát 4 hạng thành viên | Gán hạng `diamond` |
 | `core.gaming_session` | `start_time`, `end_time` | **CHECK** | `CHECK (end_time IS NULL OR end_time > start_time)` | Thời gian kết thúc phải sau bắt đầu | `end_time = '08:00'` trong khi `start_time = '09:00'` |
 | `core.gaming_session` | `status`, `end_time` | **CHECK** | `CHECK ((status = 'active' AND end_time IS NULL) OR (status <> 'active' AND end_time IS NOT NULL))` | Trạng thái đồng nhất với mốc thời gian | Phiên `finished` nhưng `end_time` vẫn là `NULL` |
-| `core.booking` | `booked_from`, `booked_to` | **CHECK** | `CHECK (booked_to > booked_from)` | Thời gian kết thúc đặt sau bắt đầu | Đặt lịch lùi thời gian |
-| `core.booking` | `computer_id`, `tstzrange` | **EXCLUDE (GiST)** | `EXCLUDE USING gist (computer_id WITH =, tstzrange(booked_from, booked_to) WITH &&) WHERE (status IN ('pending','confirmed'))` | **Chống đặt trùng máy (Overbooking)** | Đặt cùng máy PC001 từ 14:00-18:00 và 16:00-20:00 |
 | `inventory.product` | `stock_qty` | **CHECK** | `CHECK (stock_qty >= 0)` | Tồn kho không âm, chặn bán lố kho | Bán hàng khi số lượng trong kho = 0 |
 | `inventory.product` | `unit_price` | **CHECK** | `CHECK (unit_price >= 0)` | Đơn giá sản phẩm F&B không âm | Đặt giá `-15000` |
 | `inventory.food_order_detail`| `quantity` | **CHECK** | `CHECK (quantity > 0)` | Số lượng gọi món phải lớn hơn 0 | Gọi 0 ly nước hoặc số lượng âm |
@@ -62,9 +60,9 @@
    - Có dữ liệu mới nhất ở thời điểm hiện tại (`now()`), không bị đóng băng trong quá khứ.
 
 3. **ĐÚNG (Correctness & Consistency):**
-   - Tính nhất quán thời gian: `end_time > start_time`, `finished_at >= started_at`, `booked_to > booked_from`.
+   - Tính nhất quán thời gian: `end_time > start_time`, `finished_at >= started_at`.
    - Tính nhất quán tài chính: Công thức hóa đơn luôn thỏa mãn `total_amount = play_amount + service_amount + surcharge - discount_amount`.
-   - Tính toàn vẹn phi mâu thuẫn: Không bao giờ có 2 phiên chơi hoặc 2 lịch đặt máy chồng lấn giờ trên cùng 1 máy trạm (`EXCLUDE USING gist`).
+   - Tính toàn vẹn phi mâu thuẫn: Không bao giờ có hai phiên active trên cùng một máy nhờ khóa nghiệp vụ và trigger đồng bộ trạng thái.
    - Tính toàn vẹn số học: Số dư tài khoản $\ge 0$, tồn kho $\ge 0$, số lượng mua $> 0$, giá tiền $\ge 0$.
 
 4. **ĐỦ (Completeness):**
