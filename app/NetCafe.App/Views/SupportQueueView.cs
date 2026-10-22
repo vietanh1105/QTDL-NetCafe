@@ -16,9 +16,11 @@ public partial class SupportQueueView : AdminCardViewBase
     {
         InitializeComponent();
         SetTitle("Yêu cầu hỗ trợ", "Máy trạm gửi yêu cầu qua PostgreSQL NOTIFY; chọn card để xử lý theo luồng Mới → Tiếp nhận → Hoàn thành.");
-        Toolbar.Controls.Add(_cancelButton);
-        Toolbar.Controls.Add(_resolveButton);
-        Toolbar.Controls.Add(_acknowledgeButton);
+        ActionsPanel.Controls.Add(_acknowledgeButton);
+        ActionsPanel.Controls.Add(_resolveButton);
+        ActionsPanel.Controls.Add(_cancelButton);
+
+
         _acknowledgeButton.Click += async (_, _) => await ChangeStatusAsync("acknowledged");
         _resolveButton.Click += async (_, _) => await ChangeStatusAsync("resolved");
         _cancelButton.Click += async (_, _) => await ChangeStatusAsync("cancelled");
@@ -81,7 +83,7 @@ public partial class SupportQueueView : AdminCardViewBase
             Text = text,
             Width = 92,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(37, 99, 235),
+            BackColor = CyberTheme.Primary,
             ForeColor = Color.White
         };
     }

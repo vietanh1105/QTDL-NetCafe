@@ -195,6 +195,7 @@ namespace NetCafe.Data
         public string RoomName { get; set; } = string.Empty;
         public long TotalSessions { get; set; }
         public decimal TotalHoursPlayed { get; set; }
+        public decimal OccupancyRate => Math.Min(100.0m, Math.Round((TotalHoursPlayed / 720.0m) * 100.0m, 1));
         public decimal TotalPlayRevenue { get; set; }
     }
 

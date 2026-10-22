@@ -32,7 +32,7 @@ public partial class CustomersView : AdminCardViewBase
         _searchButton.Text = "🔍 Tìm";
         _searchButton.Width = 65;
         _searchButton.Height = 32;
-        _searchButton.BackColor = Color.FromArgb(71, 85, 105);
+        _searchButton.BackColor = CyberTheme.Primary;
         _searchButton.ForeColor = Color.White;
         _searchButton.FlatStyle = FlatStyle.Flat;
         _searchButton.FlatAppearance.BorderSize = 0;
@@ -41,8 +41,8 @@ public partial class CustomersView : AdminCardViewBase
         _clearSearchButton.Text = "✕ Tất cả";
         _clearSearchButton.Width = 75;
         _clearSearchButton.Height = 32;
-        _clearSearchButton.BackColor = Color.FromArgb(148, 163, 184);
-        _clearSearchButton.ForeColor = Color.White;
+        _clearSearchButton.BackColor = CyberTheme.SurfaceRaised;
+        _clearSearchButton.ForeColor = CyberTheme.Text;
         _clearSearchButton.FlatStyle = FlatStyle.Flat;
         _clearSearchButton.FlatAppearance.BorderSize = 0;
         _clearSearchButton.Margin = new Padding(0, 4, 12, 4);
@@ -58,19 +58,26 @@ public partial class CustomersView : AdminCardViewBase
         _topUpButton.FlatAppearance.BorderSize = 0;
         _topUpButton.Margin = new Padding(0, 4, 6, 4);
 
-        ConfigureActionButton(_createButton, "+ Thêm mới", Color.FromArgb(37, 99, 235));
-        ConfigureActionButton(_editButton, "Chỉnh sửa", Color.FromArgb(71, 85, 105));
-        ConfigureActionButton(_toggleButton, "Khóa/Mở", Color.FromArgb(234, 88, 12));
-        ConfigureActionButton(_resetButton, "Đổi MK", Color.FromArgb(124, 58, 237));
+        ConfigureActionButton(_createButton, "+ Thêm mới", CyberTheme.Primary);
+        ConfigureActionButton(_editButton, "Chỉnh sửa", CyberTheme.SurfaceRaised);
+        ConfigureActionButton(_toggleButton, "Khóa/Mở", CyberTheme.Warning);
+        ConfigureActionButton(_resetButton, "Đổi MK", CyberTheme.SurfaceRaised);
 
-        Toolbar.Controls.Add(_resetButton);
-        Toolbar.Controls.Add(_toggleButton);
-        Toolbar.Controls.Add(_editButton);
-        Toolbar.Controls.Add(_createButton);
-        Toolbar.Controls.Add(_topUpButton);
-        Toolbar.Controls.Add(_clearSearchButton);
-        Toolbar.Controls.Add(_searchButton);
-        Toolbar.Controls.Add(_searchBox);
+        ActionsPanel.Controls.Add(_searchBox);
+        ActionsPanel.Controls.Add(_searchButton);
+        ActionsPanel.Controls.Add(_clearSearchButton);
+        ActionsPanel.Controls.Add(_topUpButton);
+        ActionsPanel.Controls.Add(_createButton);
+        ActionsPanel.Controls.Add(_editButton);
+        ActionsPanel.Controls.Add(_toggleButton);
+        ActionsPanel.Controls.Add(_resetButton);
+
+
+
+
+
+
+
 
         _searchBox.KeyDown += async (_, e) =>
         {
@@ -224,10 +231,10 @@ public partial class CustomersView : AdminCardViewBase
         button.Text = text;
         button.Width = text.Length > 6 ? 95 : 78;
         button.Height = 32;
-        button.BackColor = color;
-        button.ForeColor = Color.White;
-        button.FlatStyle = FlatStyle.Flat;
-        button.FlatAppearance.BorderSize = 0;
+        CyberTheme.StyleButton(button, color);
+
+
+
         button.Margin = new Padding(0, 4, 6, 4);
     }
 }
@@ -251,6 +258,7 @@ internal sealed class CustomerEditorDialog : Form
         Width = 380;
         Height = customer is null ? 330 : 260;
         StartPosition = FormStartPosition.CenterParent;
+        BackColor = CyberTheme.Background;
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = customer is null ? 6 : 4 };
         AddField(layout, "Họ và tên", _fullName, 0);
         AddField(layout, "Số điện thoại", _phone, 1);
@@ -262,6 +270,7 @@ internal sealed class CustomerEditorDialog : Form
             _password.UseSystemPasswordChar = true;
         }
         var save = new Button { Text = "Lưu", DialogResult = DialogResult.OK, Dock = DockStyle.Fill };
+        CyberTheme.StyleButton(save, CyberTheme.Primary);
         layout.Controls.Add(save, 1, layout.RowCount - 1);
         Controls.Add(layout);
         AcceptButton = save;
@@ -293,10 +302,12 @@ internal sealed class PasswordDialog : Form
         Width = 330;
         Height = 130;
         StartPosition = FormStartPosition.CenterParent;
+        BackColor = CyberTheme.Background;
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 2 };
         panel.Controls.Add(new Label { Text = "Mật khẩu", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
         panel.Controls.Add(_password, 1, 0);
         var save = new Button { Text = "Lưu", DialogResult = DialogResult.OK, Dock = DockStyle.Fill };
+        CyberTheme.StyleButton(save, CyberTheme.Primary);
         panel.Controls.Add(save, 1, 1);
         Controls.Add(panel);
         AcceptButton = save;
@@ -319,10 +330,10 @@ internal sealed class TopUpDialog : Form
         Width = 450;
         Height = 440;
         StartPosition = FormStartPosition.CenterParent;
+        BackColor = CyberTheme.Background;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        BackColor = Color.FromArgb(243, 246, 251);
 
         var root = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16) };
         var infoCard = new Panel
@@ -337,7 +348,7 @@ internal sealed class TopUpDialog : Form
         {
             Text = $"Hội viên: {customer.FullName} (@{customer.Username})",
             Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(30, 64, 175),
+            ForeColor = CyberTheme.Primary,
             Dock = DockStyle.Top,
             Height = 24
         };
@@ -345,7 +356,7 @@ internal sealed class TopUpDialog : Form
         {
             Text = $"Số dư ví hiện tại: {customer.Balance:N0} đ | SĐT: {customer.Phone}",
             Font = new Font("Segoe UI", 9.5F),
-            ForeColor = Color.FromArgb(51, 65, 85),
+            ForeColor = CyberTheme.MutedText,
             Dock = DockStyle.Top,
             Height = 24
         };
@@ -384,10 +395,10 @@ internal sealed class TopUpDialog : Form
                 Height = 32,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.White,
-                ForeColor = Color.FromArgb(30, 64, 175),
+                ForeColor = CyberTheme.Primary,
                 Margin = new Padding(0, 0, 8, 0)
             };
-            btn.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btn.FlatAppearance.BorderColor = CyberTheme.Border;
             btn.Click += (_, _) => _amountBox.Value = amt;
             quickButtonsPanel.Controls.Add(btn);
         }
@@ -428,7 +439,7 @@ internal sealed class TopUpDialog : Form
             Width = 130,
             Height = 36,
             DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(16, 185, 129),
+            BackColor = CyberTheme.Primary,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };

@@ -20,6 +20,8 @@ public abstract class AdminCardViewBase : AdminDataViewBase
 
     protected object? SelectedItem => _selectedItem;
 
+    protected virtual int CardHeight => 160;
+
     protected AdminCardViewBase()
     {
         Grid.Visible = false;
@@ -59,7 +61,7 @@ public abstract class AdminCardViewBase : AdminDataViewBase
         var card = new Panel
         {
             Width = 290,
-            Height = 148,
+            Height = CardHeight,
             Margin = new Padding(0, 0, 16, 16),
             Padding = new Padding(14),
             BackColor = CyberTheme.Surface,

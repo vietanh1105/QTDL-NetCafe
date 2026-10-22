@@ -23,6 +23,7 @@ public partial class OrdersView : AdminViewBase
     private readonly Label _menuCountLabel = new();
     private readonly ComboBox _categoryCombo = new();
     private readonly Button _receiveStockButton = new();
+    private readonly Button _orderForStationButton = new();
     private readonly FlowLayoutPanel _cardsPanel = new();
 
     // Kitchen Queue section (Bottom)
@@ -119,6 +120,15 @@ public partial class OrdersView : AdminViewBase
         _receiveStockButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_receiveStockButton, CyberTheme.Success);
         _receiveStockButton.Click += async (_, _) => await ReceiveStockAsync();
+
+        _orderForStationButton.Text = "🛎️ Gọi món cho máy";
+        _orderForStationButton.Width = 145;
+        _orderForStationButton.Height = 26;
+        _orderForStationButton.Dock = DockStyle.Right;
+        CyberTheme.StyleButton(_orderForStationButton, CyberTheme.Primary);
+        _orderForStationButton.Click += async (_, _) => await OrderForStationAsync();
+
+        _menuHeaderPanel.Controls.Add(_orderForStationButton);
 
         _menuHeaderPanel.Controls.Add(_receiveStockButton);
         _menuHeaderPanel.Controls.Add(_categoryCombo);
@@ -271,7 +281,7 @@ public partial class OrdersView : AdminViewBase
         var card = new Panel
         {
             Width = 270,
-            Height = 204,
+            Height = 238,
             Margin = new Padding(0, 0, 10, 10),
             Padding = new Padding(12),
             BackColor = CyberTheme.Surface,
@@ -326,13 +336,30 @@ public partial class OrdersView : AdminViewBase
 
         var priceStock = new Label
         {
-            Dock = DockStyle.Fill,
-            Text = $"Giá: {product.UnitPrice:N0} đ\nTồn kho: {product.StockQty:N0} phần",
+            Dock = DockStyle.Top,
+            Height = 32,
+            Text = $"Giá: {product.UnitPrice:N0} đ | Tồn: {product.StockQty:N0} phần",
             ForeColor = CyberTheme.Primary,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
 
+        var orderBtn = new Button
+        {
+            Dock = DockStyle.Bottom,
+            Height = 28,
+            Text = isAvailable ? "🛎️ Đặt món" : "Hết hàng",
+            Enabled = isAvailable,
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+        };
+        CyberTheme.StyleButton(orderBtn, isAvailable ? CyberTheme.Primary : CyberTheme.SurfaceRaised);
+        orderBtn.Click += async (_, _) =>
+        {
+            _selectedProduct = product;
+            await OrderForStationAsync();
+        };
+
         card.Tag = product;
+        card.Controls.Add(orderBtn);
         card.Controls.Add(priceStock);
         card.Controls.Add(status);
         card.Controls.Add(category);
@@ -402,6 +429,58 @@ public partial class OrdersView : AdminViewBase
         }
     }
 
+    private async Task OrderForStationAsync()
+    {
+        if (_selectedProduct is null)
+        {
+            MessageBox.Show(FindForm(), "Vui lòng chọn một món ăn/nước uống trong thực đơn trước.", "Chưa chọn món", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (_selectedProduct.StockQty <= 0)
+        {
+            MessageBox.Show(FindForm(), $"Món '{_selectedProduct.ProductName}' đã hết hàng trong kho.", "Hết hàng", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            var computers = await RequiredContext.Repository.GetComputersAsync();
+            var activeStations = computers
+                .Where(c => c.ComputerStatus.Equals("in_use", StringComparison.OrdinalIgnoreCase) && c.CurrentSessionId.HasValue)
+                .ToList();
+
+            if (activeStations.Count == 0)
+            {
+                MessageBox.Show(FindForm(), "Hiện không có máy trạm nào đang mở phiên chơi để gọi món.", "Không có máy đang hoạt động", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var dialog = new StationOrderDialog(_selectedProduct, activeStations);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || dialog.SelectedStation == null)
+            {
+                return;
+            }
+
+            var sessionId = dialog.SelectedStation.CurrentSessionId!.Value;
+            var quantity = dialog.Quantity;
+            var empId = RequiredContext.CurrentEmployeeId;
+
+            var orderId = await RequiredContext.Repository.PlaceOrderAsync(sessionId, empId, _selectedProduct.ProductId, quantity);
+            MessageBox.Show(FindForm(),
+                $"Đã tạo đơn món #{orderId} cho {dialog.SelectedStation.ComputerCode} thành công!\nSố lượng: {quantity} x {_selectedProduct.ProductName}\nTổng tiền: {quantity * _selectedProduct.UnitPrice:N0} đ",
+                "Đặt món thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
     private void ResizeCards()
     {
         var availableWidth = _cardsPanel.ClientSize.Width - _cardsPanel.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth;
@@ -432,7 +511,7 @@ public partial class OrdersView : AdminViewBase
         {
             colTotal.HeaderText = "Tổng tiền";
             colTotal.Width = 110;
-            colTotal.DefaultCellStyle.Format = "N0 đ";
+
             colTotal.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_kitchenGrid.Columns["Status"] is { } colStatus) { colStatus.HeaderText = "Trạng thái"; colStatus.Width = 130; }
@@ -462,6 +541,12 @@ public partial class OrdersView : AdminViewBase
         if (e.RowIndex < 0 || e.RowIndex >= _kitchenGrid.Rows.Count) return;
 
         var columnName = _kitchenGrid.Columns[e.ColumnIndex].Name;
+        if (columnName.Equals("TotalAmount", StringComparison.OrdinalIgnoreCase) && e.Value is decimal totalAmount)
+        {
+            e.Value = $"{totalAmount:N0} đ";
+            e.FormattingApplied = true;
+            return;
+        }
         if (columnName.Equals("Status", StringComparison.OrdinalIgnoreCase) && e.Value != null)
         {
             var rawStatus = e.Value.ToString()?.ToLowerInvariant() ?? "";
@@ -597,5 +682,134 @@ internal sealed class StockReceiveDialog : Form
         layout.Controls.Add(save, 1, 1);
         Controls.Add(layout);
         AcceptButton = save;
+    }
+}
+
+
+internal sealed class StationOrderDialog : Form
+{
+    private readonly ComboBox _stationCombo = new();
+    private readonly NumericUpDown _qtyBox = new();
+    private readonly Label _totalLabel = new();
+    private readonly decimal _unitPrice;
+
+    public ComputerGridItem? SelectedStation { get; private set; }
+    public int Quantity => (int)_qtyBox.Value;
+
+    public StationOrderDialog(ProductItem product, IReadOnlyList<ComputerGridItem> activeStations)
+    {
+        _unitPrice = product.UnitPrice;
+        Text = $"Gọi món cho máy - {product.ProductName}";
+        StartPosition = FormStartPosition.CenterParent;
+        Width = 440;
+        Height = 310;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
+
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            Padding = new Padding(16)
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 45F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 55F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 55F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 35F));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        var infoLabel = new Label
+        {
+            Text = $"Món: {product.ProductName} | Đơn giá: {product.UnitPrice:N0} đ | Tồn kho: {product.StockQty:N0}",
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = CyberTheme.Primary,
+            Dock = DockStyle.Fill
+        };
+
+        var stationPanel = new Panel { Dock = DockStyle.Fill };
+        var stationLbl = new Label { Text = "Máy trạm nhận món:", Dock = DockStyle.Top, Height = 18, ForeColor = CyberTheme.Text };
+        _stationCombo.Dock = DockStyle.Bottom;
+        _stationCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        foreach (var s in activeStations)
+        {
+            _stationCombo.Items.Add(new StationOption(s));
+        }
+        if (_stationCombo.Items.Count > 0) _stationCombo.SelectedIndex = 0;
+        stationPanel.Controls.Add(stationLbl);
+        stationPanel.Controls.Add(_stationCombo);
+
+        var qtyPanel = new Panel { Dock = DockStyle.Fill };
+        var qtyLbl = new Label { Text = "Số lượng món:", Dock = DockStyle.Top, Height = 18, ForeColor = CyberTheme.Text };
+        _qtyBox.Dock = DockStyle.Bottom;
+        _qtyBox.Minimum = 1;
+        _qtyBox.Maximum = Math.Max(1, product.StockQty);
+        _qtyBox.Value = 1;
+        _qtyBox.ValueChanged += (_, _) => UpdateTotal();
+        qtyPanel.Controls.Add(qtyLbl);
+        qtyPanel.Controls.Add(_qtyBox);
+
+        _totalLabel.Text = $"Thành tiền: {_unitPrice:N0} đ";
+        _totalLabel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        _totalLabel.ForeColor = CyberTheme.Success;
+        _totalLabel.Dock = DockStyle.Fill;
+
+        var btnPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 42,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        var okBtn = new Button
+        {
+            Text = "Xác nhận đặt",
+            DialogResult = DialogResult.OK,
+            Width = 120,
+            Height = 36
+        };
+        CyberTheme.StyleButton(okBtn, CyberTheme.Success);
+        okBtn.Click += (_, _) =>
+        {
+            if (_stationCombo.SelectedItem is StationOption option)
+            {
+                SelectedStation = option.Station;
+            }
+        };
+
+        var cancelBtn = new Button
+        {
+            Text = "Hủy",
+            DialogResult = DialogResult.Cancel,
+            Width = 80,
+            Height = 36
+        };
+        CyberTheme.StyleButton(cancelBtn, CyberTheme.SurfaceRaised);
+        btnPanel.Controls.Add(cancelBtn);
+        btnPanel.Controls.Add(okBtn);
+
+        root.Controls.Add(infoLabel, 0, 0);
+        root.Controls.Add(stationPanel, 0, 1);
+        root.Controls.Add(qtyPanel, 0, 2);
+        root.Controls.Add(_totalLabel, 0, 3);
+        root.Controls.Add(btnPanel, 0, 4);
+        Controls.Add(root);
+        AcceptButton = okBtn;
+        CancelButton = cancelBtn;
+    }
+
+    private void UpdateTotal()
+    {
+        var total = _qtyBox.Value * _unitPrice;
+        _totalLabel.Text = $"Thành tiền: {total:N0} đ";
+    }
+
+    private sealed class StationOption
+    {
+        public ComputerGridItem Station { get; }
+        public StationOption(ComputerGridItem station) => Station = station;
+        public override string ToString() => $"{Station.ComputerCode} - {Station.CurrentCustomerName} (Phiên #{Station.CurrentSessionId})";
     }
 }

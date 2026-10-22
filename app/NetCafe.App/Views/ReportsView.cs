@@ -16,65 +16,89 @@ public partial class ReportsView : AdminDataViewBase
     private readonly Button _refreshSnapshotsButton = new();
     private readonly Button _exportPdfButton = new();
     private readonly Button _exportExcelButton = new();
+    private readonly Label _fromLabel = new() { Text = "Từ:", AutoSize = true, Padding = new Padding(0, 8, 2, 0) };
     private readonly DateTimePicker _fromPicker = new();
+    private readonly Label _toLabel = new() { Text = "Đến:", AutoSize = true, Padding = new Padding(4, 8, 2, 0) };
     private readonly DateTimePicker _toPicker = new();
     private string _mode = "revenue";
 
     public ReportsView()
     {
         InitializeComponent();
-        SetTitle("Báo cáo vận hành", "Chọn một nhóm báo cáo; dữ liệu nặng chỉ refresh snapshot khi bấm cập nhật.");
+        SetTitle("Báo cáo vận hành", "Chọn một nhóm báo cáo; dữ liệu snapshot chỉ refresh khi bấm Cập nhật.");
         ConfigureToolbar();
     }
 
     private void ConfigureToolbar()
     {
-        ConfigureModeButton(_revenueButton, "📅 Doanh thu ngày", "revenue");
-        ConfigureModeButton(_usageButton, "🖥️ Hiệu suất máy", "usage");
-        ConfigureModeButton(_customersButton, "👑 Top hội viên", "customers");
+        ConfigureModeButton(_revenueButton, "📅 Doanh thu theo ngày", "revenue");
+        ConfigureModeButton(_usageButton, "🖥️ Hiệu suất máy trạm", "usage");
+        ConfigureModeButton(_customersButton, "👑 Top Hội viên chi tiêu", "customers");
 
         _fromPicker.Format = DateTimePickerFormat.Short;
-        _fromPicker.Width = 92;
+        _fromPicker.Width = 95;
         _fromPicker.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         _toPicker.Format = DateTimePickerFormat.Short;
-        _toPicker.Width = 92;
+        _toPicker.Width = 95;
         _toPicker.Value = DateTime.Today;
         _fromPicker.ValueChanged += async (_, _) => await RefreshAsync();
         _toPicker.ValueChanged += async (_, _) => await RefreshAsync();
 
-        ConfigureToolbarButton(_refreshSnapshotsButton, "⚡ Cập nhật số liệu", CyberTheme.Warning, 124);
+        ConfigureToolbarButton(_refreshSnapshotsButton, "⚡ Cập nhật số liệu (REFRESH MATVIEW)", CyberTheme.Warning, 240);
         ConfigureToolbarButton(_exportPdfButton, "📄 PDF", CyberTheme.Primary, 72);
         ConfigureToolbarButton(_exportExcelButton, "📊 Excel", CyberTheme.Success, 78);
+
         _refreshSnapshotsButton.Click += async (_, _) => await RefreshSnapshotsAsync();
         _exportPdfButton.Click += async (_, _) => await ExportPdfAsync();
         _exportExcelButton.Click += async (_, _) => await ExportExcelAsync();
 
-        Toolbar.Controls.Add(_exportExcelButton);
-        Toolbar.Controls.Add(_exportPdfButton);
-        Toolbar.Controls.Add(_refreshSnapshotsButton);
-        Toolbar.Controls.Add(_toPicker);
-        Toolbar.Controls.Add(_fromPicker);
-        Toolbar.Controls.Add(_customersButton);
-        Toolbar.Controls.Add(_usageButton);
-        Toolbar.Controls.Add(_revenueButton);
+        ActionsPanel.Controls.Add(_revenueButton);
+        ActionsPanel.Controls.Add(_usageButton);
+        ActionsPanel.Controls.Add(_customersButton);
+        ActionsPanel.Controls.Add(_fromLabel);
+        ActionsPanel.Controls.Add(_fromPicker);
+        ActionsPanel.Controls.Add(_toLabel);
+        ActionsPanel.Controls.Add(_toPicker);
+        ActionsPanel.Controls.Add(_refreshSnapshotsButton);
+        ActionsPanel.Controls.Add(_exportPdfButton);
+        ActionsPanel.Controls.Add(_exportExcelButton);
+
+        UpdateModeButtonStyles();
+    }
+
+    private void UpdateModeButtonStyles()
+    {
+        _revenueButton.BackColor = _mode == "revenue" ? CyberTheme.Primary : CyberTheme.SurfaceRaised;
+        _revenueButton.ForeColor = _mode == "revenue" ? Color.White : CyberTheme.Text;
+        _usageButton.BackColor = _mode == "usage" ? CyberTheme.Primary : CyberTheme.SurfaceRaised;
+        _usageButton.ForeColor = _mode == "usage" ? Color.White : CyberTheme.Text;
+        _customersButton.BackColor = _mode == "customers" ? CyberTheme.Primary : CyberTheme.SurfaceRaised;
+        _customersButton.ForeColor = _mode == "customers" ? Color.White : CyberTheme.Text;
+
+        var isRevenue = _mode == "revenue";
+        _fromLabel.Visible = isRevenue;
+        _fromPicker.Visible = isRevenue;
+        _toLabel.Visible = isRevenue;
+        _toPicker.Visible = isRevenue;
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         try
         {
+            UpdateModeButtonStyles();
             switch (_mode)
             {
                 case "usage":
                 {
                     var rows = await RequiredContext.Repository.GetComputerUsageAsync(cancellationToken);
-                    SetRows(rows, $"Hiệu suất {rows.Count} máy | {_fromPicker.Value:dd/MM/yyyy} → {_toPicker.Value:dd/MM/yyyy}");
+                    SetRows(rows, $"Hiệu suất {rows.Count} máy trạm | Tỷ lệ lấp đầy tính trên chuẩn 720 giờ/tháng");
                     break;
                 }
                 case "customers":
                 {
                     var rows = await RequiredContext.Repository.GetTopCustomersAsync(cancellationToken);
-                    SetRows(rows, $"Top {rows.Count} hội viên theo chi tiêu | snapshot hiện tại");
+                    SetRows(rows, $"Top {rows.Count} hội viên theo chi tiêu | Materialized View Snapshot");
                     break;
                 }
                 default:
@@ -96,7 +120,13 @@ public partial class ReportsView : AdminDataViewBase
 
     private void ConfigureModeButton(Button button, string text, string mode)
     {
-        ConfigureToolbarButton(button, text, CyberTheme.SurfaceRaised, text.Length > 18 ? 132 : 118);
+        button.Text = text;
+        button.Width = text.Length > 20 ? 175 : 155;
+        button.Height = 32;
+        button.Margin = new Padding(3, 2, 3, 2);
+        button.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        button.FlatStyle = FlatStyle.Flat;
+        button.FlatAppearance.BorderSize = 0;
         button.Click += async (_, _) =>
         {
             _mode = mode;
@@ -108,8 +138,8 @@ public partial class ReportsView : AdminDataViewBase
     {
         button.Text = text;
         button.Width = width;
-        button.Height = 30;
-        button.Margin = new Padding(3, 0, 3, 0);
+        button.Height = 32;
+        button.Margin = new Padding(3, 2, 3, 2);
         CyberTheme.StyleButton(button, color);
     }
 
@@ -119,6 +149,11 @@ public partial class ReportsView : AdminDataViewBase
         {
             await RequiredContext.Repository.RefreshMaterializedViewsAsync();
             await RefreshAsync();
+            MessageBox.Show(FindForm(),
+                "Đã chạy lệnh REFRESH MATERIALIZED VIEW (mv_hourly_usage, mv_top_customers, mv_monthly_revenue) thành công!\nDữ liệu báo cáo đã được làm mới.",
+                "Cập nhật số liệu thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
         catch (Exception exception)
         {
@@ -182,7 +217,7 @@ public partial class ReportsView : AdminDataViewBase
             if (_mode == "usage")
             {
                 var rows = await RequiredContext.Repository.GetComputerUsageAsync();
-                lines.AddRange(rows.Select(row => $"{row.ComputerCode}: {row.TotalHoursPlayed:N2} giờ | {row.TotalPlayRevenue:N0} đ"));
+                lines.AddRange(rows.Select(row => $"{row.ComputerCode} ({row.ComputerName}): {row.TotalHoursPlayed:N1} giờ | Lấp đầy: {row.OccupancyRate:N1}% | Thu: {row.TotalPlayRevenue:N0} đ"));
             }
             else if (_mode == "customers")
             {
@@ -193,7 +228,7 @@ public partial class ReportsView : AdminDataViewBase
             {
                 var rows = await RequiredContext.Repository.GetDailyRevenueAsync();
                 lines.AddRange(rows.Where(row => row.RevenueDate.Date >= _fromPicker.Value.Date && row.RevenueDate.Date <= _toPicker.Value.Date)
-                    .Select(row => $"{row.RevenueDate:dd/MM/yyyy}: {row.NetRevenue:N0} đ | {row.TotalInvoices} hóa đơn"));
+                    .Select(row => $"{row.RevenueDate:dd/MM/yyyy}: Giờ={row.TotalPlayAmount:N0} đ | Dịch vụ={row.TotalServiceAmount:N0} đ | Ròng={row.NetRevenue:N0} đ"));
             }
             ExportService.ExportReportPdf($"Báo cáo NetCafe - {_mode}", lines, dialog.FileName);
             MessageBox.Show(FindForm(), $"Đã xuất PDF: {dialog.FileName}", "Xuất báo cáo", MessageBoxButtons.OK, MessageBoxIcon.Information);

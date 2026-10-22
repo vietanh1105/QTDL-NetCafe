@@ -208,7 +208,7 @@ public partial class InvoicesView : AdminViewBase
         var card1 = CreateKpiCard("💳 TỔNG DOANH THU", "0 đ", CyberTheme.Primary, _kpiRevenueValue);
         var card2 = CreateKpiCard("🧾 SỐ LƯỢNG HÓA ĐƠN", "0", CyberTheme.Text, _kpiCountValue);
         var card3 = CreateKpiCard("⏱️ TIỀN GIỜ CHƠI", "0 đ", CyberTheme.Success, _kpiPlayValue);
-        var card4 = CreateKpiCard("🍔 TIỀN DỊCH VỤ F&B", "0 đ", CyberTheme.Warning, _kpiServiceValue);
+        var card4 = CreateKpiCard("🍔 TIỀN DỊCH VỤ", "0 đ", CyberTheme.Warning, _kpiServiceValue);
 
         _kpiContainer.Controls.Add(card4);
         _kpiContainer.Controls.Add(card3);
@@ -355,7 +355,7 @@ public partial class InvoicesView : AdminViewBase
         _receiptPlayLabel.Dock = DockStyle.Top;
         _receiptPlayLabel.Height = 26;
 
-        _receiptServiceLabel.Text = "🍜 Dịch vụ F&B: 0 đ";
+        _receiptServiceLabel.Text = "🍜 Tiền dịch vụ: 0 đ";
         _receiptServiceLabel.Font = new Font("Segoe UI", 9.5F);
         _receiptServiceLabel.ForeColor = CyberTheme.Text;
         _receiptServiceLabel.Dock = DockStyle.Top;
@@ -532,28 +532,28 @@ public partial class InvoicesView : AdminViewBase
         {
             colPlay.HeaderText = "Tiền giờ";
             colPlay.Width = 100;
-            colPlay.DefaultCellStyle.Format = "N0 đ";
+
             colPlay.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["ServiceAmount"] is { } colService)
         {
-            colService.HeaderText = "Tiền F&B";
+            colService.HeaderText = "Tiền dịch vụ";
             colService.Width = 100;
-            colService.DefaultCellStyle.Format = "N0 đ";
+
             colService.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["DiscountAmount"] is { } colDiscount)
         {
             colDiscount.HeaderText = "Giảm giá";
             colDiscount.Width = 90;
-            colDiscount.DefaultCellStyle.Format = "N0 đ";
+
             colDiscount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["TotalAmount"] is { } colTotal)
         {
             colTotal.HeaderText = "Tổng tiền";
             colTotal.Width = 110;
-            colTotal.DefaultCellStyle.Format = "N0 đ";
+
             colTotal.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             colTotal.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
@@ -571,6 +571,13 @@ public partial class InvoicesView : AdminViewBase
         if (e.RowIndex < 0 || e.RowIndex >= _grid.Rows.Count) return;
 
         var colName = _grid.Columns[e.ColumnIndex].Name;
+        if (e.Value is decimal amount && (colName.EndsWith("Amount", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Total", StringComparison.OrdinalIgnoreCase)))
+        {
+            e.Value = $"{amount:N0} đ";
+            e.FormattingApplied = true;
+            return;
+        }
         if (colName.Equals("Status", StringComparison.OrdinalIgnoreCase) && e.Value != null)
         {
             var raw = e.Value.ToString()?.ToLowerInvariant() ?? "";
@@ -627,7 +634,7 @@ public partial class InvoicesView : AdminViewBase
         _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss} · {inv.PaymentMethod}";
 
         _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
-        _receiptServiceLabel.Text = $"🍜 Dịch vụ F&B: {inv.ServiceAmount:N0} đ";
+        _receiptServiceLabel.Text = $"🍜 Tiền dịch vụ: {inv.ServiceAmount:N0} đ";
         _receiptDiscountLabel.Text = $"🏷️ Giảm giá: -{inv.DiscountAmount:N0} đ";
         _receiptTotalLabel.Text = $"{inv.TotalAmount:N0} đ";
     }
@@ -642,7 +649,7 @@ public partial class InvoicesView : AdminViewBase
         _receiptSessionLabel.Text = "Mã phiên máy: --";
         _receiptTimeLabel.Text = "Thời gian: --";
         _receiptPlayLabel.Text = "🎮 Tiền giờ chơi: 0 đ";
-        _receiptServiceLabel.Text = "🍜 Dịch vụ F&B: 0 đ";
+        _receiptServiceLabel.Text = "🍜 Tiền dịch vụ: 0 đ";
         _receiptDiscountLabel.Text = "🏷️ Giảm giá: 0 đ";
         _receiptTotalLabel.Text = "0 đ";
     }
@@ -667,7 +674,7 @@ public partial class InvoicesView : AdminViewBase
         sb.AppendLine($"Thời gian:  {_selectedInvoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
         sb.AppendLine("----------------------------------------");
         sb.AppendLine($"Tiền giờ:   {_selectedInvoice.PlayAmount:N0} đ");
-        sb.AppendLine($"Tiền F&B:   {_selectedInvoice.ServiceAmount:N0} đ");
+        sb.AppendLine($"Tiền dịch vụ:   {_selectedInvoice.ServiceAmount:N0} đ");
         sb.AppendLine($"Giảm giá:  -{_selectedInvoice.DiscountAmount:N0} đ");
         sb.AppendLine("----------------------------------------");
         sb.AppendLine($"TỔNG CỘNG:  {_selectedInvoice.TotalAmount:N0} đ");
@@ -789,7 +796,7 @@ public partial class InvoicesView : AdminViewBase
                 return;
             }
             var lines = detail.Lines.Count == 0
-                ? "Không có món F&B."
+                ? "Không có món dịch vụ."
                 : string.Join(Environment.NewLine, detail.Lines.Select(line => $"- {line.ProductName} x{line.Quantity}: {line.LineTotal:N0} đ"));
             MessageBox.Show(
                 FindForm(),

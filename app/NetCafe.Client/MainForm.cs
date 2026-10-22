@@ -167,7 +167,9 @@ public partial class MainForm : Form
         try
         {
             var requestId = await _repository.CreateServiceRequestAsync(
-                _session.SessionId, _session.CustomerId, _session.ComputerId, type, message);
+                _session.SessionId, _session.CustomerId, _session.ComputerId,
+                type switch { "Kỹ thuật" => "technical", "Đồ ăn / Nước" => "food", "Nạp tiền" => "payment", _ => "general" },
+                message);
             _supportRequestView.ShowMessage($"Đã gửi yêu cầu hỗ trợ #{requestId} thành công.");
         }
         catch (Exception exception)

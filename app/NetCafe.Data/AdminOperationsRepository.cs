@@ -78,10 +78,10 @@ public partial class DbRepository
                 ORDER BY p.payment_id DESC
                 LIMIT 1
             ) AS pay ON TRUE
-            WHERE (@status IS NULL OR i.status = @status)
-              AND (@fromDate IS NULL OR i.issued_at >= @fromDate)
-              AND (@toDate IS NULL OR i.issued_at < @toDate)
-              AND (@search IS NULL OR c.full_name ILIKE @search OR i.invoice_id::text ILIKE @search OR cp.computer_code ILIKE @search)
+            WHERE (@status::varchar IS NULL OR i.status = @status)
+              AND (@fromDate::timestamptz IS NULL OR i.issued_at >= @fromDate)
+              AND (@toDate::timestamptz IS NULL OR i.issued_at < @toDate)
+              AND (@search::varchar IS NULL OR c.full_name ILIKE @search OR i.invoice_id::text ILIKE @search OR cp.computer_code ILIKE @search)
             ORDER BY i.invoice_id DESC;";
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);

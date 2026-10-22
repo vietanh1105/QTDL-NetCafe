@@ -138,7 +138,7 @@ public partial class MainForm : Form
         {
             if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                button.BackColor = Color.FromArgb(239, 246, 255);
+                button.BackColor = Color.FromArgb(255, 247, 237);
             }
         };
         button.MouseLeave += (_, _) =>
@@ -159,7 +159,7 @@ public partial class MainForm : Form
             Width = 190,
             Height = 26,
             Margin = new Padding(4, 8, 4, 0),
-            ForeColor = Color.FromArgb(100, 116, 139),
+            ForeColor = Color.FromArgb(194, 65, 12),
             Font = new Font("Segoe UI", 8F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         });
@@ -183,8 +183,8 @@ public partial class MainForm : Form
         foreach (var item in _navigationButtons)
         {
             var selected = string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase);
-            item.Value.BackColor = selected ? Color.FromArgb(219, 234, 254) : Color.White;
-            item.Value.ForeColor = selected ? Color.FromArgb(30, 64, 175) : Color.FromArgb(51, 65, 85);
+            item.Value.BackColor = selected ? Color.FromArgb(255, 237, 213) : Color.White;
+            item.Value.ForeColor = selected ? Color.FromArgb(194, 65, 12) : Color.FromArgb(51, 65, 85);
         }
         _activeView = view;
         var displayTitle = _viewLabels.TryGetValue(key, out var label) ? label : key;

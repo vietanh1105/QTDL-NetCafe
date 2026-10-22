@@ -43,11 +43,11 @@ public partial class MainForm
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 700);
         Size = new Size(1440, 900);
-        BackColor = Color.FromArgb(243, 246, 251);
+        BackColor = Color.FromArgb(248, 250, 252);
 
         _headerPanel.Dock = DockStyle.Top;
         _headerPanel.Height = 74;
-        _headerPanel.BackColor = Color.FromArgb(30, 64, 175);
+        _headerPanel.BackColor = Color.FromArgb(234, 88, 12);
         _headerPanel.Padding = new Padding(18, 10, 18, 10);
 
         _titleLabel.AutoSize = true;
@@ -57,7 +57,7 @@ public partial class MainForm
         _titleLabel.Text = "NETCAFE QUẢN TRỊ";
 
         _activeViewLabel.AutoSize = true;
-        _activeViewLabel.ForeColor = Color.FromArgb(219, 234, 254);
+        _activeViewLabel.ForeColor = Color.FromArgb(254, 215, 170);
         _activeViewLabel.Location = new Point(20, 43);
         _activeViewLabel.Text = "Đang mở: Máy trạm";
 
@@ -76,7 +76,7 @@ public partial class MainForm
         _refreshButton.Text = "Làm mới";
         _refreshButton.FlatStyle = FlatStyle.Flat;
         _refreshButton.BackColor = Color.White;
-        _refreshButton.ForeColor = Color.FromArgb(30, 64, 175);
+        _refreshButton.ForeColor = Color.FromArgb(234, 88, 12);
         _refreshButton.FlatAppearance.BorderSize = 0;
 
         _headerPanel.Controls.AddRange(new Control[] { _titleLabel, _activeViewLabel, _dbStatusLabel, _roleCombo, _refreshButton });
@@ -95,7 +95,7 @@ public partial class MainForm
 
         _contentPanel.Dock = DockStyle.Fill;
         _contentPanel.Padding = new Padding(8);
-        _contentPanel.BackColor = Color.FromArgb(243, 246, 251);
+        _contentPanel.BackColor = Color.FromArgb(248, 250, 252);
 
         _errorBanner.Dock = DockStyle.Bottom;
         _errorBanner.Height = 42;

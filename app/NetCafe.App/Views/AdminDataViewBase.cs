@@ -10,6 +10,7 @@ public abstract class AdminDataViewBase : AdminViewBase
 {
     protected readonly Panel Toolbar = new();
     protected readonly Label TitleLabel = new();
+    protected readonly FlowLayoutPanel ActionsPanel = new();
     protected readonly Label InfoLabel = new();
     protected readonly Button RefreshButton = new();
     protected readonly DataGridView Grid = new();
@@ -47,6 +48,14 @@ public abstract class AdminDataViewBase : AdminViewBase
         Controls.Add(Grid);
         Controls.Add(InfoLabel);
         Controls.Add(Toolbar);
+        ActionsPanel.Dock = DockStyle.Fill;
+        ActionsPanel.FlowDirection = FlowDirection.LeftToRight;
+        ActionsPanel.WrapContents = false;
+        ActionsPanel.AutoScroll = false;
+        ActionsPanel.BackColor = Color.Transparent;
+        ActionsPanel.Padding = new Padding(12, 4, 12, 4);
+
+        Toolbar.Controls.Add(ActionsPanel);
         Toolbar.Controls.Add(RefreshButton);
         Toolbar.Controls.Add(TitleLabel);
     }
@@ -70,7 +79,7 @@ public abstract class AdminDataViewBase : AdminViewBase
         ["SessionId"] = "Mã phiên",
         ["CustomerName"] = "Khách hàng",
         ["PlayAmount"] = "Tiền giờ",
-        ["ServiceAmount"] = "Tiền F&B",
+        ["ServiceAmount"] = "Tiền dịch vụ",
         ["DiscountAmount"] = "Giảm giá",
         ["TotalAmount"] = "Tổng tiền",
         ["Status"] = "Trạng thái",
@@ -114,12 +123,13 @@ public abstract class AdminDataViewBase : AdminViewBase
         ["RevenueDate"] = "Ngày doanh thu",
         ["TotalInvoices"] = "Tổng hóa đơn",
         ["TotalPlayAmount"] = "Tổng tiền giờ",
-        ["TotalServiceAmount"] = "Tổng tiền F&B",
+        ["TotalServiceAmount"] = "Doanh thu dịch vụ",
         ["TotalDiscountAmount"] = "Tổng giảm giá",
         ["NetRevenue"] = "Doanh thu thuần",
         ["TotalSessions"] = "Tổng số phiên",
         ["TotalHoursPlayed"] = "Tổng giờ chơi",
-        ["TotalPlayRevenue"] = "Doanh thu giờ chơi",
+        ["TotalPlayRevenue"] = "Doanh thu máy mang lại",
+        ["OccupancyRate"] = "Tỷ lệ lấp đầy (%)",
         ["TotalSpent"] = "Tổng chi tiêu",
         ["LastPlayedAt"] = "Lần chơi gần nhất"
     };
@@ -145,11 +155,29 @@ public abstract class AdminDataViewBase : AdminViewBase
 
         var colName = grid.Columns[e.ColumnIndex].DataPropertyName;
 
+        if (colName.Equals("TotalHoursPlayed", StringComparison.OrdinalIgnoreCase) && e.Value is decimal hours)
+        {
+            e.Value = $"{hours:N1} giờ";
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (colName.Equals("OccupancyRate", StringComparison.OrdinalIgnoreCase) && e.Value is decimal rate)
+        {
+            e.Value = $"{rate:N1} %";
+            e.FormattingApplied = true;
+            return;
+        }
+
         if (e.Value is decimal amount && (colName.EndsWith("Amount", StringComparison.OrdinalIgnoreCase) ||
                                           colName.EndsWith("Rate", StringComparison.OrdinalIgnoreCase) ||
                                           colName.EndsWith("Balance", StringComparison.OrdinalIgnoreCase) ||
                                           colName.EndsWith("Spent", StringComparison.OrdinalIgnoreCase) ||
-                                          colName.EndsWith("Revenue", StringComparison.OrdinalIgnoreCase)))
+                                          colName.EndsWith("Revenue", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Salary", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Cost", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Price", StringComparison.OrdinalIgnoreCase) ||
+                                          colName.EndsWith("Total", StringComparison.OrdinalIgnoreCase)))
         {
             e.Value = $"{amount:N0} đ";
             e.FormattingApplied = true;

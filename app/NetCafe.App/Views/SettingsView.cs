@@ -16,10 +16,10 @@ public partial class SettingsView : AdminCardViewBase
         _vacuumButton.Text = "🧹 VACUUM ANALYZE";
         _vacuumButton.Width = 170;
         _vacuumButton.Height = 34;
-        _vacuumButton.Dock = DockStyle.Right;
+
         CyberTheme.StyleButton(_vacuumButton, CyberTheme.Warning);
         _vacuumButton.Click += async (_, _) => await RunVacuumAsync();
-        Toolbar.Controls.Add(_vacuumButton);
+        ActionsPanel.Controls.Add(_vacuumButton);
     }
 
     public override Task RefreshAsync(CancellationToken cancellationToken = default)

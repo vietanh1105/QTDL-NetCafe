@@ -20,10 +20,10 @@ public partial class AiCenterView : AdminCardViewBase
         SetTitle("Phân tích và cảnh báo dữ liệu", "Năm mô-đun PL/pgSQL chạy trong PostgreSQL; mỗi card có trạng thái, mô tả và nút xử lý riêng.");
         _runAllButton.Text = "Chạy cả 5 mô-đun";
         _runAllButton.Width = 135;
-        _runAllButton.BackColor = PrimaryColor;
-        _runAllButton.ForeColor = Color.White;
-        _runAllButton.FlatStyle = FlatStyle.Flat;
-        _runAllButton.FlatAppearance.BorderSize = 0;
+        CyberTheme.StyleButton(_runAllButton, PrimaryColor);
+
+
+
         _runAllButton.Click += async (_, _) => await RunAllAsync();
         ConfigureButton(_runIndexButton, "Tối ưu chỉ mục");
         ConfigureButton(_runDuplicateButton, "Tìm trùng lặp");
@@ -39,14 +39,21 @@ public partial class AiCenterView : AdminCardViewBase
         _reviewAlertButton.Click += async (_, _) => await UpdateSelectedAsync("reviewed");
         _mergeDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("merged");
         _ignoreDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("ignored");
-        Toolbar.Controls.Add(_ignoreDuplicateButton);
-        Toolbar.Controls.Add(_mergeDuplicateButton);
-        Toolbar.Controls.Add(_reviewAlertButton);
-        Toolbar.Controls.Add(_runPromotionButton);
-        Toolbar.Controls.Add(_runAnomalyButton);
-        Toolbar.Controls.Add(_runDuplicateButton);
-        Toolbar.Controls.Add(_runIndexButton);
-        Toolbar.Controls.Add(_runAllButton);
+        ActionsPanel.Controls.Add(_runAllButton);
+        ActionsPanel.Controls.Add(_runIndexButton);
+        ActionsPanel.Controls.Add(_runDuplicateButton);
+        ActionsPanel.Controls.Add(_runAnomalyButton);
+        ActionsPanel.Controls.Add(_runPromotionButton);
+        ActionsPanel.Controls.Add(_reviewAlertButton);
+        ActionsPanel.Controls.Add(_mergeDuplicateButton);
+        ActionsPanel.Controls.Add(_ignoreDuplicateButton);
+
+
+
+
+
+
+
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -138,10 +145,10 @@ public partial class AiCenterView : AdminCardViewBase
     {
         button.Text = text;
         button.Width = 108;
-        button.BackColor = Color.FromArgb(71, 85, 105);
-        button.ForeColor = Color.White;
-        button.FlatStyle = FlatStyle.Flat;
-        button.FlatAppearance.BorderSize = 0;
+        CyberTheme.StyleButton(button, CyberTheme.SurfaceRaised);
+
+
+
     }
 
     private sealed record AiModuleRow(

@@ -16,10 +16,11 @@ public partial class MaintenanceView : AdminCardViewBase
     {
         InitializeComponent();
         SetTitle("Bảo trì thiết bị", "Phiếu reported/in_progress chuyển máy sang maintenance; fixed trả máy về available qua trigger CSDL.");
-        ConfigureButton(_createButton, "+ Lập phiếu", CyberTheme.Primary, 92);
-        ConfigureButton(_completeButton, "Hoàn thành", CyberTheme.Success, 98);
-        Toolbar.Controls.Add(_completeButton);
-        Toolbar.Controls.Add(_createButton);
+        ConfigureButton(_createButton, "+ Lập phiếu bảo trì", CyberTheme.Primary, 150);
+        ConfigureButton(_completeButton, "✅ Hoàn tất sửa chữa", CyberTheme.Success, 160);
+        ActionsPanel.Controls.Add(_createButton);
+        ActionsPanel.Controls.Add(_completeButton);
+
         _createButton.Click += async (_, _) => await CreateTicketAsync();
         _completeButton.Click += async (_, _) => await CompleteTicketAsync();
     }
@@ -124,6 +125,7 @@ internal sealed class MaintenanceEditorDialog : Form
         Width = 480;
         Height = 270;
         StartPosition = FormStartPosition.CenterParent;
+        BackColor = CyberTheme.Background;
         _computerBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _technicianBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _computerBox.Items.AddRange(computers.Where(computer => computer.ComputerStatus != "in_use").Select(computer => new ComputerOption(computer)).ToArray());
@@ -171,6 +173,7 @@ internal sealed class MaintenanceCompleteDialog : Form
         Width = 360;
         Height = 190;
         StartPosition = FormStartPosition.CenterParent;
+        BackColor = CyberTheme.Background;
         _statusBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _statusBox.Items.AddRange(new object[] { "fixed", "unrepairable" });
         _statusBox.SelectedIndex = 0;

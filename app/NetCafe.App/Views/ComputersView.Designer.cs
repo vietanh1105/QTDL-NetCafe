@@ -16,7 +16,7 @@ public partial class ComputersView
         _cardsViewport = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(243, 246, 251),
+            BackColor = CyberTheme.Background,
             Padding = new Padding(0)
         };
         _cardsGrid = new FlowLayoutPanel
@@ -26,7 +26,7 @@ public partial class ComputersView
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(16, 16, 24, 24),
-            BackColor = Color.FromArgb(243, 246, 251)
+            BackColor = CyberTheme.Background
         };
         _cardsGrid.Resize += (_, _) => RebuildGridPositions();
         _cardsViewport.Controls.Add(_cardsGrid);

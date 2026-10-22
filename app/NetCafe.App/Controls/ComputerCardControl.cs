@@ -27,7 +27,7 @@ public partial class ComputerCardControl : UserControl
         _codeLabel.Text = model.ComputerCode;
         _nameLabel.Text = model.ComputerName;
         _roomLabel.Text = $"Phòng: {model.RoomName}";
-        _typeLabel.Text = $"{model.TypeName} · {model.HourlyRate:N0}đ/giờ";
+        _typeLabel.Text = $"{model.TypeName} · {model.HourlyRate:N0} đ/giờ";
         var statusColor = model.ComputerStatus switch
         {
             "available" => Color.FromArgb(22, 163, 74),
@@ -46,7 +46,7 @@ public partial class ComputerCardControl : UserControl
         };
         _statusLabel.ForeColor = statusColor;
         _customerLabel.Text = string.IsNullOrWhiteSpace(model.CurrentCustomerName) ? "Chưa có khách" : model.CurrentCustomerName;
-        _costLabel.Text = model.PlayedMinutes is null ? "Chưa có phiên" : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0}đ / {model.PlayedMinutes:N0} phút";
+        _costLabel.Text = model.PlayedMinutes is null ? "Chưa có phiên" : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0} đ / {model.PlayedMinutes:N0} phút";
         _baseColor = Color.White;
         SetSelected(_selected);
     }
@@ -54,7 +54,7 @@ public partial class ComputerCardControl : UserControl
     public void SetSelected(bool selected)
     {
         _selected = selected;
-        BackColor = selected ? Color.FromArgb(219, 234, 254) : _baseColor;
+        BackColor = selected ? Color.FromArgb(255, 237, 213) : _baseColor;
         Invalidate();
     }
 

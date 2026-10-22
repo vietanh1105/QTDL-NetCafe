@@ -50,6 +50,17 @@ static class Program
     [STAThread]
     static void Main()
     {
+        var viCulture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo("vi-VN").Clone();
+        viCulture.NumberFormat.NumberGroupSeparator = ".";
+        viCulture.NumberFormat.NumberDecimalSeparator = ",";
+        viCulture.NumberFormat.CurrencyGroupSeparator = ".";
+        viCulture.NumberFormat.CurrencyDecimalSeparator = ",";
+        viCulture.NumberFormat.CurrencySymbol = "đ";
+
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = viCulture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = viCulture;
+        System.Threading.Thread.CurrentThread.CurrentCulture = viCulture;
+        System.Threading.Thread.CurrentThread.CurrentUICulture = viCulture;
         // 1. Tách khỏi terminal hiện tại và ép Windows tạo một CỬA SỔ CMD ĐỘC LẬP MỚI
         FreeConsole();
         AllocConsole();

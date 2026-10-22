@@ -70,8 +70,8 @@ public partial class ComputerCardControl
         _detailsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _detailsButton.FlatStyle = FlatStyle.Flat;
         _detailsButton.FlatAppearance.BorderSize = 0;
-        _detailsButton.BackColor = Color.FromArgb(219, 234, 254);
-        _detailsButton.ForeColor = Color.FromArgb(30, 64, 175);
+        _detailsButton.BackColor = Color.FromArgb(255, 237, 213);
+        _detailsButton.ForeColor = Color.FromArgb(194, 65, 12);
 
         Controls.AddRange(new Control[] { _codeLabel, _nameLabel, _roomLabel, _typeLabel, _statusLabel, _customerLabel, _costLabel, _detailsButton });
         ResumeLayout(false);
