@@ -118,7 +118,7 @@ public partial class MainForm : Form
         var button = new Button
         {
             Text = label,
-            Width = 190,
+            Width = 209,
             Height = 38,
             Margin = new Padding(4),
             FlatStyle = FlatStyle.Flat,
@@ -156,7 +156,7 @@ public partial class MainForm : Form
         _navigationPanel.Controls.Add(new Label
         {
             Text = title,
-            Width = 190,
+            Width = 209,
             Height = 26,
             Margin = new Padding(4, 8, 4, 0),
             ForeColor = CyberTheme.Primary,

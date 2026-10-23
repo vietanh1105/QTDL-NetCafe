@@ -20,7 +20,7 @@ public partial class CustomersView : AdminCardViewBase
     public CustomersView()
     {
         InitializeComponent();
-        SetTitle("Quản lý Hội viên & Ví tài khoản", "Tìm kiếm theo tài khoản/tên/SĐT; nạp tiền qua hàm CSDL có tự động ghi nhận thanh toán.");
+        SetTitle("Quản lý Hội viên · Ví tài khoản", "Tìm kiếm theo tài khoản/tên/SĐT; nạp tiền qua hàm CSDL có tự động ghi nhận thanh toán.");
 
         // Cấu hình thanh tìm kiếm tài khoản
         _searchBox.Width = 250;
@@ -192,11 +192,39 @@ public partial class CustomersView : AdminCardViewBase
     {
         if (!RequiredContext.CanManageCustomers) return;
         if (SelectedCustomer is null) return;
-        using var dialog = new CustomerEditorDialog(SelectedCustomer);
+        var customer = SelectedCustomer;
+        using var dialog = new CustomerEditorDialog(customer);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
         try
         {
-            await RequiredContext.Repository.UpdateCustomerAsync(SelectedCustomer.CustomerId, dialog.FullName, dialog.Phone, dialog.Email);
+            if (dialog.ShouldTopUp)
+            {
+                if (RequiredContext.CurrentEmployeeId <= 0)
+                {
+                    ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể ghi nhận nạp ví."));
+                    return;
+                }
+
+                var newBalance = await RequiredContext.Repository.UpdateCustomerAndTopUpAsync(
+                    customer.CustomerId,
+                    dialog.FullName,
+                    dialog.Phone,
+                    dialog.Email,
+                    RequiredContext.CurrentEmployeeId,
+                    dialog.TopUpAmount,
+                    dialog.PaymentMethod,
+                    string.IsNullOrWhiteSpace(dialog.TopUpNote) ? "admin_ui_customer_edit_topup" : dialog.TopUpNote);
+                MessageBox.Show(
+                    FindForm(),
+                    $"Đã lưu thông tin và nạp {dialog.TopUpAmount:N0} đ cho {dialog.FullName}.\nSố dư mới: {newBalance:N0} đ",
+                    "Cập nhật hội viên thành công",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            else
+            {
+                await RequiredContext.Repository.UpdateCustomerAsync(customer.CustomerId, dialog.FullName, dialog.Phone, dialog.Email);
+            }
             await RefreshAsync();
         }
         catch (Exception exception) { ReportError(exception); }
@@ -247,38 +275,30 @@ internal sealed class CustomerEditorDialog : Form
     private readonly TextBox _email = new();
     private readonly TextBox _username = new();
     private readonly TextBox _password = new();
+    private readonly NumericUpDown _topUpAmount = new();
+    private readonly ComboBox _paymentMethod = new();
+    private readonly TextBox _topUpNote = new();
+
     public string FullName => _fullName.Text.Trim();
     public string Phone => _phone.Text.Trim();
     public string Email => _email.Text.Trim();
     public string Username => _username.Text.Trim();
     public string Password => _password.Text;
+    public bool ShouldTopUp { get; private set; }
+    public decimal TopUpAmount => _topUpAmount.Value;
+    public string PaymentMethod => _paymentMethod.SelectedItem?.ToString() == "Chuyển khoản (transfer)" ? "transfer" : "cash";
+    public string TopUpNote => _topUpNote.Text.Trim();
 
     public CustomerEditorDialog(NetCafe.Data.CustomerItem? customer)
     {
         Text = customer is null ? "Thêm hội viên" : $"Chỉnh sửa hội viên · {customer.FullName}";
-        Width = 380;
-        Height = customer is null ? 330 : 260;
+        ClientSize = customer is null ? new Size(430, 350) : new Size(560, 570);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         BackColor = CyberTheme.Background;
         ForeColor = CyberTheme.Text;
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = customer is null ? 6 : 4 };
-        AddField(layout, "Họ và tên", _fullName, 0);
-        AddField(layout, "Số điện thoại", _phone, 1);
-        AddField(layout, "Email", _email, 2);
-        if (customer is null)
-        {
-            AddField(layout, "Tên đăng nhập", _username, 3);
-            AddField(layout, "Mật khẩu", _password, 4);
-            _password.UseSystemPasswordChar = true;
-        }
-        var save = new Button { Text = "Lưu", DialogResult = DialogResult.OK, Dock = DockStyle.Fill };
-        CyberTheme.StyleButton(save, CyberTheme.Primary);
-        layout.Controls.Add(save, 1, layout.RowCount - 1);
-        Controls.Add(layout);
-        AcceptButton = save;
         if (customer is not null)
         {
             _fullName.Text = customer.FullName;
@@ -286,14 +306,257 @@ internal sealed class CustomerEditorDialog : Form
             _email.Text = customer.Email;
             _username.ReadOnly = true;
         }
+
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Point(12, 6),
+            BackColor = CyberTheme.Background,
+            ForeColor = CyberTheme.Text
+        };
+        var infoTab = new TabPage("Thông tin hội viên")
+        {
+            BackColor = CyberTheme.Background,
+            ForeColor = CyberTheme.Text,
+            Padding = new Padding(4)
+        };
+        var saveButton = BuildInfoTab(infoTab, customer);
+        tabs.TabPages.Add(infoTab);
+
+        if (customer is not null)
+        {
+            var topUpTab = new TabPage("Nạp tiền")
+            {
+                BackColor = CyberTheme.Background,
+                ForeColor = CyberTheme.Text,
+                Padding = new Padding(4)
+            };
+            var topUpButton = BuildTopUpTab(topUpTab, customer);
+            tabs.TabPages.Insert(0, topUpTab);
+            tabs.SelectedIndex = 0;
+            AcceptButton = topUpButton;
+            tabs.SelectedIndexChanged += (_, _) => AcceptButton = tabs.SelectedIndex == 0 ? topUpButton : saveButton;
+        }
+        else
+        {
+            AcceptButton = saveButton;
+        }
+
+        Controls.Add(tabs);
+        CancelButton = null;
+    }
+
+    private Button BuildInfoTab(TabPage tab, NetCafe.Data.CustomerItem? customer)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(12),
+            ColumnCount = 2,
+            RowCount = customer is null ? 6 : 5,
+            BackColor = CyberTheme.Background
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, customer is null ? 112 : 132));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        var row = 0;
+        AddField(layout, "Họ và tên", _fullName, row++);
+        AddField(layout, "Số điện thoại", _phone, row++);
+        AddField(layout, "Email", _email, row++);
+        if (customer is null)
+        {
+            AddField(layout, "Tên đăng nhập", _username, row++);
+            AddField(layout, "Mật khẩu", _password, row++);
+            _password.UseSystemPasswordChar = true;
+        }
+
+        var actionPanel = CreateActionPanel();
+        var save = new Button
+        {
+            Text = customer is null ? "Lưu hội viên" : "Lưu thông tin",
+            Width = customer is null ? 132 : 126,
+            Height = 34
+        };
+        CyberTheme.StyleButton(save, CyberTheme.Primary);
+        save.Click += (_, _) =>
+        {
+            ShouldTopUp = false;
+            DialogResult = DialogResult.OK;
+        };
+        actionPanel.Controls.Add(save);
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.Controls.Add(actionPanel, 0, row);
+        layout.SetColumnSpan(actionPanel, 2);
+        tab.Controls.Add(layout);
+        return save;
+    }
+
+    private Button BuildTopUpTab(TabPage tab, NetCafe.Data.CustomerItem customer)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            Padding = new Padding(12),
+            BackColor = CyberTheme.Background
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.Controls.Add(CreateWalletPanel(customer), 0, 0);
+
+        var actionPanel = CreateActionPanel();
+        var confirm = new Button { Text = "Xác nhận nạp tiền", Width = 150, Height = 34 };
+        CyberTheme.StyleButton(confirm, CyberTheme.Success);
+        confirm.Click += (_, _) =>
+        {
+            if (_topUpAmount.Value <= 0)
+            {
+                MessageBox.Show(this, "Nhập số tiền cần nạp trước khi xác nhận.", "Thiếu số tiền", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!customer.IsActive)
+            {
+                MessageBox.Show(this, "Hội viên đang bị khóa, không thể nạp tiền.", "Tài khoản bị khóa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ShouldTopUp = true;
+            DialogResult = DialogResult.OK;
+        };
+        actionPanel.Controls.Add(confirm);
+        layout.Controls.Add(actionPanel, 0, 1);
+        tab.Controls.Add(layout);
+        return confirm;
+    }
+
+    private FlowLayoutPanel CreateActionPanel()
+    {
+        var cancel = new Button { Text = "Hủy", Width = 82, Height = 34, DialogResult = DialogResult.Cancel };
+        CyberTheme.StyleButton(cancel, CyberTheme.SurfaceRaised);
+        var actionPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Padding = new Padding(0, 4, 0, 0)
+        };
+        actionPanel.Controls.Add(cancel);
+        return actionPanel;
+    }
+
+    private GroupBox CreateWalletPanel(NetCafe.Data.CustomerItem customer)
+    {
+        var walletGroup = new GroupBox
+        {
+            Text = "Ví hội viên",
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.Primary,
+            Padding = new Padding(10),
+            BackColor = CyberTheme.Surface
+        };
+        var walletLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 5,
+            BackColor = CyberTheme.Surface
+        };
+        walletLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 156));
+        walletLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        walletLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+        walletLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        walletLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        walletLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        walletLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+
+        var balanceLabel = new Label
+        {
+            Text = $"Số dư hiện tại: {customer.Balance:N0} đ  ·  @{customer.Username}",
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.Text,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        walletLayout.Controls.Add(balanceLabel, 0, 0);
+        walletLayout.SetColumnSpan(balanceLabel, 2);
+
+        _topUpAmount.Minimum = 0;
+        _topUpAmount.Maximum = 50000000;
+        _topUpAmount.Increment = 10000;
+        _topUpAmount.ThousandsSeparator = true;
+        _topUpAmount.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        _topUpAmount.Dock = DockStyle.Fill;
+        _topUpAmount.Margin = new Padding(0, 2, 0, 2);
+        AddWalletField(walletLayout, "Số tiền nạp (VND)", _topUpAmount, 1);
+
+        _paymentMethod.DropDownStyle = ComboBoxStyle.DropDownList;
+        _paymentMethod.Items.AddRange(new object[] { "Tiền mặt (cash)", "Chuyển khoản (transfer)" });
+        _paymentMethod.SelectedIndex = 0;
+        _paymentMethod.Dock = DockStyle.Fill;
+        _paymentMethod.Margin = new Padding(0, 2, 0, 2);
+        AddWalletField(walletLayout, "Phương thức", _paymentMethod, 2);
+
+        _topUpNote.PlaceholderText = "Mã tham chiếu hoặc ghi chú giao dịch";
+        _topUpNote.Dock = DockStyle.Fill;
+        _topUpNote.Margin = new Padding(0, 2, 0, 2);
+        AddWalletField(walletLayout, "Ghi chú", _topUpNote, 3);
+
+        var quickButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 2, 0, 0)
+        };
+        foreach (var amount in new[] { 20000, 50000, 100000, 200000, 500000 })
+        {
+            var button = new Button
+            {
+                Text = $"+{amount / 1000}k",
+                Width = 70,
+                Height = 30,
+                Margin = new Padding(0, 0, 8, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CyberTheme.SurfaceRaised,
+                ForeColor = CyberTheme.Primary
+            };
+            button.FlatAppearance.BorderColor = CyberTheme.Border;
+            button.Click += (_, _) => _topUpAmount.Value = amount;
+            quickButtons.Controls.Add(button);
+        }
+        walletLayout.Controls.Add(quickButtons, 0, 4);
+        walletLayout.SetColumnSpan(quickButtons, 2);
+        walletGroup.Controls.Add(walletLayout);
+        return walletGroup;
+    }
+
+    private static void AddWalletField(TableLayoutPanel layout, string label, Control control, int row)
+    {
+        var labelControl = new Label
+        {
+            Text = label,
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.MutedText,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        layout.Controls.Add(labelControl, 0, row);
+        layout.Controls.Add(control, 1, row);
     }
 
     private static void AddField(TableLayoutPanel layout, string label, TextBox box, int row)
     {
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
-        layout.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
+        layout.Controls.Add(new Label
+        {
+            Text = label,
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.Text,
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, row);
         layout.Controls.Add(box, 1, row);
         box.Dock = DockStyle.Fill;
+        box.BackColor = CyberTheme.SurfaceRaised;
+        box.ForeColor = CyberTheme.Text;
     }
 }
 

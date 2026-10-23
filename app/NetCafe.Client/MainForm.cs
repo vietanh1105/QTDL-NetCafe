@@ -55,6 +55,12 @@ public partial class MainForm : Form
         try
         {
             _loginView.ShowError(string.Empty);
+            if (string.IsNullOrWhiteSpace(_config.Password))
+            {
+                _loginView.ShowError("Chưa có STATION_DB_PASSWORD. Hãy cấu hình .env hoặc station.json cho máy trạm.");
+                return;
+            }
+
             _session = await _repository.CustomerLoginAsync(username, password, _config.ComputerCode);
             _sessionView.SetSession(_session);
             _sessionController.Start(_session);

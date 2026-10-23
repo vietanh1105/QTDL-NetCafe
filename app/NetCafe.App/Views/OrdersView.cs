@@ -73,6 +73,7 @@ public partial class OrdersView : AdminViewBase
         _refreshAllButton.Dock = DockStyle.Right;
         _refreshAllButton.Width = 140;
         CyberTheme.StyleButton(_refreshAllButton, PrimaryColor);
+        CyberTheme.FitToolbarButton(_refreshAllButton, 140);
         _refreshAllButton.Click += async (_, _) => await RefreshAsync();
 
         _toolbar.Controls.Add(_refreshAllButton);
@@ -119,6 +120,7 @@ public partial class OrdersView : AdminViewBase
         _receiveStockButton.Height = 26;
         _receiveStockButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_receiveStockButton, CyberTheme.Success);
+        CyberTheme.FitToolbarButton(_receiveStockButton, 98);
         _receiveStockButton.Click += async (_, _) => await ReceiveStockAsync();
 
         _orderForStationButton.Text = "🛎️ Gọi món cho máy";
@@ -126,6 +128,7 @@ public partial class OrdersView : AdminViewBase
         _orderForStationButton.Height = 26;
         _orderForStationButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_orderForStationButton, CyberTheme.Primary);
+        CyberTheme.FitToolbarButton(_orderForStationButton, 145);
         _orderForStationButton.Click += async (_, _) => await OrderForStationAsync();
 
         _menuHeaderPanel.Controls.Add(_orderForStationButton);
@@ -173,18 +176,21 @@ public partial class OrdersView : AdminViewBase
         _refreshKitchenButton.Width = 115;
         _refreshKitchenButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_refreshKitchenButton, CyberTheme.SurfaceRaised);
+        CyberTheme.FitToolbarButton(_refreshKitchenButton, 115);
         _refreshKitchenButton.Click += async (_, _) => await RefreshKitchenOrdersAsync();
 
         _cancelOrderButton.Text = "✕ Hủy đơn";
         _cancelOrderButton.Width = 95;
         _cancelOrderButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_cancelOrderButton, CyberTheme.Danger);
+        CyberTheme.FitToolbarButton(_cancelOrderButton, 95);
         _cancelOrderButton.Click += async (_, _) => await CancelSelectedOrderAsync();
 
         _serveButton.Text = "✓ Đã làm xong & Phục vụ";
         _serveButton.Width = 175;
         _serveButton.Dock = DockStyle.Right;
         CyberTheme.StyleButton(_serveButton, CyberTheme.Success);
+        CyberTheme.FitToolbarButton(_serveButton, 175);
         _serveButton.Click += async (_, _) => await ServeSelectedOrderAsync();
 
         _kitchenHeaderPanel.Controls.Add(_kitchenTitleLabel);

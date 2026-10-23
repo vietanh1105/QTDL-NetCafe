@@ -22,17 +22,18 @@ public abstract class AdminDataViewBase : AdminViewBase
         Padding = new Padding(12);
 
         Toolbar.Dock = DockStyle.Top;
-        Toolbar.Height = 92;
+        Toolbar.Height = 100;
         Toolbar.BackColor = CyberTheme.Surface;
         Toolbar.Padding = new Padding(12, 8, 12, 8);
 
         TitleLabel.Dock = DockStyle.Left;
         TitleLabel.AutoSize = false;
-        TitleLabel.Width = 255;
-        TitleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        TitleLabel.Width = 330;
+        TitleLabel.Font = new Font("Segoe UI", 11.5F, FontStyle.Bold);
         TitleLabel.ForeColor = CyberTheme.Text;
         TitleLabel.Padding = new Padding(4, 0, 12, 0);
         TitleLabel.TextAlign = ContentAlignment.MiddleLeft;
+        TitleLabel.UseMnemonic = false;
 
         InfoLabel.Dock = DockStyle.Bottom;
         InfoLabel.Height = 22;
@@ -58,6 +59,13 @@ public abstract class AdminDataViewBase : AdminViewBase
         ActionsPanel.AutoScroll = true;
         ActionsPanel.BackColor = Color.Transparent;
         ActionsPanel.Padding = new Padding(12, 6, 12, 6);
+        ActionsPanel.ControlAdded += (_, args) =>
+        {
+            if (args.Control is Button button)
+            {
+                CyberTheme.FitToolbarButton(button, button.Width);
+            }
+        };
 
         Toolbar.Controls.Add(ActionsPanel);
         Toolbar.Controls.Add(RefreshButton);

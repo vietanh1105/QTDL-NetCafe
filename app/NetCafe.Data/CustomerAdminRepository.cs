@@ -49,6 +49,48 @@ public partial class DbRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<decimal> UpdateCustomerAndTopUpAsync(
+        int customerId,
+        string fullName,
+        string phone,
+        string? email,
+        int employeeId,
+        decimal amount,
+        string paymentMethod,
+        string? reference,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string updateSql = @"UPDATE core.customer
+                                   SET full_name = @fullName, phone = @phone, email = NULLIF(@email, '')
+                                   WHERE customer_id = @customerId;";
+        await using var updateCommand = new NpgsqlCommand(updateSql, connection, transaction);
+        updateCommand.Parameters.AddWithValue("customerId", customerId);
+        updateCommand.Parameters.AddWithValue("fullName", fullName.Trim());
+        updateCommand.Parameters.AddWithValue("phone", phone.Trim());
+        updateCommand.Parameters.AddWithValue("email", email?.Trim() ?? string.Empty);
+        var updatedRows = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+        if (updatedRows != 1)
+        {
+            throw new InvalidOperationException("Không tìm thấy hội viên để cập nhật.");
+        }
+
+        const string topUpSql = "SELECT billing.sp_top_up(@customerId, @employeeId, @amount, @paymentMethod, @reference);";
+        await using var topUpCommand = new NpgsqlCommand(topUpSql, connection, transaction);
+        topUpCommand.Parameters.AddWithValue("customerId", customerId);
+        topUpCommand.Parameters.AddWithValue("employeeId", employeeId);
+        topUpCommand.Parameters.AddWithValue("amount", amount);
+        topUpCommand.Parameters.AddWithValue("paymentMethod", paymentMethod);
+        topUpCommand.Parameters.AddWithValue("reference", (object?)reference ?? DBNull.Value);
+        var newBalance = Convert.ToDecimal(await topUpCommand.ExecuteScalarAsync(cancellationToken));
+
+        await transaction.CommitAsync(cancellationToken);
+        return newBalance;
+    }
+
     public async Task SetCustomerActiveAsync(int customerId, bool isActive, CancellationToken cancellationToken = default)
     {
         const string sql = "UPDATE core.customer SET is_active = @isActive WHERE customer_id = @customerId;";

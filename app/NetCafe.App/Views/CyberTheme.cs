@@ -8,13 +8,13 @@ namespace NetCafe.App.Views;
 
 public static class CyberTheme
 {
-    public static Color Background { get; } = Color.FromArgb(26, 29, 39); // #1A1D27 - graphite workspace
-    public static Color Surface { get; } = Color.FromArgb(36, 40, 54); // #242836 - graphite cards
-    public static Color SurfaceRaised { get; } = Color.FromArgb(52, 54, 79); // #34364F - purple-blue raised surface
-    public static Color Border { get; } = Color.FromArgb(80, 83, 111); // #50536F - muted indigo border
-    public static Color Text { get; } = Color.FromArgb(244, 245, 255); // #F4F5FF - cool white text
-    public static Color MutedText { get; } = Color.FromArgb(177, 184, 205); // #B1B8CD - secondary text
-    public static Color Primary { get; } = Color.FromArgb(129, 140, 248); // #818CF8 - indigo primary
+    public static Color Background { get; } = Color.FromArgb(43, 46, 58); // #2B2E3A - sáng hơn, vẫn giữ nền graphite
+    public static Color Surface { get; } = Color.FromArgb(53, 58, 74); // #353A4A - card graphite
+    public static Color SurfaceRaised { get; } = Color.FromArgb(74, 74, 105); // #4A4A69 - bề mặt tím xanh
+    public static Color Border { get; } = Color.FromArgb(116, 122, 152); // #747A98 - viền dễ nhìn
+    public static Color Text { get; } = Color.FromArgb(248, 249, 255); // #F8F9FF - chữ sáng
+    public static Color MutedText { get; } = Color.FromArgb(196, 201, 219); // #C4C9DB - chữ phụ sáng
+    public static Color Primary { get; } = Color.FromArgb(143, 155, 255); // #8F9BFF - tím xanh chủ đạo
     public static Color Success { get; } = Color.FromArgb(52, 211, 153); // #34D399 - service teal
     public static Color Warning { get; } = Color.FromArgb(251, 191, 36); // #FBBF24 - warning amber
     public static Color Danger { get; } = Color.FromArgb(251, 113, 133); // #FB7185 - danger pink red
@@ -32,5 +32,15 @@ public static class CyberTheme
         button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(color, 0.12F);
         button.FlatAppearance.CheckedBackColor = color;
         button.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+    }
+
+    public static void FitToolbarButton(Button button, int minimumWidth = 0)
+    {
+        button.AutoEllipsis = false;
+        button.AutoSize = true;
+        button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        button.Padding = new Padding(8, 0, 8, 0);
+        var preferredWidth = button.GetPreferredSize(new Size(0, Math.Max(30, button.Height))).Width + 16;
+        button.MinimumSize = new Size(Math.Max(minimumWidth, preferredWidth), Math.Max(30, button.Height));
     }
 }

@@ -72,10 +72,12 @@ public partial class MainForm
         _dbStatusLabel.AutoEllipsis = true;
         _dbStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
         _dbStatusLabel.Text = "Vai trò: postgres";
+        _dbStatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
         _roleCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-        _roleCombo.Width = 150;
+        _roleCombo.Width = 240;
         _roleCombo.Height = 30;
+        _roleCombo.DropDownWidth = 300;
         _roleCombo.Margin = new Padding(8, 8, 0, 8);
         _roleCombo.BackColor = CyberTheme.Surface;
         _roleCombo.ForeColor = CyberTheme.Text;
@@ -92,7 +94,7 @@ public partial class MainForm
         _refreshButton.FlatAppearance.BorderSize = 0;
 
         _headerActionsPanel.Dock = DockStyle.Right;
-        _headerActionsPanel.Width = 270;
+        _headerActionsPanel.Width = 360;
         _headerActionsPanel.FlowDirection = FlowDirection.RightToLeft;
         _headerActionsPanel.WrapContents = false;
         _headerActionsPanel.BackColor = Color.Transparent;
@@ -106,9 +108,13 @@ public partial class MainForm
             _activeViewLabel,
             _dbStatusLabel
         });
+        _headerPanel.Resize += (_, _) =>
+        {
+            _dbStatusLabel.Width = Math.Max(180, _headerActionsPanel.Left - _dbStatusLabel.Left - 16);
+        };
 
         _sidebarPanel.Dock = DockStyle.Left;
-        _sidebarPanel.Width = 215;
+        _sidebarPanel.Width = 235;
         _sidebarPanel.BackColor = CyberTheme.Surface;
         _sidebarPanel.Padding = new Padding(8, 14, 8, 8);
 
@@ -117,6 +123,7 @@ public partial class MainForm
         _navigationPanel.WrapContents = false;
         _navigationPanel.AutoScroll = true;
         _navigationPanel.BackColor = CyberTheme.Surface;
+        _navigationPanel.HorizontalScroll.Visible = false;
         _sidebarPanel.Controls.Add(_navigationPanel);
 
         _contentPanel.Dock = DockStyle.Fill;
