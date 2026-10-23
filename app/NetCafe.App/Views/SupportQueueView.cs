@@ -24,6 +24,7 @@ public partial class SupportQueueView : AdminCardViewBase
         _acknowledgeButton.Click += async (_, _) => await ChangeStatusAsync("acknowledged");
         _resolveButton.Click += async (_, _) => await ChangeStatusAsync("resolved");
         _cancelButton.Click += async (_, _) => await ChangeStatusAsync("cancelled");
+        CardDoubleClicked += async (_, _) => await OpenRequestDetailsAsync();
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -57,6 +58,22 @@ public partial class SupportQueueView : AdminCardViewBase
         }
     }
 
+    private async Task OpenRequestDetailsAsync()
+    {
+        if (SelectedItem is not ServiceRequestItem request)
+        {
+            return;
+        }
+
+        using var dialog = new SupportRequestDialog(request);
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK || dialog.SelectedStatus is null)
+        {
+            return;
+        }
+
+        await ChangeStatusAsync(dialog.SelectedStatus);
+    }
+
     private static AdminCardModel BuildCard(ServiceRequestItem request)
     {
         var (status, accent) = request.Status switch
@@ -86,5 +103,192 @@ public partial class SupportQueueView : AdminCardViewBase
             BackColor = CyberTheme.Primary,
             ForeColor = Color.White
         };
+    }
+}
+
+internal sealed class SupportRequestDialog : Form
+{
+    private readonly ComboBox _statusBox = new();
+
+    public string? SelectedStatus =>
+        _statusBox.Enabled && _statusBox.SelectedItem is SupportStatusOption option
+            ? option.Value
+            : null;
+
+    public SupportRequestDialog(ServiceRequestItem request)
+    {
+        Text = $"Chi tiết yêu cầu hỗ trợ #{request.ServiceRequestId}";
+        StartPosition = FormStartPosition.CenterParent;
+        Width = 560;
+        Height = 430;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
+
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 7,
+            Padding = new Padding(18)
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        AddInfo(root, "Máy trạm", request.ComputerCode, 0);
+        AddInfo(root, "Hội viên", request.CustomerName, 1);
+        AddInfo(root, "Loại yêu cầu", request.RequestType, 2);
+
+        var messageLabel = new Label
+        {
+            Text = "Nội dung",
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.MutedText,
+            TextAlign = ContentAlignment.TopLeft,
+            Padding = new Padding(0, 7, 0, 0)
+        };
+        var messageBox = new TextBox
+        {
+            Text = request.Message,
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical,
+            BackColor = CyberTheme.Surface,
+            ForeColor = CyberTheme.Text,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        root.Controls.Add(messageLabel, 0, 3);
+        root.Controls.Add(messageBox, 1, 3);
+
+        AddInfo(root, "Gửi lúc", request.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm:ss"), 4);
+
+        var statusLabel = new Label
+        {
+            Text = "Chuyển trạng thái",
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.MutedText,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        _statusBox.Dock = DockStyle.Fill;
+        _statusBox.DropDownStyle = ComboBoxStyle.DropDownList;
+        _statusBox.BackColor = CyberTheme.Surface;
+        _statusBox.ForeColor = CyberTheme.Text;
+        var options = GetStatusOptions(request.Status);
+        _statusBox.Items.AddRange(options.Cast<object>().ToArray());
+        if (_statusBox.Items.Count > 0)
+        {
+            _statusBox.SelectedIndex = 0;
+        }
+        else
+        {
+            _statusBox.Items.Add(new SupportStatusOption(request.Status, StatusText(request.Status)));
+            _statusBox.SelectedIndex = 0;
+            _statusBox.Enabled = false;
+        }
+        root.Controls.Add(statusLabel, 0, 5);
+        root.Controls.Add(_statusBox, 1, 5);
+
+        var cancelButton = new Button
+        {
+            Text = "Đóng",
+            Width = 90,
+            Height = 34,
+            DialogResult = DialogResult.Cancel
+        };
+        CyberTheme.StyleButton(cancelButton, CyberTheme.SurfaceRaised);
+
+        var saveButton = new Button
+        {
+            Text = "Lưu trạng thái",
+            Width = 130,
+            Height = 34,
+            Enabled = _statusBox.Enabled
+        };
+        CyberTheme.StyleButton(saveButton, CyberTheme.Primary);
+        saveButton.Click += (_, _) =>
+        {
+            if (SelectedStatus is not null)
+            {
+                DialogResult = DialogResult.OK;
+            }
+        };
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false
+        };
+        buttonPanel.Controls.Add(cancelButton);
+        buttonPanel.Controls.Add(saveButton);
+        root.Controls.Add(buttonPanel, 1, 6);
+
+        Controls.Add(root);
+        AcceptButton = saveButton;
+        CancelButton = cancelButton;
+    }
+
+    private static void AddInfo(TableLayoutPanel root, string label, string value, int row)
+    {
+        root.Controls.Add(new Label
+        {
+            Text = label,
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.MutedText,
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, row);
+        root.Controls.Add(new Label
+        {
+            Text = value,
+            Dock = DockStyle.Fill,
+            ForeColor = CyberTheme.Text,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 1, row);
+    }
+
+    private static SupportStatusOption[] GetStatusOptions(string status)
+    {
+        return status switch
+        {
+            "new" =>
+            [
+                new SupportStatusOption("acknowledged", "Tiếp nhận"),
+                new SupportStatusOption("cancelled", "Hủy yêu cầu")
+            ],
+            "acknowledged" =>
+            [
+                new SupportStatusOption("resolved", "Hoàn thành"),
+                new SupportStatusOption("cancelled", "Hủy yêu cầu")
+            ],
+            _ => []
+        };
+    }
+
+    private static string StatusText(string status)
+    {
+        return status switch
+        {
+            "new" => "Mới tiếp nhận",
+            "acknowledged" => "Đang xử lý",
+            "resolved" => "Hoàn thành",
+            "cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+
+    private sealed record SupportStatusOption(string Value, string Label)
+    {
+        public override string ToString() => Label;
     }
 }

@@ -36,6 +36,7 @@ public partial class EmployeesView : AdminCardViewBase
         _editButton.Click += async (_, _) => await EditEmployeeAsync();
         _toggleButton.Click += async (_, _) => await ToggleEmployeeAsync();
         _resetPasswordButton.Click += async (_, _) => await ResetPasswordAsync();
+        CardDoubleClicked += async (_, _) => await EditEmployeeAsync();
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)

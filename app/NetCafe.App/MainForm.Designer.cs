@@ -15,6 +15,7 @@ public partial class MainForm
     private Label _dbStatusLabel = null!;
     private ComboBox _roleCombo = null!;
     private Button _refreshButton = null!;
+    private FlowLayoutPanel _headerActionsPanel = null!;
     private Panel _sidebarPanel = null!;
     private FlowLayoutPanel _navigationPanel = null!;
     private Panel _contentPanel = null!;
@@ -31,6 +32,7 @@ public partial class MainForm
         _dbStatusLabel = new Label();
         _roleCombo = new ComboBox();
         _refreshButton = new Button();
+        _headerActionsPanel = new FlowLayoutPanel();
         _sidebarPanel = new Panel();
         _navigationPanel = new FlowLayoutPanel();
         _contentPanel = new Panel();
@@ -48,43 +50,62 @@ public partial class MainForm
         ForeColor = CyberTheme.Text;
 
         _headerPanel.Dock = DockStyle.Top;
-        _headerPanel.Height = 74;
+        _headerPanel.Height = 82;
         _headerPanel.BackColor = CyberTheme.SurfaceRaised;
         _headerPanel.Padding = new Padding(18, 10, 18, 10);
 
         _titleLabel.AutoSize = true;
         _titleLabel.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
         _titleLabel.ForeColor = Color.White;
-        _titleLabel.Location = new Point(18, 10);
+        _titleLabel.Location = new Point(24, 10);
         _titleLabel.Text = "NETCAFE QUẢN TRỊ";
 
         _activeViewLabel.AutoSize = true;
         _activeViewLabel.ForeColor = Color.FromArgb(199, 210, 254);
-        _activeViewLabel.Location = new Point(20, 43);
+        _activeViewLabel.Location = new Point(26, 48);
         _activeViewLabel.Text = "Đang mở: Máy trạm";
 
-        _dbStatusLabel.AutoSize = true;
+        _dbStatusLabel.AutoSize = false;
+        _dbStatusLabel.Size = new Size(450, 28);
         _dbStatusLabel.ForeColor = Color.White;
-        _dbStatusLabel.Location = new Point(330, 16);
+        _dbStatusLabel.Location = new Point(340, 18);
+        _dbStatusLabel.AutoEllipsis = true;
+        _dbStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
         _dbStatusLabel.Text = "Vai trò: postgres";
 
         _roleCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-        _roleCombo.Location = new Point(660, 14);
         _roleCombo.Width = 150;
+        _roleCombo.Height = 30;
+        _roleCombo.Margin = new Padding(8, 8, 0, 8);
         _roleCombo.BackColor = CyberTheme.Surface;
         _roleCombo.ForeColor = CyberTheme.Text;
         _roleCombo.FlatStyle = FlatStyle.Flat;
 
-        _refreshButton.Location = new Point(820, 13);
-        _refreshButton.Width = 105;
+        _refreshButton.Width = 48;
         _refreshButton.Height = 30;
-        _refreshButton.Text = "Làm mới";
+        _refreshButton.Text = "↻";
+        _refreshButton.AccessibleName = "Làm mới kết nối";
+        _refreshButton.Margin = new Padding(8, 8, 0, 8);
         _refreshButton.FlatStyle = FlatStyle.Flat;
         _refreshButton.BackColor = CyberTheme.Surface;
         _refreshButton.ForeColor = CyberTheme.Primary;
         _refreshButton.FlatAppearance.BorderSize = 0;
 
-        _headerPanel.Controls.AddRange(new Control[] { _titleLabel, _activeViewLabel, _dbStatusLabel, _roleCombo, _refreshButton });
+        _headerActionsPanel.Dock = DockStyle.Right;
+        _headerActionsPanel.Width = 270;
+        _headerActionsPanel.FlowDirection = FlowDirection.RightToLeft;
+        _headerActionsPanel.WrapContents = false;
+        _headerActionsPanel.BackColor = Color.Transparent;
+        _headerActionsPanel.Controls.Add(_refreshButton);
+        _headerActionsPanel.Controls.Add(_roleCombo);
+
+        _headerPanel.Controls.AddRange(new Control[]
+        {
+            _headerActionsPanel,
+            _titleLabel,
+            _activeViewLabel,
+            _dbStatusLabel
+        });
 
         _sidebarPanel.Dock = DockStyle.Left;
         _sidebarPanel.Width = 215;

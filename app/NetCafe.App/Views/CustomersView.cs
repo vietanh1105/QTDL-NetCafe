@@ -95,6 +95,7 @@ public partial class CustomersView : AdminCardViewBase
         _editButton.Click += async (_, _) => await EditCustomerAsync();
         _toggleButton.Click += async (_, _) => await ToggleCustomerAsync();
         _resetButton.Click += async (_, _) => await ResetPasswordAsync();
+        CardDoubleClicked += async (_, _) => await EditCustomerAsync();
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -254,10 +255,13 @@ internal sealed class CustomerEditorDialog : Form
 
     public CustomerEditorDialog(NetCafe.Data.CustomerItem? customer)
     {
-        Text = customer is null ? "Thêm hội viên" : "Chỉnh sửa hội viên";
+        Text = customer is null ? "Thêm hội viên" : $"Chỉnh sửa hội viên · {customer.FullName}";
         Width = 380;
         Height = customer is null ? 330 : 260;
         StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
         BackColor = CyberTheme.Background;
         ForeColor = CyberTheme.Text;
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = customer is null ? 6 : 4 };

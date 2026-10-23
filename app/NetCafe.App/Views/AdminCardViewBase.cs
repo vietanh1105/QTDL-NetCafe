@@ -16,6 +16,7 @@ public sealed record AdminCardModel(
 public abstract class AdminCardViewBase : AdminDataViewBase
 {
     protected readonly FlowLayoutPanel CardsPanel = new();
+    protected event EventHandler? CardDoubleClicked;
     private object? _selectedItem;
 
     protected object? SelectedItem => _selectedItem;
@@ -65,7 +66,9 @@ public abstract class AdminCardViewBase : AdminDataViewBase
             Margin = new Padding(0, 0, 16, 16),
             Padding = new Padding(14),
             BackColor = CyberTheme.Surface,
-            BorderStyle = BorderStyle.FixedSingle
+            BorderStyle = BorderStyle.FixedSingle,
+            Cursor = Cursors.Hand,
+            AccessibleName = $"{model.Title}; nhấn đúp để mở form tương tác"
         };
         var accent = new Panel
         {
@@ -116,7 +119,13 @@ public abstract class AdminCardViewBase : AdminDataViewBase
 
     private void AttachSelection(Control control)
     {
+        control.Cursor = Cursors.Hand;
         control.Click += (_, _) => SelectCard(control);
+        control.DoubleClick += (_, _) =>
+        {
+            SelectCard(control);
+            CardDoubleClicked?.Invoke(this, EventArgs.Empty);
+        };
         control.MouseEnter += (_, _) => SetHover(control, true);
         control.MouseLeave += (_, _) => SetHover(control, false);
         foreach (Control child in control.Controls)

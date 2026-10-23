@@ -27,9 +27,11 @@ public abstract class AdminDataViewBase : AdminViewBase
         Toolbar.Padding = new Padding(12, 8, 12, 8);
 
         TitleLabel.Dock = DockStyle.Left;
-        TitleLabel.AutoSize = true;
-        TitleLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        TitleLabel.AutoSize = false;
+        TitleLabel.Width = 255;
+        TitleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         TitleLabel.ForeColor = CyberTheme.Text;
+        TitleLabel.Padding = new Padding(4, 0, 12, 0);
         TitleLabel.TextAlign = ContentAlignment.MiddleLeft;
 
         InfoLabel.Dock = DockStyle.Bottom;
@@ -38,8 +40,10 @@ public abstract class AdminDataViewBase : AdminViewBase
         InfoLabel.Font = new Font("Segoe UI", 8.5F);
 
         RefreshButton.Dock = DockStyle.Right;
-        RefreshButton.Width = 105;
-        RefreshButton.Text = "Làm mới";
+        RefreshButton.Width = 52;
+        RefreshButton.Height = 30;
+        RefreshButton.Text = "↻";
+        RefreshButton.AccessibleName = "Làm mới dữ liệu";
         CyberTheme.StyleButton(RefreshButton, PrimaryColor);
         RefreshButton.Click += async (_, _) => await RefreshAsync();
 
