@@ -122,8 +122,8 @@ public partial class MainForm : Form
             Height = 38,
             Margin = new Padding(4),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.White,
-            ForeColor = Color.FromArgb(51, 65, 85),
+            BackColor = CyberTheme.Surface,
+            ForeColor = CyberTheme.Text,
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(12, 0, 0, 0)
         };
@@ -138,14 +138,14 @@ public partial class MainForm : Form
         {
             if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                button.BackColor = Color.FromArgb(255, 247, 237);
+                button.BackColor = CyberTheme.SurfaceRaised;
             }
         };
         button.MouseLeave += (_, _) =>
         {
             if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                button.BackColor = Color.White;
+                button.BackColor = CyberTheme.Surface;
             }
         };
         _navigationPanel.Controls.Add(button);
@@ -159,7 +159,7 @@ public partial class MainForm : Form
             Width = 190,
             Height = 26,
             Margin = new Padding(4, 8, 4, 0),
-            ForeColor = Color.FromArgb(194, 65, 12),
+            ForeColor = CyberTheme.Primary,
             Font = new Font("Segoe UI", 8F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         });
@@ -183,8 +183,8 @@ public partial class MainForm : Form
         foreach (var item in _navigationButtons)
         {
             var selected = string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase);
-            item.Value.BackColor = selected ? Color.FromArgb(255, 237, 213) : Color.White;
-            item.Value.ForeColor = selected ? Color.FromArgb(194, 65, 12) : Color.FromArgb(51, 65, 85);
+            item.Value.BackColor = selected ? CyberTheme.SurfaceRaised : CyberTheme.Surface;
+            item.Value.ForeColor = selected ? CyberTheme.Primary : CyberTheme.Text;
         }
         _activeView = view;
         var displayTitle = _viewLabels.TryGetValue(key, out var label) ? label : key;

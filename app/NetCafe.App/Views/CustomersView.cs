@@ -51,7 +51,7 @@ public partial class CustomersView : AdminCardViewBase
         _topUpButton.Text = "💰 Nạp tiền";
         _topUpButton.Width = 100;
         _topUpButton.Height = 32;
-        _topUpButton.BackColor = Color.FromArgb(16, 185, 129);
+        _topUpButton.BackColor = CyberTheme.Success;
         _topUpButton.ForeColor = Color.White;
         _topUpButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         _topUpButton.FlatStyle = FlatStyle.Flat;
@@ -259,6 +259,7 @@ internal sealed class CustomerEditorDialog : Form
         Height = customer is null ? 330 : 260;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = customer is null ? 6 : 4 };
         AddField(layout, "Họ và tên", _fullName, 0);
         AddField(layout, "Số điện thoại", _phone, 1);
@@ -303,6 +304,7 @@ internal sealed class PasswordDialog : Form
         Height = 130;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 2 };
         panel.Controls.Add(new Label { Text = "Mật khẩu", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
         panel.Controls.Add(_password, 1, 0);
@@ -331,6 +333,7 @@ internal sealed class TopUpDialog : Form
         Height = 440;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -340,7 +343,7 @@ internal sealed class TopUpDialog : Form
         {
             Dock = DockStyle.Top,
             Height = 72,
-            BackColor = Color.White,
+            BackColor = CyberTheme.Surface,
             BorderStyle = BorderStyle.FixedSingle,
             Padding = new Padding(12)
         };
@@ -394,7 +397,7 @@ internal sealed class TopUpDialog : Form
                 Width = 72,
                 Height = 32,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White,
+                BackColor = CyberTheme.Surface,
                 ForeColor = CyberTheme.Primary,
                 Margin = new Padding(0, 0, 8, 0)
             };

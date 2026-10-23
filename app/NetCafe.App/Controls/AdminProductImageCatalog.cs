@@ -2,6 +2,7 @@
 // Liên kết: NetCafe.Client/Assets/Products, ProductItem và OrdersView.
 
 using System.Drawing;
+using NetCafe.App.Views;
 
 namespace NetCafe.App.Controls;
 
@@ -18,7 +19,7 @@ public static class AdminProductImageCatalog
 
         var fallback = new Bitmap(180, 110);
         using var graphics = Graphics.FromImage(fallback);
-        graphics.Clear(Color.FromArgb(234, 88, 12));
+        graphics.Clear(CyberTheme.Primary);
         using var brush = new SolidBrush(Color.FromArgb(60, Color.White));
         graphics.FillEllipse(brush, 38, 8, 104, 94);
         return fallback;

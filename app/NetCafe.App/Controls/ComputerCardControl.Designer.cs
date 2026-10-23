@@ -3,6 +3,7 @@
 
 using System.Drawing;
 using System.Windows.Forms;
+using NetCafe.App.Views;
 
 namespace NetCafe.App.Controls;
 
@@ -32,24 +33,24 @@ public partial class ComputerCardControl
         Height = 190;
         Margin = new Padding(8);
         Padding = new Padding(12);
-        BackColor = Color.White;
+        BackColor = CyberTheme.Surface;
         BorderStyle = BorderStyle.FixedSingle;
 
         _codeLabel.AutoSize = true;
         _codeLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        _codeLabel.ForeColor = Color.FromArgb(30, 41, 59);
+        _codeLabel.ForeColor = CyberTheme.Text;
         _codeLabel.Location = new Point(12, 10);
 
         _nameLabel.AutoSize = true;
-        _nameLabel.ForeColor = Color.FromArgb(71, 85, 105);
+        _nameLabel.ForeColor = CyberTheme.Text;
         _nameLabel.Location = new Point(12, 36);
 
         _roomLabel.AutoSize = true;
-        _roomLabel.ForeColor = Color.FromArgb(100, 116, 139);
+        _roomLabel.ForeColor = CyberTheme.MutedText;
         _roomLabel.Location = new Point(12, 58);
 
         _typeLabel.AutoSize = true;
-        _typeLabel.ForeColor = Color.FromArgb(100, 116, 139);
+        _typeLabel.ForeColor = CyberTheme.MutedText;
         _typeLabel.Location = new Point(12, 79);
 
         _statusLabel.AutoSize = true;
@@ -57,11 +58,11 @@ public partial class ComputerCardControl
         _statusLabel.Location = new Point(12, 103);
 
         _customerLabel.AutoSize = true;
-        _customerLabel.ForeColor = Color.FromArgb(71, 85, 105);
+        _customerLabel.ForeColor = CyberTheme.Text;
         _customerLabel.Location = new Point(12, 126);
 
         _costLabel.AutoSize = true;
-        _costLabel.ForeColor = Color.FromArgb(71, 85, 105);
+        _costLabel.ForeColor = CyberTheme.Text;
         _costLabel.Location = new Point(12, 148);
 
         _detailsButton.Text = "Chi tiết";
@@ -70,8 +71,8 @@ public partial class ComputerCardControl
         _detailsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _detailsButton.FlatStyle = FlatStyle.Flat;
         _detailsButton.FlatAppearance.BorderSize = 0;
-        _detailsButton.BackColor = Color.FromArgb(255, 237, 213);
-        _detailsButton.ForeColor = Color.FromArgb(194, 65, 12);
+        _detailsButton.BackColor = CyberTheme.SurfaceRaised;
+        _detailsButton.ForeColor = CyberTheme.Primary;
 
         Controls.AddRange(new Control[] { _codeLabel, _nameLabel, _roomLabel, _typeLabel, _statusLabel, _customerLabel, _costLabel, _detailsButton });
         ResumeLayout(false);

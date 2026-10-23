@@ -2,13 +2,14 @@
 // Liên kết: ComputerGridItem từ NetCafe.Data; ComputersView quản lý collection theo ComputerId.
 
 using System.Drawing;
+using NetCafe.App.Views;
 using NetCafe.Data;
 
 namespace NetCafe.App.Controls;
 
 public partial class ComputerCardControl : UserControl
 {
-    private Color _baseColor = Color.White;
+    private Color _baseColor = CyberTheme.Surface;
     private bool _selected;
     public ComputerGridItem? Model { get; private set; }
     public event EventHandler<ComputerGridItem>? CardSelected;
@@ -30,11 +31,11 @@ public partial class ComputerCardControl : UserControl
         _typeLabel.Text = $"{model.TypeName} · {model.HourlyRate:N0} đ/giờ";
         var statusColor = model.ComputerStatus switch
         {
-            "available" => Color.FromArgb(22, 163, 74),
-            "in_use" => Color.FromArgb(220, 38, 38),
-            "maintenance" => Color.FromArgb(234, 88, 12),
-            "broken" => Color.FromArgb(107, 114, 128),
-            _ => Color.FromArgb(71, 85, 105)
+            "available" => CyberTheme.Success,
+            "in_use" => CyberTheme.Danger,
+            "maintenance" => CyberTheme.Warning,
+            "broken" => CyberTheme.MutedText,
+            _ => CyberTheme.MutedText
         };
         _statusLabel.Text = model.ComputerStatus switch
         {
@@ -47,14 +48,14 @@ public partial class ComputerCardControl : UserControl
         _statusLabel.ForeColor = statusColor;
         _customerLabel.Text = string.IsNullOrWhiteSpace(model.CurrentCustomerName) ? "Chưa có khách" : model.CurrentCustomerName;
         _costLabel.Text = model.PlayedMinutes is null ? "Chưa có phiên" : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0} đ / {model.PlayedMinutes:N0} phút";
-        _baseColor = Color.White;
+        _baseColor = CyberTheme.Surface;
         SetSelected(_selected);
     }
 
     public void SetSelected(bool selected)
     {
         _selected = selected;
-        BackColor = selected ? Color.FromArgb(255, 237, 213) : _baseColor;
+        BackColor = selected ? CyberTheme.SurfaceRaised : _baseColor;
         Invalidate();
     }
 
@@ -90,7 +91,7 @@ public partial class ComputerCardControl : UserControl
     {
         if (!_selected)
         {
-            BackColor = hovered ? Color.FromArgb(239, 246, 255) : _baseColor;
+            BackColor = hovered ? CyberTheme.SurfaceRaised : _baseColor;
         }
     }
 

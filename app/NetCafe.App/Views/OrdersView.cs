@@ -1,4 +1,4 @@
-// Trách nhiệm: menu gọi món, tồn kho F&B và hàng đợi bếp từ máy trạm.
+// Trách nhiệm: menu gọi món, tồn kho dịch vụ và hàng đợi bếp từ máy trạm.
 // Liên kết: inventory.product, inventory.food_order, sp_update_order_status và sp_receive_stock.
 
 using System.Drawing;
@@ -57,7 +57,7 @@ public partial class OrdersView : AdminViewBase
         _toolbar.BackColor = CyberTheme.Surface;
         _toolbar.Padding = new Padding(12, 6, 12, 6);
 
-        _titleLabel.Text = "🍽️ Gọi món & Bếp F&B";
+        _titleLabel.Text = "🍽️ Gọi món & Bếp";
         _titleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         _titleLabel.ForeColor = CyberTheme.Text;
         _titleLabel.AutoSize = true;
@@ -300,7 +300,7 @@ public partial class OrdersView : AdminViewBase
             Dock = DockStyle.Top,
             Height = 98,
             SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.White,
+            BackColor = CyberTheme.Surface,
             Image = AdminProductImageCatalog.Load(product.Sku)
         };
 
@@ -661,6 +661,8 @@ internal sealed class StockReceiveDialog : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
+        BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
 
         var layout = new TableLayoutPanel
         {

@@ -27,7 +27,8 @@ public sealed class ComputerActionDialog : Form
         Width = 460;
         Height = 650;
         MinimumSize = new Size(420, 580);
-        BackColor = Color.FromArgb(248, 250, 252);
+        BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         BuildLayout();
     }
 
@@ -50,7 +51,7 @@ public sealed class ComputerActionDialog : Form
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             AutoScroll = true,
-            BackColor = Color.White,
+            BackColor = CyberTheme.Surface,
             Padding = new Padding(14)
         };
         details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
@@ -72,7 +73,7 @@ public sealed class ComputerActionDialog : Form
         AddDetail(details, "Khách đang ngồi", string.IsNullOrWhiteSpace(_computer.CurrentCustomerName) ? "Chưa có" : _computer.CurrentCustomerName);
         AddDetail(details, "Mã phiên chơi", _computer.CurrentSessionId?.ToString() ?? "Không có phiên");
         AddDetail(details, "Thời gian đã chơi", _computer.PlayedMinutes is null ? "Chưa có" : $"{_computer.PlayedMinutes:N0} phút");
-        AddDetail(details, "Tiền giờ tạm tính", _computer.CurrentPlayAmount is null ? EstimatePlayAmount() : $"{_computer.CurrentPlayAmount:N0} đ");
+        AddDetail(details, "Tiền giờ tạm tính", $"{EstimatePlayAmountValue():N0} đ");
         AddDetail(details, "Tiền dịch vụ", _computer.CurrentServiceAmount is null ? "0 đ" : $"{_computer.CurrentServiceAmount:N0} đ");
         AddDetail(details, "Số dư tài khoản", _computer.CurrentBalance is null ? "Chưa có" : $"{_computer.CurrentBalance:N0} đ");
         AddDetail(details, "Tín hiệu máy (Heartbeat)", _computer.LastHeartbeatAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa có dữ liệu");
@@ -93,53 +94,44 @@ public sealed class ComputerActionDialog : Form
         if (_computer.ComputerStatus == "in_use")
         {
             _primaryActionButton.Text = "⏹ Kết thúc & Tính tiền";
-            _primaryActionButton.BackColor = Color.FromArgb(220, 38, 38);
-            _primaryActionButton.ForeColor = Color.White;
+            CyberTheme.StyleButton(_primaryActionButton, CyberTheme.Danger);
             _primaryActionButton.Enabled = _computer.CurrentSessionId.HasValue && _context.CanManageSessions && _context.CurrentEmployeeId > 0;
             _primaryActionButton.Click += async (_, _) => await CloseSessionAsync();
         }
         else if (_computer.ComputerStatus == "available")
         {
             _primaryActionButton.Text = "▶ Mở máy cho khách";
-            _primaryActionButton.BackColor = Color.FromArgb(16, 185, 129);
-            _primaryActionButton.ForeColor = Color.White;
+            CyberTheme.StyleButton(_primaryActionButton, CyberTheme.Success);
             _primaryActionButton.Enabled = _context.CanManageSessions && _context.CurrentEmployeeId > 0;
             _primaryActionButton.Click += async (_, _) => await OpenSessionForCustomerAsync();
         }
         else
         {
             _primaryActionButton.Text = "⚪ Máy không khả dụng";
-            _primaryActionButton.BackColor = Color.FromArgb(148, 163, 184);
-            _primaryActionButton.ForeColor = Color.White;
+            CyberTheme.StyleButton(_primaryActionButton, CyberTheme.MutedText);
             _primaryActionButton.Enabled = false;
         }
 
         _customerButton.Text = "👤 Quản lý hội viên";
-        _customerButton.BackColor = Color.FromArgb(234, 88, 12);
-        _customerButton.ForeColor = Color.White;
+        CyberTheme.StyleButton(_customerButton, CyberTheme.Primary);
 
         if (_computer.ComputerStatus is "maintenance" or "broken")
         {
             _maintenanceButton.Text = "✅ Hoàn tất / Mở máy";
-            _maintenanceButton.BackColor = Color.FromArgb(5, 150, 105);
-            _maintenanceButton.ForeColor = Color.White;
+            CyberTheme.StyleButton(_maintenanceButton, CyberTheme.Success);
         }
         else
         {
             _maintenanceButton.Text = "🛠️ Báo hỏng / Bảo trì";
-            _maintenanceButton.BackColor = Color.FromArgb(217, 119, 6);
-            _maintenanceButton.ForeColor = Color.White;
+            CyberTheme.StyleButton(_maintenanceButton, CyberTheme.Warning);
         }
 
         _refreshButton.Text = "🔄 Làm mới";
-        _refreshButton.BackColor = Color.FromArgb(100, 116, 139);
-        _refreshButton.ForeColor = Color.White;
+        CyberTheme.StyleButton(_refreshButton, CyberTheme.SurfaceRaised);
 
         foreach (var button in new[] { _primaryActionButton, _customerButton, _maintenanceButton, _refreshButton })
         {
             button.Dock = DockStyle.Fill;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderSize = 0;
             button.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             button.Margin = new Padding(3);
         }
@@ -151,7 +143,7 @@ public sealed class ComputerActionDialog : Form
         root.Controls.Add(actions, 0, 1);
 
         _messageLabel.Dock = DockStyle.Fill;
-        _messageLabel.ForeColor = Color.FromArgb(234, 88, 12);
+        _messageLabel.ForeColor = CyberTheme.Primary;
         _messageLabel.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
         root.Controls.Add(_messageLabel, 0, 2);
 
@@ -175,7 +167,7 @@ public sealed class ComputerActionDialog : Form
         {
             Text = key,
             AutoSize = true,
-            ForeColor = Color.FromArgb(100, 116, 139),
+            ForeColor = CyberTheme.MutedText,
             Padding = new Padding(0, 4, 4, 4)
         }, 0, row);
         table.Controls.Add(new Label
@@ -183,13 +175,16 @@ public sealed class ComputerActionDialog : Form
             Text = value,
             AutoSize = true,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(30, 41, 59),
+            ForeColor = CyberTheme.Text,
             Padding = new Padding(0, 4, 0, 4)
         }, 1, row);
     }
 
-    private string EstimatePlayAmount() =>
-        _computer.PlayedMinutes is null ? "Chưa có" : $"{_computer.HourlyRate * _computer.PlayedMinutes.Value / 60:N0} đ";
+    private decimal EstimatePlayAmountValue() =>
+        SessionCostCalculator.EstimatePlayAmount(
+            _computer.HourlyRate,
+            _computer.PlayedMinutes,
+            _computer.CurrentPlayAmount);
 
     private async Task OpenSessionForCustomerAsync()
     {
@@ -236,7 +231,7 @@ public sealed class ComputerActionDialog : Form
         }
         try
         {
-            var estTotal = (_computer.CurrentPlayAmount ?? 0) + (_computer.CurrentServiceAmount ?? 0);
+            var estTotal = EstimatePlayAmountValue() + (_computer.CurrentServiceAmount ?? 0);
             var method = (_computer.CurrentBalance ?? 0) >= estTotal ? "balance" : "cash";
             await _context.Repository.CloseSessionAndPayAsync(_computer.CurrentSessionId.Value, _context.CurrentEmployeeId, method);
             _messageLabel.Text = "Đã kết thúc phiên chơi và lập hóa đơn thanh toán thành công.";
@@ -254,11 +249,61 @@ public sealed class ComputerActionDialog : Form
     {
         try
         {
-            var targetStatus = _computer.ComputerStatus is "maintenance" or "broken" ? "available" : "maintenance";
-            await _context.Repository.SetComputerStatusAsync(_computer.ComputerId, targetStatus);
-            _messageLabel.Text = targetStatus == "maintenance"
-                ? "Đã chuyển máy sang trạng thái bảo trì."
-                : "Đã hoàn tất bảo trì và mở lại máy.";
+            if (_computer.ComputerStatus is "maintenance" or "broken")
+            {
+                var ticket = (await _context.Repository.GetMaintenanceAsync())
+                    .Where(item => item.ComputerId == _computer.ComputerId)
+                    .Where(item => item.Status is not "fixed" and not "unrepairable")
+                    .OrderByDescending(item => item.StartedAt)
+                    .FirstOrDefault();
+                if (ticket is null)
+                {
+                    _messageLabel.Text = "Máy chưa có phiếu bảo trì đang xử lý; hãy lập phiếu ở Tab Bảo trì.";
+                    return;
+                }
+
+                using var completeDialog = new MaintenanceCompleteDialog();
+                if (completeDialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                await _context.Repository.CompleteMaintenanceAsync(
+                    ticket.MaintenanceId,
+                    completeDialog.Status,
+                    completeDialog.Cost);
+                _messageLabel.Text = "Đã hoàn tất phiếu bảo trì và đưa máy về trạng thái sẵn sàng.";
+            }
+            else
+            {
+                var technicians = (await _context.Repository.GetEmployeesAsync())
+                    .Where(employee => employee.IsActive)
+                    .Where(employee => employee.EmpRole.Equals("technician", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (technicians.Count == 0)
+                {
+                    _messageLabel.Text = "Chưa có kỹ thuật viên đang hoạt động để lập phiếu bảo trì.";
+                    return;
+                }
+
+                using var createDialog = new MaintenanceEditorDialog(new[] { _computer }, technicians);
+                if (createDialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(createDialog.IssueDescription) || createDialog.SelectedTechnician is null)
+                {
+                    _messageLabel.Text = "Cần chọn kỹ thuật viên và nhập lý do bảo trì.";
+                    return;
+                }
+
+                await _context.Repository.CreateMaintenanceAsync(
+                    _computer.ComputerId,
+                    createDialog.SelectedTechnician.EmployeeId,
+                    createDialog.IssueDescription);
+                _messageLabel.Text = "Đã lập phiếu bảo trì; trigger CSDL đã đồng bộ trạng thái máy.";
+            }
+
             await _context.RefreshComputersAsync();
             _maintenanceButton.Enabled = false;
         }
@@ -290,6 +335,7 @@ internal sealed class OpenSessionCustomerPicker : Form
         MaximizeBox = false;
         MinimizeBox = false;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
 
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(16) };
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));

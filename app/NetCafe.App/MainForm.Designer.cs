@@ -3,6 +3,7 @@
 
 using System.Drawing;
 using System.Windows.Forms;
+using NetCafe.App.Views;
 
 namespace NetCafe.App;
 
@@ -43,11 +44,12 @@ public partial class MainForm
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 700);
         Size = new Size(1440, 900);
-        BackColor = Color.FromArgb(248, 250, 252);
+        BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
 
         _headerPanel.Dock = DockStyle.Top;
         _headerPanel.Height = 74;
-        _headerPanel.BackColor = Color.FromArgb(234, 88, 12);
+        _headerPanel.BackColor = CyberTheme.SurfaceRaised;
         _headerPanel.Padding = new Padding(18, 10, 18, 10);
 
         _titleLabel.AutoSize = true;
@@ -57,7 +59,7 @@ public partial class MainForm
         _titleLabel.Text = "NETCAFE QUẢN TRỊ";
 
         _activeViewLabel.AutoSize = true;
-        _activeViewLabel.ForeColor = Color.FromArgb(254, 215, 170);
+        _activeViewLabel.ForeColor = Color.FromArgb(199, 210, 254);
         _activeViewLabel.Location = new Point(20, 43);
         _activeViewLabel.Text = "Đang mở: Máy trạm";
 
@@ -69,42 +71,45 @@ public partial class MainForm
         _roleCombo.DropDownStyle = ComboBoxStyle.DropDownList;
         _roleCombo.Location = new Point(660, 14);
         _roleCombo.Width = 150;
+        _roleCombo.BackColor = CyberTheme.Surface;
+        _roleCombo.ForeColor = CyberTheme.Text;
+        _roleCombo.FlatStyle = FlatStyle.Flat;
 
         _refreshButton.Location = new Point(820, 13);
         _refreshButton.Width = 105;
         _refreshButton.Height = 30;
         _refreshButton.Text = "Làm mới";
         _refreshButton.FlatStyle = FlatStyle.Flat;
-        _refreshButton.BackColor = Color.White;
-        _refreshButton.ForeColor = Color.FromArgb(234, 88, 12);
+        _refreshButton.BackColor = CyberTheme.Surface;
+        _refreshButton.ForeColor = CyberTheme.Primary;
         _refreshButton.FlatAppearance.BorderSize = 0;
 
         _headerPanel.Controls.AddRange(new Control[] { _titleLabel, _activeViewLabel, _dbStatusLabel, _roleCombo, _refreshButton });
 
         _sidebarPanel.Dock = DockStyle.Left;
         _sidebarPanel.Width = 215;
-        _sidebarPanel.BackColor = Color.White;
+        _sidebarPanel.BackColor = CyberTheme.Surface;
         _sidebarPanel.Padding = new Padding(8, 14, 8, 8);
 
         _navigationPanel.Dock = DockStyle.Fill;
         _navigationPanel.FlowDirection = FlowDirection.TopDown;
         _navigationPanel.WrapContents = false;
         _navigationPanel.AutoScroll = true;
-        _navigationPanel.BackColor = Color.White;
+        _navigationPanel.BackColor = CyberTheme.Surface;
         _sidebarPanel.Controls.Add(_navigationPanel);
 
         _contentPanel.Dock = DockStyle.Fill;
         _contentPanel.Padding = new Padding(8);
-        _contentPanel.BackColor = Color.FromArgb(248, 250, 252);
+        _contentPanel.BackColor = CyberTheme.Background;
 
         _errorBanner.Dock = DockStyle.Bottom;
         _errorBanner.Height = 42;
         _errorBanner.Visible = false;
-        _errorBanner.BackColor = Color.FromArgb(254, 226, 226);
+        _errorBanner.BackColor = Color.FromArgb(69, 20, 35);
         _errorLabel.Dock = DockStyle.Fill;
         _errorLabel.Padding = new Padding(12, 0, 0, 0);
         _errorLabel.TextAlign = ContentAlignment.MiddleLeft;
-        _errorLabel.ForeColor = Color.FromArgb(185, 28, 28);
+        _errorLabel.ForeColor = Color.FromArgb(253, 164, 175);
         _dismissErrorButton.Dock = DockStyle.Right;
         _dismissErrorButton.Width = 90;
         _dismissErrorButton.Text = "Đóng";

@@ -50,7 +50,7 @@ public partial class SessionView : UserControl
         };
 
         _balanceLabel.Text = $"Số dư: {result.BalanceRemaining:N0} đ";
-        _costLabel.Text = $"Tạm tính: {result.ProjectedTotalAmount:N0} đ (Tiền giờ: {result.ProjectedPlayAmount:N0} đ + F&B: {result.ProjectedServiceAmount:N0} đ)";
+        _costLabel.Text = $"Tạm tính: {result.ProjectedTotalAmount:N0} đ (Tiền giờ: {result.ProjectedPlayAmount:N0} đ + Dịch vụ: {result.ProjectedServiceAmount:N0} đ)";
         _statusLabel.Text = $"Tín hiệu: {result.LastHeartbeatAt:HH:mm:ss} | {statusText}";
     }
 }

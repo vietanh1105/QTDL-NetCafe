@@ -22,7 +22,7 @@ public abstract class AdminDataViewBase : AdminViewBase
         Padding = new Padding(12);
 
         Toolbar.Dock = DockStyle.Top;
-        Toolbar.Height = 58;
+        Toolbar.Height = 92;
         Toolbar.BackColor = CyberTheme.Surface;
         Toolbar.Padding = new Padding(12, 8, 12, 8);
 
@@ -50,10 +50,10 @@ public abstract class AdminDataViewBase : AdminViewBase
         Controls.Add(Toolbar);
         ActionsPanel.Dock = DockStyle.Fill;
         ActionsPanel.FlowDirection = FlowDirection.LeftToRight;
-        ActionsPanel.WrapContents = false;
-        ActionsPanel.AutoScroll = false;
+        ActionsPanel.WrapContents = true;
+        ActionsPanel.AutoScroll = true;
         ActionsPanel.BackColor = Color.Transparent;
-        ActionsPanel.Padding = new Padding(12, 4, 12, 4);
+        ActionsPanel.Padding = new Padding(12, 6, 12, 6);
 
         Toolbar.Controls.Add(ActionsPanel);
         Toolbar.Controls.Add(RefreshButton);

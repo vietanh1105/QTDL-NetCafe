@@ -75,7 +75,7 @@ public static class ExportService
                     column.Item().Text($"Thời gian: {invoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
                     column.Item().LineHorizontal(1);
                     column.Item().Text($"Tiền giờ: {invoice.PlayAmount:N0} đ");
-                    column.Item().Text($"Tiền F&B: {invoice.ServiceAmount:N0} đ");
+                    column.Item().Text($"Tiền dịch vụ: {invoice.ServiceAmount:N0} đ");
                     column.Item().Text($"Giảm giá: -{invoice.DiscountAmount:N0} đ");
                     foreach (var line in invoice.Lines)
                     {
@@ -94,7 +94,7 @@ public static class ExportService
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Hóa đơn");
-        var headers = new[] { "Mã hóa đơn", "Khách hàng", "Máy", "Tiền giờ", "Tiền F&B", "Giảm giá", "Tổng tiền", "Trạng thái", "Phương thức", "Thời gian" };
+        var headers = new[] { "Mã hóa đơn", "Khách hàng", "Máy", "Tiền giờ", "Tiền dịch vụ", "Giảm giá", "Tổng tiền", "Trạng thái", "Phương thức", "Thời gian" };
         for (var index = 0; index < headers.Length; index++)
         {
             sheet.Cell(1, index + 1).Value = headers[index];

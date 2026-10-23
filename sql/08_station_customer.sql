@@ -31,7 +31,16 @@ SELECT
     ROUND(EXTRACT(EPOCH FROM (clock_timestamp() - s.start_time)) / 60.0) AS played_minutes,
     c.specs,
     -- Giữ specs ở vị trí cũ để CREATE OR REPLACE VIEW không đổi tên cột hiện hữu.
-    COALESCE(s.play_amount, 0) AS current_play_amount,
+    COALESCE(
+        s.play_amount,
+        CASE
+            WHEN s.session_id IS NULL THEN 0
+            ELSE core.fn_calc_session_amount(
+                s.start_time,
+                clock_timestamp(),
+                s.hourly_rate_applied)
+        END
+    ) AS current_play_amount,
     COALESCE((
         SELECT SUM(fod.quantity * fod.unit_price)
         FROM inventory.food_order AS fo

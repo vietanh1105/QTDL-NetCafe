@@ -227,10 +227,10 @@ internal sealed class EmployeeEditorDialog : Form
         Height = employee is null ? 430 : 380;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        BackColor = CyberTheme.Background;
 
         _roleBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _roleBox.Items.AddRange(new object[] { "admin", "manager", "cashier", "staff", "technician" });
@@ -295,6 +295,7 @@ internal sealed class EmployeePasswordDialog : Form
         Height = 150;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 2 };
         layout.Controls.Add(new Label { Text = "Mật khẩu mới", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
         layout.Controls.Add(_passwordBox, 1, 0);
@@ -313,6 +314,7 @@ internal sealed class EmployeeSalaryDialog : Form
         Text = "👁️ Bảng lương & Dữ liệu nhạy cảm (PostgreSQL Column-Level Security)";
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         Width = 840;
         Height = 460;
         FormBorderStyle = FormBorderStyle.FixedDialog;

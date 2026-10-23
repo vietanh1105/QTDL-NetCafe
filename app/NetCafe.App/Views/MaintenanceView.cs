@@ -126,6 +126,7 @@ internal sealed class MaintenanceEditorDialog : Form
         Height = 270;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         _computerBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _technicianBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _computerBox.Items.AddRange(computers.Where(computer => computer.ComputerStatus != "in_use").Select(computer => new ComputerOption(computer)).ToArray());
@@ -174,6 +175,7 @@ internal sealed class MaintenanceCompleteDialog : Form
         Height = 190;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = CyberTheme.Background;
+        ForeColor = CyberTheme.Text;
         _statusBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _statusBox.Items.AddRange(new object[] { "fixed", "unrepairable" });
         _statusBox.SelectedIndex = 0;
