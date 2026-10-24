@@ -112,7 +112,10 @@ namespace NetCafe.App
             var u = user ?? Username;
             var p = pwd ?? Password;
             var ssl = !string.IsNullOrEmpty(SslMode) ? $";SSL Mode={SslMode};Trust Server Certificate={TrustServerCertificate}" : "";
-            return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true{ssl};";
+            var resilience = ";Timeout=30;Command Timeout=60;Keepalive=15;Tcp Keepalive=true;Tcp Keepalive Time=30;"
+                + "Tcp Keepalive Interval=5;Connection Idle Lifetime=45;Connection Pruning Interval=10;"
+                + "Pooling=true;Min Pool Size=1;Max Pool Size=25";
+            return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true{ssl}{resilience};";
         }
 
         public static string GetConfiguredRolePassword(string role)

@@ -1,4 +1,4 @@
-// Trách nhiệm: sơ đồ card máy theo ComputerId và mở panel thao tác của Admin.
+﻿// Trách nhiệm: sơ đồ card máy theo ComputerId và mở panel thao tác của Admin.
 // Liên kết: vw_computer_grid, ComputerCardControl và ComputerActionDialog.
 
 using System.Drawing;
@@ -42,32 +42,43 @@ public partial class ComputersView : AdminDataViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await RequiredContext.Repository.GetComputersAsync(cancellationToken);
-        _lastRows = rows.ToList();
-
-        var activeIds = rows.Select(row => row.ComputerId).ToHashSet();
-        foreach (var stale in _cards.Keys.Where(id => !activeIds.Contains(id)).ToList())
+        try
         {
-            var card = _cards[stale];
-            _cardsGrid.Controls.Remove(card);
-            card.Dispose();
-            _cards.Remove(stale);
-        }
+            var rows = await RequiredContext.Repository.GetComputersAsync(cancellationToken);
+            if (rows is null) return;
+            _lastRows = rows.ToList();
 
-        foreach (var row in rows)
-        {
-            if (!_cards.TryGetValue(row.ComputerId, out var card))
+            var activeIds = rows.Select(row => row.ComputerId).ToHashSet();
+            foreach (var stale in _cards.Keys.Where(id => !activeIds.Contains(id)).ToList())
             {
-                card = new ComputerCardControl();
-                card.CardSelected += HandleCardSelected;
-                _cards.Add(row.ComputerId, card);
+                var card = _cards[stale];
+                _cardsGrid.Controls.Remove(card);
+                card.Dispose();
+                _cards.Remove(stale);
             }
-            card.Bind(row);
-        }
 
-        UpdateKpiSummary(rows);
-        FilterCards();
-        SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy trạm | Cập nhật lúc {DateTime.Now:HH:mm:ss}");
+            foreach (var row in rows)
+            {
+                if (!_cards.TryGetValue(row.ComputerId, out var card))
+                {
+                    card = new ComputerCardControl();
+                    card.CardSelected += HandleCardSelected;
+                    _cards.Add(row.ComputerId, card);
+                }
+                card.Bind(row);
+            }
+
+            UpdateKpiSummary(rows);
+            FilterCards();
+            SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy trạm | Cập nhật lúc {DateTime.Now:HH:mm:ss}");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
     }
 
     private void UpdateKpiSummary(IReadOnlyList<ComputerGridItem> rows)

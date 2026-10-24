@@ -19,7 +19,115 @@ namespace NetCafe.Data
 
         public DbRepository(string connectionString)
         {
-            _connectionString = connectionString;
+            _connectionString = EnsureResilientConnectionString(connectionString);
+        }
+
+        private static string EnsureResilientConnectionString(string connectionString)
+        {
+            try
+            {
+                var builder = new NpgsqlConnectionStringBuilder(connectionString);
+                if (builder.Timeout < 30) builder.Timeout = 30;
+                if (builder.CommandTimeout < 60) builder.CommandTimeout = 60;
+                if (builder.KeepAlive <= 0) builder.KeepAlive = 15;
+                builder.TcpKeepAlive = true;
+                builder.TcpKeepAliveTime = 30;
+                builder.TcpKeepAliveInterval = 5;
+                builder.ConnectionIdleLifetime = 45;
+                builder.ConnectionPruningInterval = 10;
+                builder.Pooling = true;
+                if (builder.MinPoolSize < 1) builder.MinPoolSize = 1;
+                if (builder.MaxPoolSize <= 0 || builder.MaxPoolSize > 50) builder.MaxPoolSize = 25;
+                builder.IncludeErrorDetail = true;
+                return builder.ConnectionString;
+            }
+            catch
+            {
+                return connectionString;
+            }
+        }
+
+        public static bool IsTransientException(Exception ex)
+        {
+            if (ex is TimeoutException or System.Net.Sockets.SocketException or System.IO.IOException)
+            {
+                return true;
+            }
+
+            if (ex is NpgsqlException npgEx)
+            {
+                if (npgEx.IsTransient) return true;
+                var msg = npgEx.Message.ToLowerInvariant();
+                if (msg.Contains("reading from stream") || msg.Contains("broker connection")
+                    || msg.Contains("failed to connect") || msg.Contains("forcibly closed")
+                    || msg.Contains("connection reset") || msg.Contains("timeout")
+                    || msg.Contains("socket has been shut down") || msg.Contains("broken")
+                    || msg.Contains("could not connect") || msg.Contains("connection refused")
+                    || msg.Contains("eof") || msg.Contains("transport connection"))
+                {
+                    return true;
+                }
+            }
+
+            if (ex is PostgresException pgEx)
+            {
+                if (pgEx.IsTransient) return true;
+                if (pgEx.SqlState is "08000" or "08003" or "08006" or "08001" or "08004"
+                    or "57P01" or "57P02" or "57P03")
+                {
+                    return true;
+                }
+            }
+
+            if (ex.InnerException is not null && IsTransientException(ex.InnerException))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static async Task<T> ExecuteWithRetryAsync<T>(
+            Func<Task<T>> operation,
+            int maxAttempts = 3,
+            int delayMs = 300)
+        {
+            var attempt = 0;
+            while (true)
+            {
+                attempt++;
+                try
+                {
+                    return await operation();
+                }
+                catch (Exception ex) when (attempt < maxAttempts && IsTransientException(ex))
+                {
+                    try { NpgsqlConnection.ClearAllPools(); } catch { }
+                    await Task.Delay(delayMs * attempt);
+                }
+            }
+        }
+
+        public static async Task ExecuteWithRetryAsync(
+            Func<Task> operation,
+            int maxAttempts = 3,
+            int delayMs = 300)
+        {
+            var attempt = 0;
+            while (true)
+            {
+                attempt++;
+                try
+                {
+                    await operation();
+                    return;
+                }
+                catch (Exception ex) when (attempt < maxAttempts && IsTransientException(ex))
+                {
+                    try { NpgsqlConnection.ClearAllPools(); } catch { }
+                    await Task.Delay(delayMs * attempt);
+                }
+            }
         }
 
         private void LogSql(string cmdText, string parameters, long durationMs, bool success, string? error)
@@ -58,7 +166,9 @@ namespace NetCafe.Data
 
         public async Task<List<ComputerGridItem>> GetComputersAsync(CancellationToken cancellationToken = default)
         {
-            var sw = Stopwatch.StartNew();
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                var sw = Stopwatch.StartNew();
             var sql = "SELECT computer_id, computer_code, computer_name, room_name, type_name, hourly_rate, computer_status, ip_address::text, current_session_id, current_customer_id, current_customer_name, current_username, session_start_time, played_minutes, current_play_amount, current_service_amount, current_balance, last_heartbeat_at, specs::text FROM reporting.vw_computer_grid;";
             try
             {
@@ -102,11 +212,14 @@ namespace NetCafe.Data
                 LogSql(sql, "", sw.ElapsedMilliseconds, false, ex.Message);
                 throw;
             }
+            });
         }
 
         public async Task<List<CustomerItem>> GetCustomersAsync(string? search = null)
         {
-            var sw = Stopwatch.StartNew();
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                var sw = Stopwatch.StartNew();
             string sql;
             if (string.IsNullOrWhiteSpace(search))
             {
@@ -153,11 +266,14 @@ namespace NetCafe.Data
                 LogSql(sql, search ?? "", sw.ElapsedMilliseconds, false, ex.Message);
                 throw;
             }
+            });
         }
 
         public async Task<List<ProductItem>> GetProductsAsync()
         {
-            var sw = Stopwatch.StartNew();
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                var sw = Stopwatch.StartNew();
             var sql = "SELECT p.product_id, p.sku, p.product_name, c.category_name, p.unit_price, p.stock_qty FROM inventory.product p JOIN inventory.product_category c ON p.category_id = c.category_id WHERE p.is_active = TRUE ORDER BY p.product_id;";
             try
             {
@@ -188,6 +304,7 @@ namespace NetCafe.Data
                 LogSql(sql, "", sw.ElapsedMilliseconds, false, ex.Message);
                 throw;
             }
+            });
         }
 
         public async Task<List<InvoiceItem>> GetRecentInvoicesAsync(int limit = 50)
@@ -234,7 +351,9 @@ namespace NetCafe.Data
 
         public async Task<List<EmployeeItem>> GetEmployeesAsync()
         {
-            var sw = Stopwatch.StartNew();
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                var sw = Stopwatch.StartNew();
             var sql = "SELECT employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active FROM hr.employee WHERE is_active = TRUE ORDER BY employee_id;";
             try
             {
@@ -268,6 +387,7 @@ namespace NetCafe.Data
                 LogSql(sql, "", sw.ElapsedMilliseconds, false, ex.Message);
                 throw;
             }
+            });
         }
 
         // ==========================================
@@ -384,7 +504,9 @@ namespace NetCafe.Data
 
         public async Task<List<KitchenOrderItem>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
         {
-            var sw = Stopwatch.StartNew();
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                var sw = Stopwatch.StartNew();
             var sql = @"
                 SELECT 
                     fo.order_id,
@@ -437,6 +559,7 @@ namespace NetCafe.Data
                 LogSql(sql, "", sw.ElapsedMilliseconds, false, ex.Message);
                 throw;
             }
+            });
         }
 
         public async Task UpdateFoodOrderStatusAsync(long orderId, string status, int employeeId = 0)
@@ -465,29 +588,43 @@ namespace NetCafe.Data
 
         public async Task StartListeningAsync(CancellationToken ct)
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                await using var conn = new NpgsqlConnection(_connectionString);
-                await conn.OpenAsync(ct);
-                conn.Notification += (o, e) =>
+                try
                 {
-                    OnNotificationReceived?.Invoke(e.Channel, e.Payload);
-                };
+                    await using var conn = new NpgsqlConnection(_connectionString);
+                    await conn.OpenAsync(ct);
+                    conn.Notification += (o, e) =>
+                    {
+                        OnNotificationReceived?.Invoke(e.Channel, e.Payload);
+                    };
 
-                await using var cmd = new NpgsqlCommand(
-                    "LISTEN ai_security_alert; LISTEN computer_state_changed; LISTEN support_queue_changed; LISTEN food_order_changed;",
-                    conn);
-                await cmd.ExecuteNonQueryAsync(ct);
+                    await using var cmd = new NpgsqlCommand(
+                        "LISTEN ai_security_alert; LISTEN computer_state_changed; LISTEN support_queue_changed; LISTEN food_order_changed;",
+                        conn);
+                    await cmd.ExecuteNonQueryAsync(ct);
 
-                while (!ct.IsCancellationRequested)
-                {
-                    await conn.WaitAsync(ct);
+                    while (!ct.IsCancellationRequested)
+                    {
+                        await conn.WaitAsync(ct);
+                    }
                 }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                LogSql("LISTEN ai_security_alert", "", 0, false, ex.Message);
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    LogSql("LISTEN ai_security_alert", "", 0, false, ex.Message);
+                    try
+                    {
+                        await Task.Delay(3000, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
             }
         }
     }

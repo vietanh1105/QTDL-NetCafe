@@ -1,4 +1,4 @@
-// Trách nhiệm: shell điều phối navigation, role thật, listener và refresh Admin.
+﻿// Trách nhiệm: shell điều phối navigation, role thật, listener và refresh Admin.
 // Liên kết: MainForm.Designer.cs, Views/*.cs, AppConfig.cs và DbRepository.
 
 using System.Drawing;
@@ -258,6 +258,10 @@ public partial class MainForm : Form
             {
                 ShowError(new InvalidOperationException(_runtimeContractStatus));
             }
+            else
+            {
+                ClearError();
+            }
         }
         catch (Exception exception)
         {
@@ -271,9 +275,13 @@ public partial class MainForm : Form
 
     private async Task RefreshVisibleAsync()
     {
-        if (!_databaseContractReady && (_activeView is ComputersView || _activeView is MaintenanceView))
+        if (!_databaseContractReady)
         {
-            return;
+            await RefreshDatabaseStatusAsync();
+            if (!_databaseContractReady && (_activeView is ComputersView || _activeView is MaintenanceView))
+            {
+                return;
+            }
         }
         if (_activeView is null || !await _refreshGate.WaitAsync(0))
         {
@@ -282,6 +290,7 @@ public partial class MainForm : Form
         try
         {
             await _activeView.RefreshAsync(_lifetimeCancellation.Token);
+            ClearError();
         }
         catch (OperationCanceledException)
         {
@@ -327,6 +336,15 @@ public partial class MainForm : Form
 
     private async Task ReconcileAndRefreshAsync()
     {
+        if (!_databaseContractReady)
+        {
+            await RefreshDatabaseStatusAsync();
+            if (!_databaseContractReady)
+            {
+                return;
+            }
+        }
+
         if (!_reconcileAvailable || _activeView is not ComputersView)
         {
             return;
@@ -348,7 +366,10 @@ public partial class MainForm : Form
                 _dbStatusLabel.Text = "Bản cập nhật 08 chưa có: tạm dừng đồng bộ phiên";
                 return;
             }
-            ShowError(exception);
+            if (!DbRepository.IsTransientException(exception))
+            {
+                ShowError(exception);
+            }
         }
     }
 
@@ -438,6 +459,14 @@ public partial class MainForm : Form
             status += $" | {_runtimeContractStatus}";
         }
         _dbStatusLabel.Text = status;
+    }
+
+    private void ClearError()
+    {
+        if (_errorBanner.Visible)
+        {
+            _errorBanner.Visible = false;
+        }
     }
 
     private void ShowError(Exception exception)

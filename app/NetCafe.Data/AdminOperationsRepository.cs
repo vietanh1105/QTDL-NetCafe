@@ -55,7 +55,9 @@ public partial class DbRepository
         string? search = null,
         CancellationToken cancellationToken = default)
     {
-        const string sql = @"
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"
             SELECT i.invoice_id,
                    i.session_id,
                    c.full_name,
@@ -110,11 +112,14 @@ public partial class DbRepository
             });
         }
         return rows;
+        });
     }
 
     public async Task<InvoiceDetailItem?> GetInvoiceDetailAsync(long invoiceId, CancellationToken cancellationToken = default)
     {
-        const string invoiceSql = @"
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string invoiceSql = @"
             SELECT i.invoice_id, i.session_id, c.full_name, c.username,
                    COALESCE(cp.computer_code, 'N/A'), s.start_time, s.end_time,
                    i.play_amount, i.service_amount, i.discount_amount, i.total_amount,
@@ -182,11 +187,14 @@ public partial class DbRepository
             });
         }
         return result with { Lines = lines };
+        });
     }
 
     public async Task<IReadOnlyList<EmployeeItem>> GetEmployeesWithSalaryAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = @"SELECT employee_id, full_name, phone, username, db_username, emp_role,
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"SELECT employee_id, full_name, phone, username, db_username, emp_role,
                                     default_shift, salary, hired_date, is_active
                              FROM hr.employee ORDER BY employee_id;";
         await using var connection = new NpgsqlConnection(_connectionString);
@@ -211,6 +219,7 @@ public partial class DbRepository
             });
         }
         return rows;
+        });
     }
 
     public async Task<int> CreateEmployeeAsync(
@@ -279,7 +288,9 @@ public partial class DbRepository
 
     public async Task<IReadOnlyList<MaintenanceItem>> GetMaintenanceAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = @"SELECT m.maintenance_id, m.computer_id, c.computer_code, m.technician_id,
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"SELECT m.maintenance_id, m.computer_id, c.computer_code, m.technician_id,
                                     e.full_name, m.issue_description, m.started_at, m.finished_at,
                                     m.cost, m.status
                              FROM hr.maintenance AS m
@@ -308,6 +319,7 @@ public partial class DbRepository
             });
         }
         return rows;
+        });
     }
 
     public async Task<int> CreateMaintenanceAsync(int computerId, int technicianId, string issue, CancellationToken cancellationToken = default)

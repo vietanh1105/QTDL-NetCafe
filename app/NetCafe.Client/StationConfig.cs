@@ -101,5 +101,8 @@ public sealed class StationConfig
 
     public string ConnectionString =>
         $"Host={Host};Port={Port};Database={Database};Username={Username};Password={Password};" +
-        $"SSL Mode={SslMode};Include Error Detail=true;";
+        $"SSL Mode={SslMode};Include Error Detail=true;" +
+        "Timeout=30;Command Timeout=60;Keepalive=15;Tcp Keepalive=true;Tcp Keepalive Time=30;" +
+        "Tcp Keepalive Interval=5;Connection Idle Lifetime=45;Connection Pruning Interval=10;" +
+        "Pooling=true;Min Pool Size=1;Max Pool Size=25;";
 }

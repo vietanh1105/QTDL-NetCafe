@@ -9,7 +9,9 @@ public partial class DbRepository
 {
     public async Task<DatabaseRuntimeInfo> GetDatabaseRuntimeInfoAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = @"SELECT current_database(), current_user, COALESCE(inet_server_addr()::text, 'local'),
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"SELECT current_database(), current_user, COALESCE(inet_server_addr()::text, 'local'),
                                     current_setting('server_version'),
                                     to_regclass('core.service_request') IS NOT NULL,
                                     to_regprocedure('core.sp_reconcile_stale_sessions(integer)') IS NOT NULL,
@@ -44,7 +46,8 @@ public partial class DbRepository
             HasComputerGridContract = reader.GetBoolean(6),
             HasCustomerMenuContract = reader.GetBoolean(7),
             HasStationLogoutContract = reader.GetBoolean(8)
-        };
+            };
+        });
     }
 
     public async Task<bool> HasFunctionAsync(string qualifiedSignature, CancellationToken cancellationToken = default)

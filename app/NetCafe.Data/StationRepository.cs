@@ -295,15 +295,18 @@ public partial class DbRepository
         Func<NpgsqlDataReader, T> map,
         CancellationToken cancellationToken)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var result = new List<T>();
-        while (await reader.ReadAsync(cancellationToken))
+        return await ExecuteWithRetryAsync(async () =>
         {
-            result.Add(map(reader));
-        }
-        return result;
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var result = new List<T>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add(map(reader));
+            }
+            return result;
+        });
     }
 }

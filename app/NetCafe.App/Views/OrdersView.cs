@@ -1,4 +1,4 @@
-// Trách nhiệm: menu gọi món, tồn kho dịch vụ và hàng đợi bếp từ máy trạm.
+﻿// Trách nhiệm: menu gọi món, tồn kho dịch vụ và hàng đợi bếp từ máy trạm.
 // Liên kết: inventory.product, inventory.food_order, sp_update_order_status và sp_receive_stock.
 
 using System.Drawing;
@@ -214,14 +214,31 @@ public partial class OrdersView : AdminViewBase
     {
         try
         {
-            var productsTask = RequiredContext.Repository.GetProductsAsync();
-            var kitchenOrdersTask = RequiredContext.Repository.GetKitchenOrdersAsync(cancellationToken);
+            var products = await RequiredContext.Repository.GetProductsAsync();
+            if (products is not null && products.Count > 0)
+            {
+                _allProducts = products;
+                ApplyProductFilter();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
 
-            await Task.WhenAll(productsTask, kitchenOrdersTask);
-
-            _allProducts = productsTask.Result;
-            ApplyProductFilter();
-            PopulateKitchenOrders(kitchenOrdersTask.Result);
+        try
+        {
+            var kitchenOrders = await RequiredContext.Repository.GetKitchenOrdersAsync(cancellationToken);
+            if (kitchenOrders is not null)
+            {
+                PopulateKitchenOrders(kitchenOrders);
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
