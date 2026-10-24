@@ -25,29 +25,73 @@ public partial class MaintenanceView : AdminCardViewBase
         _completeButton.Click += async (_, _) => await CompleteTicketAsync();
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        var canAccess = CanAccessMaintenance(context.CurrentUser);
+        if (!canAccess)
+        {
+            ClearCards("🔒 Vai trò hiện tại không có quyền truy cập phiếu bảo trì (Chỉ Admin, Quản lý hoặc Kỹ thuật viên).");
+            UpdateButtonsState(false);
+        }
+        else
+        {
+            UpdateButtonsState(true);
+        }
+    }
+
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await RequiredContext.Repository.GetMaintenanceAsync(cancellationToken);
-        SetCards(
-            rows,
-            maintenance => new AdminCardModel(
-                $"{maintenance.ComputerCode} · Phiếu #{maintenance.MaintenanceId}",
-                $"Kỹ thuật viên: {maintenance.TechnicianName}",
-                $"{maintenance.IssueDescription}\nBắt đầu: {maintenance.StartedAt:dd/MM/yyyy HH:mm}\nChi phí: {maintenance.Cost:N0} đ",
-                maintenance.Status switch
-                {
-                    "fixed" => "Đã hoàn thành",
-                    "unrepairable" => "Không thể sửa",
-                    "in_progress" => "Đang xử lý",
-                    _ => "Mới tiếp nhận"
-                },
-                maintenance.Status switch
-                {
-                    "fixed" => CyberTheme.Success,
-                    "unrepairable" => CyberTheme.Danger,
-                    _ => CyberTheme.Warning
-                }),
-            $"{rows.Count} phiếu bảo trì");
+        try
+        {
+            var rows = await RequiredContext.Repository.GetMaintenanceAsync(cancellationToken);
+            SetCards(
+                rows,
+                maintenance => new AdminCardModel(
+                    $"{maintenance.ComputerCode} · Phiếu #{maintenance.MaintenanceId}",
+                    $"Kỹ thuật viên: {maintenance.TechnicianName}",
+                    $"{maintenance.IssueDescription}\nBắt đầu: {maintenance.StartedAt:dd/MM/yyyy HH:mm}\nChi phí: {maintenance.Cost:N0} đ",
+                    maintenance.Status switch
+                    {
+                        "fixed" => "Đã hoàn thành",
+                        "unrepairable" => "Không thể sửa",
+                        "in_progress" => "Đang xử lý",
+                        _ => "Mới tiếp nhận"
+                    },
+                    maintenance.Status switch
+                    {
+                        "fixed" => CyberTheme.Success,
+                        "unrepairable" => CyberTheme.Danger,
+                        _ => CyberTheme.Warning
+                    }),
+                $"{rows.Count} phiếu bảo trì");
+            UpdateButtonsState(true);
+        }
+        catch (Exception ex)
+        {
+            var error = DbRepository.ParseException(ex);
+            ClearCards(error.SqlState == "42501"
+                ? "🔒 Vai trò hiện tại không có quyền truy cập phiếu bảo trì (PostgreSQL 42501: permission denied)."
+                : $"Không thể tải danh sách phiếu bảo trì: {error.Message}");
+            UpdateButtonsState(false);
+            throw;
+        }
+    }
+
+    private static bool CanAccessMaintenance(string user)
+    {
+        if (string.IsNullOrWhiteSpace(user))
+        {
+            return false;
+        }
+        var u = user.ToLowerInvariant();
+        return u.Contains("admin") || u.Contains("manager") || u.Contains("hung") || u.Contains("tech");
+    }
+
+    private void UpdateButtonsState(bool canAccess)
+    {
+        _createButton.Enabled = canAccess;
+        _completeButton.Enabled = canAccess;
     }
 
     private MaintenanceItem? SelectedMaintenance => SelectedItem as MaintenanceItem;

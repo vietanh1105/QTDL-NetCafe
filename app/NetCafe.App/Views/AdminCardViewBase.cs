@@ -57,6 +57,27 @@ public abstract class AdminCardViewBase : AdminDataViewBase
         InfoLabel.Text = info;
     }
 
+    protected void ClearCards(string info = "")
+    {
+        _selectedItem = null;
+        CardsPanel.SuspendLayout();
+        CardsPanel.Controls.Clear();
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            var emptyLabel = new Label
+            {
+                Text = info,
+                ForeColor = CyberTheme.MutedText,
+                Font = new Font("Segoe UI", 10F, FontStyle.Italic),
+                AutoSize = true,
+                Padding = new Padding(16, 24, 16, 16)
+            };
+            CardsPanel.Controls.Add(emptyLabel);
+        }
+        CardsPanel.ResumeLayout();
+        InfoLabel.Text = info;
+    }
+
     private Panel CreateCard(AdminCardModel model)
     {
         var card = new Panel
