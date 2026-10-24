@@ -428,6 +428,40 @@ public partial class DbRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ActivePromotionItem>> GetActivePromotionsAsync(CancellationToken cancellationToken = default)
+    {
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"
+            SELECT promotion_id, code, promotion_name, promo_type, value, valid_from, valid_to, is_active
+            FROM billing.promotion
+            WHERE is_active = TRUE AND clock_timestamp() BETWEEN valid_from AND valid_to
+            ORDER BY promotion_id;";
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            var items = new List<ActivePromotionItem>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(new ActivePromotionItem
+                {
+                    PromotionId = reader.GetInt32(0),
+                    Code = reader.GetString(1),
+                    PromotionName = reader.GetString(2),
+                    PromoType = reader.GetString(3),
+                    Value = reader.GetDecimal(4),
+                    ValidFrom = reader.GetDateTime(5),
+                    ValidTo = reader.GetDateTime(6),
+                    IsActive = reader.GetBoolean(7)
+                });
+            }
+            return items;
+        });
+    }
+
     private static DateTime? ToUtc(DateTime? value)
     {
         return value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : null;

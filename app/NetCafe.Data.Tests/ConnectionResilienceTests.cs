@@ -37,15 +37,15 @@ public sealed class ConnectionResilienceTests
         Assert.NotNull(conn);
     }
 
-    [Fact]
-    public void DbRepository_SanitizesLegacyMinAndMaxPoolSize_WithoutError()
+    [Theory]
+    [InlineData("Host=localhost;Port=5432;Database=netcafe_qa;Username=postgres;Password=test;Pooling=true;Min Pool Size=1;Max Pool Size=25;")]
+    [InlineData("Host=localhost;Port=5432;Database=netcafe_qa;Username=postgres;Password=test;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=30;")]
+    [InlineData("Host=localhost;Port=5432;Database=netcafe_qa;Username=postgres;Password=test;Pooling=true;min pool size=2;max pool size=20;")]
+    [InlineData("Host=localhost;Port=5432;Database=netcafe_qa;Username=postgres;Password=test;Pooling=true;MinPoolSize=3;MaxPoolSize=25;")]
+    public void DbRepository_SanitizesLegacyMinAndMaxPoolSize_WithoutError(string connectionString)
     {
-        var legacy = "Host=localhost;Port=5432;Database=netcafe_qa;Username=postgres;Password=test;Pooling=true;Min Pool Size=1;Max Pool Size=25;";
-        var repo = new DbRepository(legacy);
+        var repo = new DbRepository(connectionString);
         Assert.NotNull(repo);
-
-        using var conn = new NpgsqlConnection(legacy.Replace("Min Pool Size=1;", "").Replace("Max Pool Size=25;", "Maximum Pool Size=25;"));
-        Assert.NotNull(conn);
     }
 }
 

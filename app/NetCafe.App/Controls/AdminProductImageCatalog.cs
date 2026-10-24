@@ -1,6 +1,7 @@
-// Trách nhiệm: đọc ảnh SKU dùng chung với NetCafe.Client cho menu Admin.
+// Trách nhiệm: đọc ảnh SKU dùng chung với NetCafe.Client cho menu Admin có bộ nhớ đệm (cache).
 // Liên kết: NetCafe.Client/Assets/Products, ProductItem và OrdersView.
 
+using System.Collections.Concurrent;
 using System.Drawing;
 using NetCafe.App.Views;
 
@@ -8,7 +9,18 @@ namespace NetCafe.App.Controls;
 
 public static class AdminProductImageCatalog
 {
+    private static readonly ConcurrentDictionary<string, Bitmap> MasterCache = new(StringComparer.OrdinalIgnoreCase);
+
     public static Image Load(string sku)
+    {
+        var master = MasterCache.GetOrAdd(sku, CreateProductImage);
+        lock (master)
+        {
+            return new Bitmap(master);
+        }
+    }
+
+    private static Bitmap CreateProductImage(string sku)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Assets", "Products", $"{sku}.png");
         if (File.Exists(path))

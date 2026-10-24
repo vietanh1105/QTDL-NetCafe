@@ -75,6 +75,15 @@ public sealed class ComputerActionDialog : Form
         AddDetail(details, "Thời gian đã chơi", _computer.PlayedMinutes is null ? "Chưa có" : $"{_computer.PlayedMinutes:N0} phút");
         AddDetail(details, "Tiền giờ tạm tính", $"{EstimatePlayAmountValue():N0} đ");
         AddDetail(details, "Tiền dịch vụ", _computer.CurrentServiceAmount is null ? "0 đ" : $"{_computer.CurrentServiceAmount:N0} đ");
+        if (_computer.ComputerStatus == "in_use")
+        {
+            var estSum = EstimatePlayAmountValue() + (_computer.CurrentServiceAmount ?? 0);
+            AddDetail(details, "Tổng tạm tính", $"{estSum:N0} đ");
+            if ((_computer.CurrentServiceAmount ?? 0) > 0)
+            {
+                AddDetail(details, "Lưu ý dịch vụ", "Đã lưu vào phiên — Tính gộp khi đóng máy");
+            }
+        }
         AddDetail(details, "Số dư tài khoản", _computer.CurrentBalance is null ? "Chưa có" : $"{_computer.CurrentBalance:N0} đ");
         AddDetail(details, "Tín hiệu máy (Heartbeat)", _computer.LastHeartbeatAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa có dữ liệu");
         root.Controls.Add(details, 0, 0);
@@ -366,12 +375,27 @@ public sealed class ComputerActionDialog : Form
             _messageLabel.Text = "Tài khoản hiện tại không có quyền đóng phiên máy.";
             return;
         }
+
         try
         {
-            var estTotal = EstimatePlayAmountValue() + (_computer.CurrentServiceAmount ?? 0);
-            var method = (_computer.CurrentBalance ?? 0) >= estTotal ? "balance" : "cash";
-            await _context.Repository.CloseSessionAndPayAsync(_computer.CurrentSessionId.Value, _context.CurrentEmployeeId, method);
-            _messageLabel.Text = "Đã kết thúc phiên chơi và lập hóa đơn thanh toán thành công.";
+            var promotions = await _context.Repository.GetActivePromotionsAsync();
+            var playEst = EstimatePlayAmountValue();
+            var serviceEst = _computer.CurrentServiceAmount ?? 0;
+
+            using var checkout = new SessionCheckoutDialog(_computer, playEst, serviceEst, promotions);
+            if (checkout.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            var invoiceId = await _context.Repository.CloseSessionAndPayAsync(
+                _computer.CurrentSessionId.Value,
+                _context.CurrentEmployeeId,
+                checkout.SelectedPaymentMethod,
+                checkout.SelectedPromoCode);
+
+            var discountMsg = checkout.DiscountAmount > 0 ? $" (Giảm giá: -{checkout.DiscountAmount:N0} đ)" : "";
+            _messageLabel.Text = $"Đã chốt phiên và tạo HĐ #{invoiceId}{discountMsg}. Tổng thu: {checkout.FinalTotal:N0} đ.";
             await _context.RefreshComputersAsync();
             _primaryActionButton.Enabled = false;
         }

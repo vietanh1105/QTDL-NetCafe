@@ -29,7 +29,7 @@ namespace NetCafe.Data
             {
                 var sanitized = Regex.Replace(
                     connectionString,
-                    @"\b(min|max)\s+pool\s+size\s*=\s*\d+;?",
+                    @"\b(minimum|maximum|min|max)\s*pool\s*size\s*=\s*\d+;?|\b(minimum|maximum|min|max)poolsize\s*=\s*\d+;?",
                     "",
                     RegexOptions.IgnoreCase);
 

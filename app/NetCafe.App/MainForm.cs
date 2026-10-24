@@ -32,7 +32,7 @@ public partial class MainForm : Form
     private string _runtimeContractStatus = string.Empty;
     private DatabaseRuntimeInfo? _runtimeInfo;
     private string _listenerStatus = "Chưa khởi động";
-    private readonly System.Windows.Forms.Timer _notificationDebounceTimer = new() { Interval = 250 };
+    private readonly System.Windows.Forms.Timer _notificationDebounceTimer = new() { Interval = 500 };
 
     public MainForm()
     {
@@ -203,7 +203,7 @@ public partial class MainForm : Form
     private async Task StartAsync()
     {
         BuildViews();
-        _timer.Interval = 15000;
+        _timer.Interval = 30000;
         await RefreshDatabaseStatusAsync();
         if (_databaseContractReady)
         {

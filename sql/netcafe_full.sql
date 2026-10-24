@@ -2728,13 +2728,20 @@ BEGIN
     WHERE o.session_id = p_session_id AND o.status <> 'cancelled';
     v_total := v_play + v_service;
 
-    IF v_balance <= v_total AND v_total > 0 THEN
+    -- Đơn món ăn/uống được LƯU LẠI trong phiên và CHỈ TÍNH TIỀN 1 LẦN khi máy/tài khoản tắt.
+    -- Heartbeat KHÔNG tự ý đóng phiên và xuất hóa đơn gộp khi khách đang chơi.
+    IF v_balance > 0 AND v_play >= v_balance AND v_service = 0 THEN
         PERFORM billing.sp_close_session_and_pay_at(
             p_session_id, core.fn_station_service_employee_id(), 'balance', NULL,
             v_heartbeat, 'balance_exhausted'
         );
         v_status := 'finished';
         v_balance := 0;
+    ELSIF v_total >= v_balance THEN
+        v_status := 'active';
+        v_balance := GREATEST(0, v_balance - v_total);
+    ELSE
+        v_balance := v_balance - v_total;
     END IF;
 
     RETURN QUERY SELECT p_session_id, v_balance, v_play, v_service, v_total, v_heartbeat, v_status;
@@ -2752,17 +2759,35 @@ SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai
 AS $$
 DECLARE
     v_valid BOOLEAN;
+    v_customer_balance NUMERIC;
+    v_session RECORD;
+    v_est_play NUMERIC;
+    v_est_service NUMERIC;
+    v_total NUMERIC;
+    v_method VARCHAR(20) := 'balance';
 BEGIN
-    SELECT EXISTS (
-        SELECT 1 FROM core.gaming_session AS s
-        WHERE s.session_id = p_session_id AND s.customer_id = p_customer_id
-          AND s.computer_id = p_computer_id AND s.status = 'active'
-    ) INTO v_valid;
-    IF NOT v_valid THEN
+    SELECT * INTO v_session
+    FROM core.gaming_session AS s
+    WHERE s.session_id = p_session_id AND s.customer_id = p_customer_id
+      AND s.computer_id = p_computer_id AND s.status = 'active';
+    IF NOT FOUND THEN
         RAISE EXCEPTION 'Phiên station không hợp lệ hoặc đã đóng!';
     END IF;
+
+    SELECT balance INTO v_customer_balance FROM core.customer WHERE customer_id = p_customer_id;
+    v_est_play := core.fn_calc_session_amount(v_session.start_time, clock_timestamp(), v_session.hourly_rate_applied);
+    SELECT COALESCE(SUM(d.quantity * d.unit_price), 0) INTO v_est_service
+    FROM inventory.food_order o
+    JOIN inventory.food_order_detail d ON d.order_id = o.order_id
+    WHERE o.session_id = p_session_id AND o.status <> 'cancelled';
+    v_total := v_est_play + v_est_service;
+
+    IF v_customer_balance < v_total THEN
+        v_method := 'cash';
+    END IF;
+
     RETURN billing.sp_close_session_and_pay_at(
-        p_session_id, core.fn_station_service_employee_id(), 'balance', NULL,
+        p_session_id, core.fn_station_service_employee_id(), v_method, NULL,
         clock_timestamp(), 'station_logout'
     );
 END;

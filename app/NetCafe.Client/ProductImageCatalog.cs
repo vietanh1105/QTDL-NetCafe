@@ -1,6 +1,7 @@
-// Trách nhiệm: ánh xạ SKU sản phẩm thật sang ảnh trong repo và tạo fallback ổn định.
+// Trách nhiệm: ánh xạ SKU sản phẩm sang ảnh với bộ nhớ đệm (cache) trong RAM để chống giật lag.
 // Liên kết: ProductCardControl.cs nhận SKU từ inventory.fn_customer_menu_v2().
 
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
@@ -8,6 +9,8 @@ namespace NetCafe.Client;
 
 public static class ProductImageCatalog
 {
+    private static readonly ConcurrentDictionary<string, Bitmap> MasterCache = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly Dictionary<string, Color> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
         ["STING-RED"] = Color.FromArgb(220, 38, 38),
@@ -23,6 +26,15 @@ public static class ProductImageCatalog
     };
 
     public static Image Load(string sku)
+    {
+        var master = MasterCache.GetOrAdd(sku, CreateProductBitmap);
+        lock (master)
+        {
+            return new Bitmap(master);
+        }
+    }
+
+    private static Bitmap CreateProductBitmap(string sku)
     {
         var assetPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Products", $"{sku}.png");
         if (File.Exists(assetPath))

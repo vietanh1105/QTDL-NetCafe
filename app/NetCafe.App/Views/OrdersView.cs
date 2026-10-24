@@ -158,7 +158,7 @@ public partial class OrdersView : AdminViewBase
         _kitchenHeaderPanel.BackColor = CyberTheme.Surface;
         _kitchenHeaderPanel.Padding = new Padding(10, 6, 10, 6);
 
-        _kitchenTitleLabel.Text = "👨‍🍳 Đơn món ăn khách đặt (Bếp chế biến)";
+        _kitchenTitleLabel.Text = "👨‍🍳 Đơn món ăn khách đặt (Bếp chế biến) — Đơn lưu vào phiên, tính tiền khi đóng máy";
         _kitchenTitleLabel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         _kitchenTitleLabel.ForeColor = CyberTheme.Text;
         _kitchenTitleLabel.Dock = DockStyle.Left;
@@ -693,7 +693,12 @@ public partial class OrdersView : AdminViewBase
         try
         {
             await RequiredContext.Repository.UpdateFoodOrderStatusAsync(order.OrderId, "served", RequiredContext.CurrentEmployeeId);
-            MessageBox.Show($"Đã hoàn thành chế biến và phục vụ đơn #{order.OrderId} ({order.ComputerCode})!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                $"Đã hoàn thành chế biến và phục vụ đơn #{order.OrderId} cho máy {order.ComputerCode}!\n\n" +
+                $"Tiền món ({order.TotalAmount:N0} đ) đã được LƯU VÀO PHIÊN CHƠI và sẽ được chốt thanh toán 1 lần duy nhất khi máy hoặc tài khoản đó kết thúc/tắt máy.",
+                "Phục vụ món thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             await RefreshKitchenOrdersAsync();
         }
         catch (Exception ex)

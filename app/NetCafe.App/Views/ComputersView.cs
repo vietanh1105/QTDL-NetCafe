@@ -1,7 +1,8 @@
-﻿// Trách nhiệm: sơ đồ card máy theo ComputerId và mở panel thao tác của Admin.
+// Trách nhiệm: sơ đồ card máy theo ComputerId và mở panel thao tác của Admin.
 // Liên kết: vw_computer_grid, ComputerCardControl và ComputerActionDialog.
 
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using NetCafe.App.Controls;
 using NetCafe.Data;
@@ -38,6 +39,15 @@ public partial class ComputersView : AdminDataViewBase
 
         ActionsPanel.Controls.Add(_kpiLabel);
         ActionsPanel.Controls.Add(_filterCombo);
+
+        EnableDoubleBuffering(_cardsGrid);
+        _cardsGrid.Resize += (_, _) => RebuildGridPositions();
+    }
+
+    private static void EnableDoubleBuffering(Control control)
+    {
+        typeof(Control).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.SetValue(control, true, null);
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -49,12 +59,15 @@ public partial class ComputersView : AdminDataViewBase
             _lastRows = rows.ToList();
 
             var activeIds = rows.Select(row => row.ComputerId).ToHashSet();
+            var structureChanged = false;
+
             foreach (var stale in _cards.Keys.Where(id => !activeIds.Contains(id)).ToList())
             {
                 var card = _cards[stale];
                 _cardsGrid.Controls.Remove(card);
                 card.Dispose();
                 _cards.Remove(stale);
+                structureChanged = true;
             }
 
             foreach (var row in rows)
@@ -64,12 +77,13 @@ public partial class ComputersView : AdminDataViewBase
                     card = new ComputerCardControl();
                     card.CardSelected += HandleCardSelected;
                     _cards.Add(row.ComputerId, card);
+                    structureChanged = true;
                 }
                 card.Bind(row);
             }
 
             UpdateKpiSummary(rows);
-            FilterCards();
+            FilterCards(triggerRebuild: structureChanged);
             SetTitle("Sơ đồ máy trạm", $"{rows.Count} máy trạm | Cập nhật lúc {DateTime.Now:HH:mm:ss}");
         }
         catch (OperationCanceledException)
@@ -91,26 +105,38 @@ public partial class ComputersView : AdminDataViewBase
         _kpiLabel.Text = $"Tổng: {total} máy  |  🟢 Đang chơi: {inUse}  |  ⚪ Máy trống: {available}  |  🔴 Bảo trì: {maintenance}";
     }
 
-    private void FilterCards()
+    private void FilterCards(bool triggerRebuild = true)
     {
         var filter = _filterCombo.SelectedItem?.ToString() ?? "Tất cả máy";
+        var visibilityChanged = false;
+
         foreach (var card in _cards.Values)
         {
             var status = card.Model?.ComputerStatus;
-            card.Visible = filter switch
+            var targetVisible = filter switch
             {
                 "🟢 Đang chơi" => status == "in_use",
                 "⚪ Máy trống" => status == "available",
                 "🔴 Bảo trì" => status is "maintenance" or "broken",
                 _ => true
             };
+
+            if (card.Visible != targetVisible)
+            {
+                card.Visible = targetVisible;
+                visibilityChanged = true;
+            }
         }
-        RebuildGridPositions();
+
+        if (triggerRebuild || visibilityChanged)
+        {
+            RebuildGridPositions();
+        }
     }
 
     private void RebuildGridPositions()
     {
-        if (_isRebuildingGrid)
+        if (_isRebuildingGrid || _cardsGrid.IsDisposed)
         {
             return;
         }
@@ -144,8 +170,8 @@ public partial class ComputersView : AdminDataViewBase
                 {
                     _cardsGrid.Controls.Add(card);
                 }
-                card.Width = cardWidth;
-                card.Height = 190;
+                if (card.Width != cardWidth) card.Width = cardWidth;
+                if (card.Height != 190) card.Height = 190;
                 card.Margin = new Padding(0, verticalMargin, gap, verticalMargin);
             }
             _cardsGrid.ResumeLayout(true);

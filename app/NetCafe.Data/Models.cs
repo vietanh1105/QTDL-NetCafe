@@ -224,4 +224,16 @@ namespace NetCafe.Data
         public string Status { get; set; } = "placed";
         public DateTime OrderedAt { get; set; }
     }
+
+    public class ActivePromotionItem
+    {
+        public int PromotionId { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string PromotionName { get; set; } = string.Empty;
+        public string PromoType { get; set; } = string.Empty;
+        public decimal Value { get; set; }
+        public DateTime ValidFrom { get; set; }
+        public DateTime ValidTo { get; set; }
+        public bool IsActive { get; set; }
+    }
 }
