@@ -14,7 +14,7 @@ public partial class SettingsView : AdminCardViewBase
     {
         InitializeComponent();
         _vacuumButton.Text = "🧹 VACUUM ANALYZE";
-        _vacuumButton.Width = 170;
+        _vacuumButton.Width = 195;
         _vacuumButton.Height = 34;
 
         CyberTheme.StyleButton(_vacuumButton, CyberTheme.Warning);
@@ -22,9 +22,46 @@ public partial class SettingsView : AdminCardViewBase
         ActionsPanel.Controls.Add(_vacuumButton);
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        if (context.IsAdmin)
+        {
+            _vacuumButton.Visible = true;
+            _vacuumButton.Enabled = true;
+            _vacuumButton.Text = "🧹 VACUUM ANALYZE (DBA)";
+            CyberTheme.StyleButton(_vacuumButton, CyberTheme.Warning);
+        }
+        else if (context.IsManager)
+        {
+            _vacuumButton.Visible = true;
+            _vacuumButton.Enabled = false;
+            _vacuumButton.Text = "🔒 VACUUM (Chỉ Admin/DBA)";
+            CyberTheme.StyleButton(_vacuumButton, CyberTheme.MutedText);
+        }
+        else
+        {
+            _vacuumButton.Visible = false;
+            ClearCards(
+                "🔒 Vai trò hiện tại không có quyền truy cập Thông tin hệ thống (Cơ chế CSDL: DBA Privileges).");
+        }
+    }
+
     public override Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var context = RequiredContext;
+        if (context.IsCashier || context.IsTechnician)
+        {
+            UpdateRolePermissions(context);
+            return Task.CompletedTask;
+        }
+
+        UpdateRolePermissions(context);
         var cards = new[]
         {
             new AdminCardModel(
@@ -35,7 +72,7 @@ public partial class SettingsView : AdminCardViewBase
                 CyberTheme.Primary),
             new AdminCardModel(
                 "Tài khoản và quyền",
-                $"User: {context.CurrentUser} · Employee ID: {context.CurrentEmployeeId}",
+                $"User: {context.CurrentUser} · Role: {context.UserRole} · Employee ID: {context.CurrentEmployeeId}",
                 $"Session: {(context.CanManageSessions ? "được phép" : "bị khóa")}\nCustomer: {(context.CanManageCustomers ? "được phép" : "bị khóa")}",
                 "Quyền hiện tại",
                 CyberTheme.Success),
@@ -54,9 +91,9 @@ public partial class SettingsView : AdminCardViewBase
             new AdminCardModel(
                 "Dọn dẹp và bảo mật",
                 "VACUUM ANALYZE theo yêu cầu",
-                "Autovacuum do PostgreSQL quản lý. Bấm nút trên thanh công cụ để chạy thủ công; không reset dữ liệu.",
-                "Sẵn sàng",
-                CyberTheme.SurfaceRaised)
+                "Autovacuum do PostgreSQL quản lý. Chỉ Chủ quán (role_admin / DBA) có quyền chạy VACUUM thủ công.",
+                context.IsAdmin ? "Quyền DBA" : "Chỉ xem",
+                context.IsAdmin ? CyberTheme.Warning : CyberTheme.SurfaceRaised)
         };
         SetCards(cards, card => card, $"{cards.Length} nhóm thông tin hệ thống");
         return Task.CompletedTask;
@@ -64,10 +101,26 @@ public partial class SettingsView : AdminCardViewBase
 
     private async Task RunVacuumAsync()
     {
+        if (!RequiredContext.IsAdmin)
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Chỉ Chủ quán (nhóm DBA / role_admin) mới có quyền chạy lệnh VACUUM ANALYZE trên CSDL.",
+                "Từ chối quyền DBA",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
         try
         {
             await RequiredContext.Repository.RunVacuumAnalyzeAsync();
-            MessageBox.Show(FindForm(), "Đã chạy VACUUM ANALYZE cho các bảng vận hành.", "Dọn dẹp thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                FindForm(),
+                "Đã chạy VACUUM ANALYZE cho các bảng vận hành thành công.",
+                "Dọn dẹp thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
         catch (Exception exception)
         {

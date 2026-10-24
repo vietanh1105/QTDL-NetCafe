@@ -91,7 +91,13 @@ public sealed class ComputerActionDialog : Form
         actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
         actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-        if (_computer.ComputerStatus == "in_use")
+        if (_context.IsTechnician)
+        {
+            _primaryActionButton.Text = "🔒 Chỉ xem trạng thái máy";
+            CyberTheme.StyleButton(_primaryActionButton, CyberTheme.MutedText);
+            _primaryActionButton.Enabled = false;
+        }
+        else if (_computer.ComputerStatus == "in_use")
         {
             _primaryActionButton.Text = "⏹ Kết thúc & Tính tiền";
             CyberTheme.StyleButton(_primaryActionButton, CyberTheme.Danger);
@@ -156,7 +162,9 @@ public sealed class ComputerActionDialog : Form
         };
         _maintenanceButton.Click += async (_, _) => await ToggleMaintenanceAsync();
         _refreshButton.Click += async (_, _) => await RefreshAsync();
-        _maintenanceButton.Enabled = _context.CanManageSessions && _computer.ComputerStatus != "in_use";
+        _customerButton.Enabled = !_context.IsTechnician && _context.CanManageCustomers;
+        var canMaintain = (_context.IsAdmin || _context.IsManager || _context.IsTechnician) && _computer.ComputerStatus != "in_use";
+        _maintenanceButton.Enabled = canMaintain;
     }
 
     private static void AddDetail(TableLayoutPanel table, string key, string value)

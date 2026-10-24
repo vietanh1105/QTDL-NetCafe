@@ -1,4 +1,4 @@
-﻿// Trách nhiệm: menu gọi món, tồn kho dịch vụ và hàng đợi bếp từ máy trạm.
+// Trách nhiệm: menu gọi món, tồn kho dịch vụ và hàng đợi bếp từ máy trạm.
 // Liên kết: inventory.product, inventory.food_order, sp_update_order_status và sp_receive_stock.
 
 using System.Drawing;
@@ -210,8 +210,65 @@ public partial class OrdersView : AdminViewBase
         Controls.Add(_toolbar);
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        if (context.IsAdmin || context.IsManager)
+        {
+            _receiveStockButton.Enabled = true;
+            _orderForStationButton.Enabled = true;
+            _serveButton.Enabled = true;
+            _cancelOrderButton.Enabled = true;
+        }
+        else if (context.IsCashier)
+        {
+            _receiveStockButton.Enabled = false;
+            _orderForStationButton.Enabled = true;
+            _serveButton.Enabled = true;
+            _cancelOrderButton.Enabled = true;
+        }
+        else // Kỹ thuật viên: Không có quyền trên inventory
+        {
+            _receiveStockButton.Enabled = false;
+            _orderForStationButton.Enabled = false;
+            _serveButton.Enabled = false;
+            _cancelOrderButton.Enabled = false;
+            ClearForbiddenState();
+        }
+    }
+
+    private void ClearForbiddenState()
+    {
+        _cardsPanel.SuspendLayout();
+        _cardsPanel.Controls.Clear();
+        var emptyLabel = new Label
+        {
+            Text = "🔒 Kỹ thuật viên không có quyền truy cập Gọi món & Bếp (Cơ chế CSDL: Table Grant inventory).",
+            ForeColor = CyberTheme.MutedText,
+            Font = new Font("Segoe UI", 10F, FontStyle.Italic),
+            AutoSize = true,
+            Padding = new Padding(16, 24, 16, 16)
+        };
+        _cardsPanel.Controls.Add(emptyLabel);
+        _cardsPanel.ResumeLayout();
+        _kitchenGrid.DataSource = null;
+        _menuCountLabel.Text = "Không có quyền";
+        _kitchenBadgeLabel.Text = "Bị khóa";
+    }
+
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        if (RequiredContext.IsTechnician)
+        {
+            ClearForbiddenState();
+            return;
+        }
+
         try
         {
             var products = await RequiredContext.Repository.GetProductsAsync();
@@ -423,6 +480,17 @@ public partial class OrdersView : AdminViewBase
 
     private async Task ReceiveStockAsync()
     {
+        if (!RequiredContext.IsAdmin && !RequiredContext.IsManager)
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Chỉ Chủ quán và Quản lý mới có quyền quản lý menu và nhập kho hàng.",
+                "Từ chối quyền hạn",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
         if (_selectedProduct is null)
         {
             MessageBox.Show(FindForm(), "Hãy chọn một card sản phẩm trước khi nhập hàng.", "Chưa chọn sản phẩm", MessageBoxButtons.OK, MessageBoxIcon.Information);

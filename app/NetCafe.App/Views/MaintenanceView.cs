@@ -28,10 +28,10 @@ public partial class MaintenanceView : AdminCardViewBase
     public override void SetContext(AdminViewContext context)
     {
         base.SetContext(context);
-        var canAccess = CanAccessMaintenance(context.CurrentUser);
+        var canAccess = context.IsAdmin || context.IsManager || context.IsTechnician;
         if (!canAccess)
         {
-            ClearCards("🔒 Vai trò hiện tại không có quyền truy cập phiếu bảo trì (Chỉ Admin, Quản lý hoặc Kỹ thuật viên).");
+            ClearCards("🔒 Thu ngân không phụ trách bảo trì máy trạm (Cơ chế CSDL: Grant hr.maintenance).");
             UpdateButtonsState(false);
         }
         else
@@ -42,6 +42,13 @@ public partial class MaintenanceView : AdminCardViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        if (RequiredContext.IsCashier)
+        {
+            ClearCards("🔒 Thu ngân không phụ trách bảo trì máy trạm (Cơ chế CSDL: Grant hr.maintenance).");
+            UpdateButtonsState(false);
+            return;
+        }
+
         try
         {
             var rows = await RequiredContext.Repository.GetMaintenanceAsync(cancellationToken);

@@ -66,6 +66,32 @@ public partial class ReportsView : AdminDataViewBase
         UpdateModeButtonStyles();
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        var canAccess = context.IsAdmin || context.IsManager;
+        _revenueButton.Enabled = canAccess;
+        _usageButton.Enabled = canAccess;
+        _customersButton.Enabled = canAccess;
+        _refreshSnapshotsButton.Enabled = canAccess;
+        _exportPdfButton.Enabled = canAccess;
+        _exportExcelButton.Enabled = canAccess;
+        _fromPicker.Enabled = canAccess;
+        _toPicker.Enabled = canAccess;
+
+        if (!canAccess)
+        {
+            SetRows(
+                Array.Empty<DailyRevenueItem>(),
+                "🔒 Vai trò hiện tại không có quyền xem báo cáo doanh thu (Cơ chế CSDL: Materialized Views).");
+        }
+    }
+
     private void UpdateModeButtonStyles()
     {
         _revenueButton.BackColor = _mode == "revenue" ? CyberTheme.Primary : CyberTheme.SurfaceRaised;
@@ -84,6 +110,12 @@ public partial class ReportsView : AdminDataViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        if (RequiredContext.IsCashier || RequiredContext.IsTechnician)
+        {
+            UpdateRolePermissions(RequiredContext);
+            return;
+        }
+
         try
         {
             UpdateModeButtonStyles();

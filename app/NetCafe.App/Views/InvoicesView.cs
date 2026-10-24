@@ -449,8 +449,56 @@ public partial class InvoicesView : AdminViewBase
         return panel;
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        if (context.IsAdmin || context.IsManager)
+        {
+            _voidInvoiceButton.Enabled = true;
+            _exportExcelButton.Enabled = true;
+            _printReceiptButton.Enabled = true;
+            _copyReceiptButton.Enabled = true;
+            _subtitleLabel.Text = "Theo dõi doanh thu phòng máy, xem 100% hóa đơn toàn hệ thống.";
+        }
+        else if (context.IsCashier)
+        {
+            _voidInvoiceButton.Enabled = false; // Thu ngân không được hủy hóa đơn
+            _exportExcelButton.Enabled = true;
+            _printReceiptButton.Enabled = true;
+            _copyReceiptButton.Enabled = true;
+            _subtitleLabel.Text = "🔒 Chỉ hiển thị hóa đơn ca làm việc của bạn (Cơ chế CSDL: Row-Level Security p_invoice_cashier).";
+        }
+        else // Kỹ thuật viên: Cấm truy cập bill
+        {
+            _voidInvoiceButton.Enabled = false;
+            _exportExcelButton.Enabled = false;
+            _printReceiptButton.Enabled = false;
+            _copyReceiptButton.Enabled = false;
+            _subtitleLabel.Text = "🔒 Kỹ thuật viên không có quyền truy cập Hóa đơn & Sổ quỹ (Cơ chế CSDL: RLS & Grant).";
+            _allInvoices.Clear();
+            _filteredInvoices.Clear();
+            _grid.DataSource = null;
+            UpdateKpis(_allInvoices);
+        }
+    }
+
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        if (RequiredContext.IsTechnician)
+        {
+            _allInvoices.Clear();
+            _filteredInvoices.Clear();
+            _grid.DataSource = null;
+            UpdateKpis(_allInvoices);
+            _subtitleLabel.Text = "🔒 Kỹ thuật viên không có quyền truy cập Hóa đơn & Sổ quỹ (Cơ chế CSDL: RLS & Grant).";
+            return;
+        }
+
         try
         {
             var rows = await RequiredContext.Repository.GetInvoicesAsync(cancellationToken: cancellationToken);

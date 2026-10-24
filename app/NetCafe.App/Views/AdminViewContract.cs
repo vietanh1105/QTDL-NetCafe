@@ -18,6 +18,11 @@ public sealed class AdminViewContext
     public DatabaseRuntimeInfo? RuntimeInfo { get; set; }
     public bool CanManageCustomers { get; set; }
     public bool CanManageSessions { get; set; }
+    public string UserRole { get; set; } = "role_admin";
+    public bool IsAdmin => UserRole == "role_admin";
+    public bool IsManager => UserRole == "role_manager";
+    public bool IsCashier => UserRole == "role_cashier";
+    public bool IsTechnician => UserRole == "role_technician";
 }
 
 public interface IAdminView

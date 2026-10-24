@@ -194,6 +194,7 @@ public partial class MainForm : Form
             item.Value.BackColor = selected ? CyberTheme.SurfaceRaised : CyberTheme.Surface;
             item.Value.ForeColor = selected ? CyberTheme.Primary : CyberTheme.Text;
         }
+        UpdateNavigationStates(ResolveRole(_currentUser));
         _activeView = view;
         var displayTitle = _viewLabels.TryGetValue(key, out var label) ? label : key;
         _activeViewLabel.Text = $"Đang mở: {displayTitle}";
@@ -214,6 +215,8 @@ public partial class MainForm : Form
 
     private void ApplyContext()
     {
+        var role = ResolveRole(_currentUser);
+        var isTech = role == "role_technician";
         _viewContext = new AdminViewContext
         {
             Repository = _repository,
@@ -225,13 +228,15 @@ public partial class MainForm : Form
             ConnectionSummary = AppConfig.ConnectionSummary(_currentUser),
             ListenerStatus = _listenerStatus,
             RuntimeInfo = _runtimeInfo,
-            CanManageCustomers = _currentEmployeeId > 0,
-            CanManageSessions = _currentEmployeeId > 0
+            UserRole = role,
+            CanManageCustomers = !isTech && _currentEmployeeId > 0,
+            CanManageSessions = !isTech && _currentEmployeeId > 0
         };
         foreach (var view in _views.Values)
         {
             view.SetContext(_viewContext);
         }
+        UpdateNavigationStates(role);
     }
 
     private async Task RefreshDatabaseStatusAsync()
@@ -463,6 +468,11 @@ public partial class MainForm : Form
             _runtimeSummary = $"Máy chủ={AppConfig.Host}:{AppConfig.Port} | CSDL={AppConfig.Database} | Role={user}";
             ClearError();
             ApplyContext();
+            var role = ResolveRole(user);
+            if (IsTabForbidden(_activeKey, role))
+            {
+                SwitchView("Computers");
+            }
             UpdateHeaderStatus($"Đã chuyển vai trò: {user}");
 
             await RefreshVisibleAsync(force: true);
@@ -548,15 +558,52 @@ public partial class MainForm : Form
         _errorBanner.Visible = true;
     }
 
+    public static string ResolveRole(string user)
+    {
+        var u = (user ?? string.Empty).ToLowerInvariant();
+        if (u.Contains("manager")) return "role_manager";
+        if (u.Contains("thao") || u.Contains("cashier") || u.Contains("nam")) return "role_cashier";
+        if (u.Contains("hung") || u.Contains("tech")) return "role_technician";
+        return "role_admin";
+    }
+
+    public static bool IsTabForbidden(string key, string role)
+    {
+        if (role is "role_admin" or "role_manager") return false;
+        if (role == "role_cashier")
+        {
+            return key is "Reports" or "Maintenance" or "AiCenter" or "Settings";
+        }
+        if (role == "role_technician")
+        {
+            return key is "Orders" or "Invoices" or "Reports" or "AiCenter" or "Settings";
+        }
+        return false;
+    }
+
+    private void UpdateNavigationStates(string role)
+    {
+        foreach (var (key, button) in _navigationButtons)
+        {
+            var baseLabel = _viewLabels.TryGetValue(key, out var lbl) ? lbl : key;
+            var isForbidden = IsTabForbidden(key, role);
+            if (isForbidden)
+            {
+                button.Text = $"{baseLabel} 🔒";
+                button.ForeColor = CyberTheme.MutedText;
+            }
+            else
+            {
+                var selected = string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase);
+                button.Text = baseLabel;
+                button.ForeColor = selected ? CyberTheme.Primary : CyberTheme.Text;
+            }
+        }
+    }
+
     private static RoleOption CreateRoleOption(string user)
     {
-        var role = user.ToLowerInvariant() switch
-        {
-            "nv_manager" => "role_manager",
-            "nv_thao" => "role_cashier",
-            "nv_hung" => "role_technician",
-            _ => "role_admin"
-        };
+        var role = ResolveRole(user);
         var label = role switch
         {
             "role_manager" => "Vai trò demo: Quản lý",

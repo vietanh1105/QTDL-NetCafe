@@ -42,11 +42,45 @@ public partial class EmployeesView : AdminCardViewBase
     public override void SetContext(AdminViewContext context)
     {
         base.SetContext(context);
-        if (_showSalary && !context.CurrentUser.Contains("admin", StringComparison.OrdinalIgnoreCase))
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        if (_showSalary && !context.IsAdmin)
         {
             _showSalary = false;
-            _salaryButton.Text = "👁️ Xem bảng lương & Thông tin nhạy cảm";
+        }
+
+        if (context.IsAdmin)
+        {
+            _salaryButton.Visible = true;
+            _salaryButton.Enabled = true;
+            _salaryButton.Text = _showSalary ? "🙈 Ẩn thông tin lương" : "👁️ Xem bảng lương & Thông tin nhạy cảm";
+            CyberTheme.StyleButton(_salaryButton, _showSalary ? CyberTheme.SurfaceRaised : CyberTheme.Warning);
+            _createButton.Enabled = true;
+            _editButton.Enabled = true;
+            _toggleButton.Enabled = true;
+            _resetPasswordButton.Enabled = true;
+        }
+        else if (context.IsManager)
+        {
+            _salaryButton.Visible = false;
+            _createButton.Enabled = true;
+            _editButton.Enabled = true;
+            _toggleButton.Enabled = true;
+            _resetPasswordButton.Enabled = true;
+        }
+        else
+        {
+            _salaryButton.Visible = true;
+            _salaryButton.Enabled = true;
+            _salaryButton.Text = "👁️ Xem bảng lương (Yêu cầu quyền DBA)";
             CyberTheme.StyleButton(_salaryButton, CyberTheme.Warning);
+            _createButton.Enabled = false;
+            _editButton.Enabled = false;
+            _toggleButton.Enabled = false;
+            _resetPasswordButton.Enabled = false;
         }
     }
 

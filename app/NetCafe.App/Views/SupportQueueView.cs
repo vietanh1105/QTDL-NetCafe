@@ -15,16 +15,45 @@ public partial class SupportQueueView : AdminCardViewBase
     public SupportQueueView()
     {
         InitializeComponent();
-        SetTitle("Yêu cầu hỗ trợ", "Máy trạm gửi yêu cầu qua PostgreSQL NOTIFY; chọn card để xử lý theo luồng Mới → Tiếp nhận → Hoàn thành.");
+        SetTitle(
+            "Yêu cầu hỗ trợ",
+            "Máy trạm gửi yêu cầu qua PostgreSQL NOTIFY; chọn card để xử lý theo luồng Mới → Tiếp nhận → Hoàn thành.");
         ActionsPanel.Controls.Add(_acknowledgeButton);
         ActionsPanel.Controls.Add(_resolveButton);
         ActionsPanel.Controls.Add(_cancelButton);
-
 
         _acknowledgeButton.Click += async (_, _) => await ChangeStatusAsync("acknowledged");
         _resolveButton.Click += async (_, _) => await ChangeStatusAsync("resolved");
         _cancelButton.Click += async (_, _) => await ChangeStatusAsync("cancelled");
         CardDoubleClicked += async (_, _) => await OpenRequestDetailsAsync();
+    }
+
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRoleSubtitle(context);
+    }
+
+    private void UpdateRoleSubtitle(AdminViewContext context)
+    {
+        if (context.IsCashier)
+        {
+            SetTitle(
+                "Yêu cầu hỗ trợ",
+                "Thu ngân tiếp nhận: F&B / Nạp ví / Chung (Lỗi phần cứng do Kỹ thuật viên phụ trách).");
+        }
+        else if (context.IsTechnician)
+        {
+            SetTitle(
+                "Yêu cầu hỗ trợ",
+                "Kỹ thuật viên tiếp nhận: Lỗi phần cứng & kỹ thuật máy trạm (F&B/Nạp ví do Thu ngân phụ trách).");
+        }
+        else
+        {
+            SetTitle(
+                "Yêu cầu hỗ trợ",
+                "Chủ quán & Quản lý: Giám sát toàn bộ yêu cầu hỗ trợ từ máy trạm.");
+        }
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -33,16 +62,56 @@ public partial class SupportQueueView : AdminCardViewBase
         SetCards(rows, BuildCard, $"{rows.Count} yêu cầu hỗ trợ; {rows.Count(row => row.Status == "new")} yêu cầu mới.");
     }
 
+    private bool CanManageRequest(ServiceRequestItem request)
+    {
+        if (RequiredContext.IsAdmin || RequiredContext.IsManager)
+        {
+            return true;
+        }
+        if (RequiredContext.IsCashier)
+        {
+            return request.RequestType is "food" or "payment" or "general";
+        }
+        if (RequiredContext.IsTechnician)
+        {
+            return request.RequestType == "technical";
+        }
+        return false;
+    }
+
     private async Task ChangeStatusAsync(string status)
     {
         if (RequiredContext.CurrentEmployeeId <= 0)
         {
-            ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể xử lý hàng đợi hỗ trợ."));
+            ReportError(new InvalidOperationException(
+                "Vai trò hiện tại chưa gắn mã nhân viên; không thể xử lý hàng đợi hỗ trợ."));
             return;
         }
 
         if (SelectedItem is not ServiceRequestItem request)
         {
+            return;
+        }
+
+        if (RequiredContext.IsCashier && request.RequestType == "technical")
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Thu ngân chỉ tiếp nhận Gọi món (F&B) và Nạp ví.\nYêu cầu lỗi phần cứng do Kỹ thuật viên phụ trách.",
+                "Phân quyền xử lý",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (RequiredContext.IsTechnician && request.RequestType != "technical")
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Kỹ thuật viên chỉ tiếp nhận và xử lý Lỗi phần cứng.\nGọi món và Nạp ví do Thu ngân phụ trách.",
+                "Phân quyền xử lý",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
             return;
         }
 
@@ -65,7 +134,8 @@ public partial class SupportQueueView : AdminCardViewBase
             return;
         }
 
-        using var dialog = new SupportRequestDialog(request);
+        var canManage = CanManageRequest(request);
+        using var dialog = new SupportRequestDialog(request, canManage);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK || dialog.SelectedStatus is null)
         {
             return;
@@ -85,9 +155,17 @@ public partial class SupportQueueView : AdminCardViewBase
             _ => (request.Status, CyberTheme.Primary)
         };
 
+        var typeTag = request.RequestType switch
+        {
+            "technical" => "🛠️ Lỗi phần cứng",
+            "food" => "🍔 Gọi món F&B",
+            "payment" => "💳 Nạp tiền ví",
+            _ => "💬 Hỗ trợ chung"
+        };
+
         return new AdminCardModel(
             $"#{request.ServiceRequestId} · {request.ComputerCode}",
-            $"{request.CustomerName} · {request.RequestType}",
+            $"{request.CustomerName} · {typeTag}",
             $"{request.Message}\nGửi lúc: {request.CreatedAt.LocalDateTime:dd/MM HH:mm:ss}",
             status,
             accent);
@@ -115,7 +193,7 @@ internal sealed class SupportRequestDialog : Form
             ? option.Value
             : null;
 
-    public SupportRequestDialog(ServiceRequestItem request)
+    public SupportRequestDialog(ServiceRequestItem request, bool canManage = true)
     {
         Text = $"Chi tiết yêu cầu hỗ trợ #{request.ServiceRequestId}";
         StartPosition = FormStartPosition.CenterParent;
@@ -185,7 +263,7 @@ internal sealed class SupportRequestDialog : Form
         _statusBox.ForeColor = CyberTheme.Text;
         var options = GetStatusOptions(request.Status);
         _statusBox.Items.AddRange(options.Cast<object>().ToArray());
-        if (_statusBox.Items.Count > 0)
+        if (_statusBox.Items.Count > 0 && canManage)
         {
             _statusBox.SelectedIndex = 0;
         }
@@ -209,12 +287,12 @@ internal sealed class SupportRequestDialog : Form
 
         var saveButton = new Button
         {
-            Text = "Lưu trạng thái",
+            Text = canManage ? "Lưu trạng thái" : "Không có quyền",
             Width = 130,
             Height = 34,
-            Enabled = _statusBox.Enabled
+            Enabled = canManage && _statusBox.Enabled
         };
-        CyberTheme.StyleButton(saveButton, CyberTheme.Primary);
+        CyberTheme.StyleButton(saveButton, canManage ? CyberTheme.Primary : CyberTheme.MutedText);
         saveButton.Click += (_, _) =>
         {
             if (SelectedStatus is not null)

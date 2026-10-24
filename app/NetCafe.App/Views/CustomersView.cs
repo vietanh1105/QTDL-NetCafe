@@ -98,9 +98,44 @@ public partial class CustomersView : AdminCardViewBase
         CardDoubleClicked += async (_, _) => await EditCustomerAsync();
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        UpdateRolePermissions(context);
+    }
+
+    private void UpdateRolePermissions(AdminViewContext context)
+    {
+        if (context.IsAdmin || context.IsManager)
+        {
+            _topUpButton.Enabled = true;
+            _createButton.Enabled = true;
+            _editButton.Enabled = true;
+            _toggleButton.Enabled = true;
+            _resetButton.Enabled = true;
+        }
+        else if (context.IsCashier)
+        {
+            _topUpButton.Enabled = true;
+            _createButton.Enabled = true;
+            _editButton.Enabled = false;
+            _toggleButton.Enabled = false;
+            _resetButton.Enabled = false;
+        }
+        else // Kỹ thuật viên: Cấm truy cập ví
+        {
+            _topUpButton.Enabled = false;
+            _createButton.Enabled = false;
+            _editButton.Enabled = false;
+            _toggleButton.Enabled = false;
+            _resetButton.Enabled = false;
+        }
+    }
+
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetCustomersAsync(_searchBox.Text);
+        var isTech = RequiredContext.IsTechnician;
         SetCards(
             rows,
             customer =>
@@ -113,10 +148,11 @@ public partial class CustomersView : AdminCardViewBase
                     _ => string.IsNullOrWhiteSpace(customer.MembershipTier) ? "Hạng Chuẩn" : customer.MembershipTier
                 };
 
+                var walletText = isTech ? "Số dư ví: 🔒 Cấm truy cập ví" : $"Số dư ví: {customer.Balance:N0} đ";
                 return new AdminCardModel(
                     customer.FullName,
                     $"@{customer.Username} | SĐT: {customer.Phone}",
-                    $"Số dư ví: {customer.Balance:N0} đ\nĐiểm thưởng: {customer.LoyaltyPoints:N0}",
+                    $"{walletText}\nĐiểm thưởng: {customer.LoyaltyPoints:N0}",
                     customer.IsActive ? $"Đang hoạt động · {tierText}" : "Đã khóa tài khoản",
                     customer.IsActive ? CyberTheme.Success : CyberTheme.Danger);
             },
@@ -128,6 +164,17 @@ public partial class CustomersView : AdminCardViewBase
         if (RequiredContext.CurrentEmployeeId <= 0)
         {
             ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể ghi nhận nạp ví."));
+            return;
+        }
+
+        if (RequiredContext.IsTechnician)
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Vai trò Kỹ thuật viên không có quyền truy cập ví hoặc nạp tiền (Cơ chế CSDL: billing.sp_top_up).",
+                "Từ chối quyền truy cập ví",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
             return;
         }
 
