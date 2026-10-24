@@ -43,7 +43,8 @@ public partial class DbRepository
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            "VACUUM (ANALYZE) core.customer, core.computer, core.gaming_session, inventory.product, inventory.food_order, billing.invoice, hr.employee;",
+            "VACUUM (ANALYZE) core.customer, core.computer, core.gaming_session, " +
+            "inventory.product, inventory.food_order, billing.invoice, hr.employee;",
             connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -61,14 +62,16 @@ public partial class DbRepository
             SELECT i.invoice_id,
                    i.session_id,
                    c.full_name,
-                   COALESCE(cp.computer_code, 'N/A'),
+                   COALESCE(cp.computer_code, 'N/A') AS computer_code,
                    i.play_amount,
                    i.service_amount,
                    i.discount_amount,
                    i.total_amount,
                    i.status,
                    i.issued_at,
-                   COALESCE(pay.method, '')
+                   COALESCE(pay.method, 'cash') AS method,
+                   'session' AS invoice_type,
+                   '' AS note
             FROM billing.invoice AS i
             JOIN core.customer AS c ON c.customer_id = i.customer_id
             LEFT JOIN core.gaming_session AS s ON s.session_id = i.session_id
@@ -84,34 +87,61 @@ public partial class DbRepository
               AND (@fromDate::timestamptz IS NULL OR i.issued_at >= @fromDate)
               AND (@toDate::timestamptz IS NULL OR i.issued_at < @toDate)
               AND (@search::varchar IS NULL OR c.full_name ILIKE @search OR i.invoice_id::text ILIKE @search OR cp.computer_code ILIKE @search)
-            ORDER BY i.invoice_id DESC;";
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("status", (object?)status ?? DBNull.Value);
-        command.Parameters.AddWithValue("fromDate", (object?)ToUtc(from) ?? DBNull.Value);
-        command.Parameters.AddWithValue("toDate", (object?)ToUtc(to) ?? DBNull.Value);
-        command.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : $"%{search.Trim()}%");
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var rows = new List<InvoiceItem>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            rows.Add(new InvoiceItem
+
+            UNION ALL
+
+            SELECT p.payment_id AS invoice_id,
+                   0::bigint AS session_id,
+                   c.full_name,
+                   'Ví hội viên' AS computer_code,
+                   0::numeric AS play_amount,
+                   0::numeric AS service_amount,
+                   0::numeric AS discount_amount,
+                   p.amount AS total_amount,
+                   'paid' AS status,
+                   p.paid_at AS issued_at,
+                   p.method,
+                   'topup' AS invoice_type,
+                   COALESCE(p.reference, 'Nạp tiền tài khoản hội viên') AS note
+            FROM billing.payment AS p
+            JOIN core.customer AS c ON c.customer_id = p.customer_id
+            WHERE p.kind = 'topup'
+              AND (@status::varchar IS NULL OR @status = 'paid')
+              AND (@fromDate::timestamptz IS NULL OR p.paid_at >= @fromDate)
+              AND (@toDate::timestamptz IS NULL OR p.paid_at < @toDate)
+              AND (@search::varchar IS NULL OR c.full_name ILIKE @search OR p.payment_id::text ILIKE @search OR p.reference ILIKE @search)
+
+            ORDER BY issued_at DESC;";
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("status", (object?)status ?? DBNull.Value);
+            command.Parameters.AddWithValue("fromDate", (object?)ToUtc(from) ?? DBNull.Value);
+            command.Parameters.AddWithValue("toDate", (object?)ToUtc(to) ?? DBNull.Value);
+            command.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : $"%{search.Trim()}%");
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<InvoiceItem>();
+            while (await reader.ReadAsync(cancellationToken))
             {
-                InvoiceId = reader.GetInt64(0),
-                SessionId = reader.GetInt64(1),
-                CustomerName = reader.GetString(2),
-                ComputerCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                PlayAmount = reader.GetDecimal(4),
-                ServiceAmount = reader.GetDecimal(5),
-                DiscountAmount = reader.GetDecimal(6),
-                TotalAmount = reader.GetDecimal(7),
-                Status = reader.GetString(8),
-                IssuedAt = reader.GetDateTime(9),
-                PaymentMethod = reader.IsDBNull(10) ? string.Empty : reader.GetString(10)
-            });
-        }
-        return rows;
+                rows.Add(new InvoiceItem
+                {
+                    InvoiceId = reader.GetInt64(0),
+                    SessionId = reader.GetInt64(1),
+                    CustomerName = reader.GetString(2),
+                    ComputerCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    PlayAmount = reader.GetDecimal(4),
+                    ServiceAmount = reader.GetDecimal(5),
+                    DiscountAmount = reader.GetDecimal(6),
+                    TotalAmount = reader.GetDecimal(7),
+                    Status = reader.GetString(8),
+                    IssuedAt = reader.GetDateTime(9),
+                    PaymentMethod = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+                    InvoiceType = reader.IsDBNull(11) ? "session" : reader.GetString(11),
+                    Note = reader.IsDBNull(12) ? string.Empty : reader.GetString(12)
+                });
+            }
+            return rows;
         });
     }
 
@@ -134,7 +164,87 @@ public partial class DbRepository
                 ORDER BY p.payment_id DESC LIMIT 1
             ) AS pay ON TRUE
             WHERE i.invoice_id = @invoiceId;";
-        const string lineSql = @"
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var invoiceCommand = new NpgsqlCommand(invoiceSql, connection);
+            invoiceCommand.Parameters.AddWithValue("invoiceId", invoiceId);
+            await using var reader = await invoiceCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                await reader.CloseAsync();
+                // Kiểm tra xem có phải phiếu nạp tiền ví (billing.payment)
+                const string topupSql = @"
+                SELECT p.payment_id, c.full_name, c.username,
+                       p.paid_at, p.amount, p.method,
+                       COALESCE(p.reference, 'Nạp tiền tài khoản hội viên')
+                FROM billing.payment AS p
+                JOIN core.customer AS c ON c.customer_id = p.customer_id
+                WHERE p.payment_id = @invoiceId AND p.kind = 'topup';";
+
+                await using var topupCmd = new NpgsqlCommand(topupSql, connection);
+                topupCmd.Parameters.AddWithValue("invoiceId", invoiceId);
+                await using var topupReader = await topupCmd.ExecuteReaderAsync(cancellationToken);
+                if (await topupReader.ReadAsync(cancellationToken))
+                {
+                    var id = topupReader.GetInt64(0);
+                    var fullName = topupReader.GetString(1);
+                    var uname = topupReader.GetString(2);
+                    var paidAt = topupReader.GetDateTime(3);
+                    var amt = topupReader.GetDecimal(4);
+                    var meth = topupReader.GetString(5);
+                    var note = topupReader.GetString(6);
+
+                    return new InvoiceDetailItem
+                    {
+                        InvoiceId = id,
+                        SessionId = 0,
+                        CustomerName = fullName,
+                        Username = uname,
+                        ComputerCode = "Ví hội viên",
+                        SessionStart = paidAt,
+                        SessionEnd = paidAt,
+                        PlayAmount = 0,
+                        ServiceAmount = 0,
+                        DiscountAmount = 0,
+                        TotalAmount = amt,
+                        Status = "paid",
+                        IssuedAt = paidAt,
+                        PaymentMethod = meth,
+                        Lines = new[]
+                        {
+                            new InvoiceLineItem
+                            {
+                                ProductName = note,
+                                Quantity = 1,
+                                UnitPrice = amt
+                            }
+                        }
+                    };
+                }
+                return null;
+            }
+
+            var result = new InvoiceDetailItem
+            {
+                InvoiceId = reader.GetInt64(0),
+                SessionId = reader.GetInt64(1),
+                CustomerName = reader.GetString(2),
+                Username = reader.GetString(3),
+                ComputerCode = reader.GetString(4),
+                SessionStart = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
+                SessionEnd = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                PlayAmount = reader.GetDecimal(7),
+                ServiceAmount = reader.GetDecimal(8),
+                DiscountAmount = reader.GetDecimal(9),
+                TotalAmount = reader.GetDecimal(10),
+                Status = reader.GetString(11),
+                IssuedAt = reader.GetDateTime(12),
+                PaymentMethod = reader.IsDBNull(13) ? string.Empty : reader.GetString(13)
+            };
+            await reader.CloseAsync();
+
+            const string lineSql = @"
             SELECT p.product_name, d.quantity, d.unit_price
             FROM inventory.food_order AS o
             JOIN inventory.food_order_detail AS d ON d.order_id = o.order_id
@@ -145,48 +255,20 @@ public partial class DbRepository
               AND o.status <> 'cancelled'
             ORDER BY o.ordered_at, p.product_name;";
 
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var invoiceCommand = new NpgsqlCommand(invoiceSql, connection);
-        invoiceCommand.Parameters.AddWithValue("invoiceId", invoiceId);
-        await using var reader = await invoiceCommand.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-        var result = new InvoiceDetailItem
-        {
-            InvoiceId = reader.GetInt64(0),
-            SessionId = reader.GetInt64(1),
-            CustomerName = reader.GetString(2),
-            Username = reader.GetString(3),
-            ComputerCode = reader.GetString(4),
-            SessionStart = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
-            SessionEnd = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
-            PlayAmount = reader.GetDecimal(7),
-            ServiceAmount = reader.GetDecimal(8),
-            DiscountAmount = reader.GetDecimal(9),
-            TotalAmount = reader.GetDecimal(10),
-            Status = reader.GetString(11),
-            IssuedAt = reader.GetDateTime(12),
-            PaymentMethod = reader.IsDBNull(13) ? string.Empty : reader.GetString(13)
-        };
-        await reader.CloseAsync();
-
-        await using var lineCommand = new NpgsqlCommand(lineSql, connection);
-        lineCommand.Parameters.AddWithValue("invoiceId", invoiceId);
-        await using var lineReader = await lineCommand.ExecuteReaderAsync(cancellationToken);
-        var lines = new List<InvoiceLineItem>();
-        while (await lineReader.ReadAsync(cancellationToken))
-        {
-            lines.Add(new InvoiceLineItem
+            await using var lineCommand = new NpgsqlCommand(lineSql, connection);
+            lineCommand.Parameters.AddWithValue("invoiceId", invoiceId);
+            await using var lineReader = await lineCommand.ExecuteReaderAsync(cancellationToken);
+            var lines = new List<InvoiceLineItem>();
+            while (await lineReader.ReadAsync(cancellationToken))
             {
-                ProductName = lineReader.GetString(0),
-                Quantity = lineReader.GetInt32(1),
-                UnitPrice = lineReader.GetDecimal(2)
-            });
-        }
-        return result with { Lines = lines };
+                lines.Add(new InvoiceLineItem
+                {
+                    ProductName = lineReader.GetString(0),
+                    Quantity = lineReader.GetInt32(1),
+                    UnitPrice = lineReader.GetDecimal(2)
+                });
+            }
+            return result with { Lines = lines };
         });
     }
 
@@ -195,30 +277,30 @@ public partial class DbRepository
         return await ExecuteWithRetryAsync(async () =>
         {
             const string sql = @"SELECT employee_id, full_name, phone, username, db_username, emp_role,
-                                    default_shift, salary, hired_date, is_active
-                             FROM hr.employee ORDER BY employee_id;";
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var rows = new List<EmployeeItem>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            rows.Add(new EmployeeItem
+                                        default_shift, salary, hired_date, is_active
+                                 FROM hr.employee ORDER BY employee_id;";
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<EmployeeItem>();
+            while (await reader.ReadAsync(cancellationToken))
             {
-                EmployeeId = reader.GetInt32(0),
-                FullName = reader.GetString(1),
-                Phone = reader.GetString(2),
-                Username = reader.GetString(3),
-                DbUsername = reader.IsDBNull(4) ? null : reader.GetString(4),
-                EmpRole = reader.GetString(5),
-                DefaultShift = reader.GetString(6),
-                Salary = reader.GetDecimal(7),
-                HiredDate = reader.GetDateTime(8),
-                IsActive = reader.GetBoolean(9)
-            });
-        }
-        return rows;
+                rows.Add(new EmployeeItem
+                {
+                    EmployeeId = reader.GetInt32(0),
+                    FullName = reader.GetString(1),
+                    Phone = reader.GetString(2),
+                    Username = reader.GetString(3),
+                    DbUsername = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    EmpRole = reader.GetString(5),
+                    DefaultShift = reader.GetString(6),
+                    Salary = reader.GetDecimal(7),
+                    HiredDate = reader.GetDateTime(8),
+                    IsActive = reader.GetBoolean(9)
+                });
+            }
+            return rows;
         });
     }
 
@@ -291,34 +373,34 @@ public partial class DbRepository
         return await ExecuteWithRetryAsync(async () =>
         {
             const string sql = @"SELECT m.maintenance_id, m.computer_id, c.computer_code, m.technician_id,
-                                    e.full_name, m.issue_description, m.started_at, m.finished_at,
-                                    m.cost, m.status
-                             FROM hr.maintenance AS m
-                             JOIN core.computer AS c ON c.computer_id = m.computer_id
-                             JOIN hr.employee AS e ON e.employee_id = m.technician_id
-                             ORDER BY m.finished_at NULLS FIRST, m.started_at DESC;";
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var rows = new List<MaintenanceItem>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            rows.Add(new MaintenanceItem
+                                        e.full_name, m.issue_description, m.started_at, m.finished_at,
+                                        m.cost, m.status
+                                 FROM hr.maintenance AS m
+                                 JOIN core.computer AS c ON c.computer_id = m.computer_id
+                                 JOIN hr.employee AS e ON e.employee_id = m.technician_id
+                                 ORDER BY m.finished_at NULLS FIRST, m.started_at DESC;";
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<MaintenanceItem>();
+            while (await reader.ReadAsync(cancellationToken))
             {
-                MaintenanceId = reader.GetInt32(0),
-                ComputerId = reader.GetInt32(1),
-                ComputerCode = reader.GetString(2),
-                TechnicianId = reader.GetInt32(3),
-                TechnicianName = reader.GetString(4),
-                IssueDescription = reader.GetString(5),
-                StartedAt = reader.GetDateTime(6),
-                FinishedAt = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
-                Cost = reader.GetDecimal(8),
-                Status = reader.GetString(9)
-            });
-        }
-        return rows;
+                rows.Add(new MaintenanceItem
+                {
+                    MaintenanceId = reader.GetInt32(0),
+                    ComputerId = reader.GetInt32(1),
+                    ComputerCode = reader.GetString(2),
+                    TechnicianId = reader.GetInt32(3),
+                    TechnicianName = reader.GetString(4),
+                    IssueDescription = reader.GetString(5),
+                    StartedAt = reader.GetDateTime(6),
+                    FinishedAt = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
+                    Cost = reader.GetDecimal(8),
+                    Status = reader.GetString(9)
+                });
+            }
+            return rows;
         });
     }
 

@@ -206,11 +206,16 @@ public partial class CustomersView : AdminCardViewBase
                 dialog.PaymentMethod,
                 string.IsNullOrWhiteSpace(dialog.Note) ? "admin_ui_topup" : dialog.Note);
 
-            MessageBox.Show(FindForm(),
-                $"Nạp thành công {dialog.Amount:N0} đ cho hội viên {customer.FullName} (@{customer.Username}).\nSố dư mới: {newBalance:N0} đ",
+            var ask = MessageBox.Show(FindForm(),
+                $"Nạp thành công {dialog.Amount:N0} đ cho hội viên {customer.FullName} (@{customer.Username}).\nSố dư mới: {newBalance:N0} đ\n\n✓ Đã ghi nhận phiếu thu vào mục 'Hóa đơn & Sổ quỹ'.\n\nBạn có muốn chuyển sang tab 'Hóa đơn & Sổ quỹ' để in / xem phiếu thu không?",
                 "Nạp tiền thành công",
-                MessageBoxButtons.OK,
+                MessageBoxButtons.YesNo,
                 MessageBoxIcon.Information);
+
+            if (ask == DialogResult.Yes)
+            {
+                RequiredContext.NavigateToView?.Invoke("Invoices");
+            }
 
             await RefreshAsync();
         }

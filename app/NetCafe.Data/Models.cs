@@ -120,6 +120,8 @@ namespace NetCafe.Data
         public string Status { get; set; } = "paid";
         public DateTime IssuedAt { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public string InvoiceType { get; set; } = "session";
+        public string Note { get; set; } = string.Empty;
     }
 
     public sealed record InvoiceDetailItem

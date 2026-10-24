@@ -124,10 +124,18 @@ public partial class InvoicesView : AdminViewBase
         _searchBox.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) ApplyFilter(); };
 
         _statusCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-        _statusCombo.Items.AddRange(new object[] { "Tất cả trạng thái", "Đã thanh toán (paid)", "Chưa thanh toán (unpaid)", "Đã hủy (void)" });
+        _statusCombo.Items.AddRange(new object[]
+        {
+            "Tất cả chứng từ",
+            "💰 Sổ quỹ nạp tiền ví",
+            "🧾 Hóa đơn phiên chơi",
+            "✓ Đã thanh toán (paid)",
+            "○ Chưa thanh toán (unpaid)",
+            "✕ Đã hủy (void)"
+        });
         _statusCombo.SelectedIndex = 0;
         _statusCombo.Location = new Point(260, 8);
-        _statusCombo.Width = 180;
+        _statusCombo.Width = 195;
         _statusCombo.BackColor = CyberTheme.SurfaceRaised;
         _statusCombo.ForeColor = CyberTheme.Text;
         _statusCombo.Font = new Font("Segoe UI", 9F);
@@ -205,10 +213,10 @@ public partial class InvoicesView : AdminViewBase
     {
         _kpiContainer.Controls.Clear();
 
-        var card1 = CreateKpiCard("💳 TỔNG DOANH THU", "0 đ", CyberTheme.Primary, _kpiRevenueValue);
-        var card2 = CreateKpiCard("🧾 SỐ LƯỢNG HÓA ĐƠN", "0", CyberTheme.Text, _kpiCountValue);
-        var card3 = CreateKpiCard("⏱️ TIỀN GIỜ CHƠI", "0 đ", CyberTheme.Success, _kpiPlayValue);
-        var card4 = CreateKpiCard("🍔 TIỀN DỊCH VỤ", "0 đ", CyberTheme.Warning, _kpiServiceValue);
+        var card1 = CreateKpiCard("💳 TỔNG THU SỔ QUỸ", "0 đ", CyberTheme.Primary, _kpiRevenueValue);
+        var card2 = CreateKpiCard("🧾 SỐ LƯỢNG CHỨNG TỪ", "0", CyberTheme.Text, _kpiCountValue);
+        var card3 = CreateKpiCard("💰 TIỀN NẠP VÍ", "0 đ", CyberTheme.Success, _kpiPlayValue);
+        var card4 = CreateKpiCard("🎮 TIỀN GIỜ & DỊCH VỤ", "0 đ", CyberTheme.Warning, _kpiServiceValue);
 
         _kpiContainer.Controls.Add(card4);
         _kpiContainer.Controls.Add(card3);
@@ -517,31 +525,40 @@ public partial class InvoicesView : AdminViewBase
         var paidRows = rows.Where(r => r.Status.Equals("paid", StringComparison.OrdinalIgnoreCase)).ToList();
 
         var totalRev = paidRows.Sum(r => r.TotalAmount);
-        var playRev = paidRows.Sum(r => r.PlayAmount);
-        var serviceRev = paidRows.Sum(r => r.ServiceAmount);
+        var totalTopup = paidRows.Where(r => r.InvoiceType == "topup").Sum(r => r.TotalAmount);
+        var sessionPlay = paidRows.Where(r => r.InvoiceType == "session").Sum(r => r.PlayAmount);
+        var sessionService = paidRows.Where(r => r.InvoiceType == "session").Sum(r => r.ServiceAmount);
 
         _kpiRevenueValue.Text = $"{totalRev:N0} đ";
-        _kpiCountValue.Text = $"{rows.Count} Hóa đơn";
-        _kpiPlayValue.Text = $"{playRev:N0} đ";
-        _kpiServiceValue.Text = $"{serviceRev:N0} đ";
+        _kpiCountValue.Text = $"{rows.Count} chứng từ";
+        _kpiPlayValue.Text = $"{totalTopup:N0} đ";
+        _kpiServiceValue.Text = $"{(sessionPlay + sessionService):N0} đ";
     }
 
     private void ApplyFilter()
     {
         var query = _searchBox.Text.Trim();
-        var statusFilter = _statusCombo.SelectedIndex switch
-        {
-            1 => "paid",
-            2 => "unpaid",
-            3 => "void",
-            _ => null
-        };
+        var selectedFilterIndex = _statusCombo.SelectedIndex;
 
         var filtered = _allInvoices.AsEnumerable();
 
-        if (!string.IsNullOrEmpty(statusFilter))
+        switch (selectedFilterIndex)
         {
-            filtered = filtered.Where(x => x.Status.Equals(statusFilter, StringComparison.OrdinalIgnoreCase));
+            case 1:
+                filtered = filtered.Where(x => x.InvoiceType == "topup");
+                break;
+            case 2:
+                filtered = filtered.Where(x => x.InvoiceType == "session");
+                break;
+            case 3:
+                filtered = filtered.Where(x => x.Status.Equals("paid", StringComparison.OrdinalIgnoreCase));
+                break;
+            case 4:
+                filtered = filtered.Where(x => x.Status.Equals("unpaid", StringComparison.OrdinalIgnoreCase));
+                break;
+            case 5:
+                filtered = filtered.Where(x => x.Status.Equals("void", StringComparison.OrdinalIgnoreCase));
+                break;
         }
 
         if (!string.IsNullOrEmpty(query))
@@ -549,7 +566,9 @@ public partial class InvoicesView : AdminViewBase
             filtered = filtered.Where(x =>
                 x.InvoiceId.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 x.SessionId.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                x.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase));
+                x.CustomerName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                x.ComputerCode.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                x.Note.Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
         var resultList = filtered.ToList();
@@ -558,7 +577,9 @@ public partial class InvoicesView : AdminViewBase
         _grid.DataSource = resultList;
 
         FormatGridColumns();
-        _countSummaryLabel.Text = $"Hiển thị {resultList.Count} / {_allInvoices.Count} hóa đơn";
+        var sessionCount = resultList.Count(x => x.InvoiceType == "session");
+        var topupCount = resultList.Count(x => x.InvoiceType == "topup");
+        _countSummaryLabel.Text = $"Hiển thị {resultList.Count} / {_allInvoices.Count} chứng từ ({sessionCount} hóa đơn, {topupCount} phiếu nạp ví)";
 
         if (resultList.Count > 0)
         {
@@ -573,38 +594,19 @@ public partial class InvoicesView : AdminViewBase
 
     private void FormatGridColumns()
     {
-        if (_grid.Columns["InvoiceId"] is { } colId) { colId.HeaderText = "Mã HĐ"; colId.Width = 85; }
+        if (_grid.Columns["InvoiceId"] is { } colId) { colId.HeaderText = "Mã số"; colId.Width = 85; }
+        if (_grid.Columns["InvoiceType"] is { } colType) { colType.HeaderText = "Loại chứng từ"; colType.Width = 115; }
         if (_grid.Columns["SessionId"] is { } colSession) { colSession.HeaderText = "Mã phiên"; colSession.Width = 85; }
         if (_grid.Columns["CustomerName"] is { } colCust) { colCust.HeaderText = "Khách hàng"; colCust.Width = 140; }
-        if (_grid.Columns["PlayAmount"] is { } colPlay)
-        {
-            colPlay.HeaderText = "Tiền giờ";
-            colPlay.Width = 100;
-
-            colPlay.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        }
-        if (_grid.Columns["ServiceAmount"] is { } colService)
-        {
-            colService.HeaderText = "Tiền dịch vụ";
-            colService.Width = 100;
-
-            colService.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        }
-        if (_grid.Columns["DiscountAmount"] is { } colDiscount)
-        {
-            colDiscount.HeaderText = "Giảm giá";
-            colDiscount.Width = 90;
-
-            colDiscount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        }
+        if (_grid.Columns["ComputerCode"] is { } colComp) { colComp.HeaderText = "Máy / Nghiệp vụ"; colComp.Width = 125; }
         if (_grid.Columns["TotalAmount"] is { } colTotal)
         {
-            colTotal.HeaderText = "Tổng tiền";
+            colTotal.HeaderText = "Số tiền";
             colTotal.Width = 110;
-
             colTotal.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             colTotal.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
+        if (_grid.Columns["PaymentMethod"] is { } colMethod) { colMethod.HeaderText = "Hình thức"; colMethod.Width = 100; }
         if (_grid.Columns["Status"] is { } colStatus) { colStatus.HeaderText = "Trạng thái"; colStatus.Width = 120; }
         if (_grid.Columns["IssuedAt"] is { } colTime)
         {
@@ -612,6 +614,10 @@ public partial class InvoicesView : AdminViewBase
             colTime.Width = 140;
             colTime.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
         }
+        if (_grid.Columns["PlayAmount"] is { } colPlay) { colPlay.Visible = false; }
+        if (_grid.Columns["ServiceAmount"] is { } colService) { colService.Visible = false; }
+        if (_grid.Columns["DiscountAmount"] is { } colDiscount) { colDiscount.Visible = false; }
+        if (_grid.Columns["Note"] is { } colNote) { colNote.Visible = false; }
     }
 
     private void Grid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
@@ -626,6 +632,50 @@ public partial class InvoicesView : AdminViewBase
             e.FormattingApplied = true;
             return;
         }
+
+        if (colName.Equals("InvoiceType", StringComparison.OrdinalIgnoreCase) && e.Value != null)
+        {
+            var type = e.Value.ToString()?.ToLowerInvariant();
+            if (type == "topup")
+            {
+                e.Value = "💰 Nạp ví";
+                e.CellStyle!.ForeColor = CyberTheme.Success;
+                e.CellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            }
+            else
+            {
+                e.Value = "🧾 Phiên chơi";
+                e.CellStyle!.ForeColor = CyberTheme.Primary;
+            }
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (colName.Equals("SessionId", StringComparison.OrdinalIgnoreCase) && e.Value is long sid)
+        {
+            if (sid <= 0)
+            {
+                e.Value = "—";
+                e.FormattingApplied = true;
+                return;
+            }
+        }
+
+        if (colName.Equals("PaymentMethod", StringComparison.OrdinalIgnoreCase) && e.Value != null)
+        {
+            var rawMethod = e.Value.ToString()?.ToLowerInvariant() ?? "";
+            e.Value = rawMethod switch
+            {
+                "cash" => "Tiền mặt",
+                "transfer" or "bank_transfer" => "Chuyển khoản",
+                "balance" => "Số dư ví",
+                "card" => "Thẻ",
+                _ => rawMethod
+            };
+            e.FormattingApplied = true;
+            return;
+        }
+
         if (colName.Equals("Status", StringComparison.OrdinalIgnoreCase) && e.Value != null)
         {
             var raw = e.Value.ToString()?.ToLowerInvariant() ?? "";
@@ -648,6 +698,7 @@ public partial class InvoicesView : AdminViewBase
                     e.Value = raw;
                     break;
             }
+            e.FormattingApplied = true;
         }
     }
 
@@ -663,7 +714,9 @@ public partial class InvoicesView : AdminViewBase
     private void UpdateReceiptPreview(InvoiceItem inv)
     {
         _selectedInvoice = inv;
-        _receiptInvoiceIdLabel.Text = $"#HĐ-{inv.InvoiceId:D5}";
+        var isTopup = inv.InvoiceType == "topup";
+        _receiptHeaderSub.Text = isTopup ? "— PHIẾU THU NẠP TIỀN VÍ —" : "— PHIẾU THANH TOÁN DỊCH VỤ —";
+        _receiptInvoiceIdLabel.Text = isTopup ? $"#TOP-{inv.InvoiceId:D5}" : $"#HĐ-{inv.InvoiceId:D5}";
         _receiptStatusBadge.Text = inv.Status.ToLowerInvariant() switch
         {
             "paid" => "✓ ĐÃ THANH TOÁN",
@@ -677,14 +730,38 @@ public partial class InvoicesView : AdminViewBase
             _ => CyberTheme.Danger
         };
 
-        _receiptCustomerLabel.Text = $"Khách hàng: {inv.CustomerName}";
-        _receiptSessionLabel.Text = $"Máy {inv.ComputerCode} · Phiên #{inv.SessionId}";
-        _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss} · {inv.PaymentMethod}";
+        var methodText = FormatMethod(inv.PaymentMethod);
+        _receiptCustomerLabel.Text = isTopup ? $"Hội viên: {inv.CustomerName}" : $"Khách hàng: {inv.CustomerName}";
+        _receiptSessionLabel.Text = isTopup ? $"Nghiệp vụ: Nạp tiền ví · {inv.ComputerCode}" : $"Máy {inv.ComputerCode} · Phiên #{inv.SessionId}";
+        _receiptTimeLabel.Text = $"Thời gian: {inv.IssuedAt:dd/MM/yyyy HH:mm:ss} · {methodText}";
 
-        _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
-        _receiptServiceLabel.Text = $"🍜 Tiền dịch vụ: {inv.ServiceAmount:N0} đ";
-        _receiptDiscountLabel.Text = $"🏷️ Giảm giá: -{inv.DiscountAmount:N0} đ";
+        if (isTopup)
+        {
+            _receiptPlayLabel.Text = $"💵 Số tiền nạp: {inv.TotalAmount:N0} đ";
+            _receiptServiceLabel.Text = $"📝 Ghi chú: {(string.IsNullOrWhiteSpace(inv.Note) ? "Nạp thẻ hội viên" : inv.Note)}";
+            _receiptDiscountLabel.Text = "✓ Đã cộng trực tiếp vào số dư ví";
+            _voidInvoiceButton.Enabled = false;
+        }
+        else
+        {
+            _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
+            _receiptServiceLabel.Text = $"🍜 Tiền dịch vụ: {inv.ServiceAmount:N0} đ";
+            _receiptDiscountLabel.Text = $"🏷️ Giảm giá: -{inv.DiscountAmount:N0} đ";
+            _voidInvoiceButton.Enabled = (RequiredContext.IsAdmin || RequiredContext.IsManager) && inv.Status == "paid";
+        }
         _receiptTotalLabel.Text = $"{inv.TotalAmount:N0} đ";
+    }
+
+    private static string FormatMethod(string raw)
+    {
+        return (raw ?? "").ToLowerInvariant() switch
+        {
+            "cash" => "Tiền mặt",
+            "transfer" or "bank_transfer" => "Chuyển khoản",
+            "balance" => "Số dư ví",
+            "card" => "Thẻ",
+            _ => raw ?? ""
+        };
     }
 
     private void ClearReceiptPreview()
@@ -706,30 +783,44 @@ public partial class InvoicesView : AdminViewBase
     {
         if (_selectedInvoice == null)
         {
-            MessageBox.Show("Vui lòng chọn một hóa đơn để sao chép.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Vui lòng chọn một chứng từ để sao chép.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
+        var isTopup = _selectedInvoice.InvoiceType == "topup";
         var sb = new StringBuilder();
         sb.AppendLine("========================================");
         sb.AppendLine("       NETCAFE CYBER GAMING");
-        sb.AppendLine("     PHIẾU THANH TOÁN DỊCH VỤ");
+        sb.AppendLine(isTopup ? "     PHIẾU THU NẠP TIỀN VÍ" : "     PHIẾU THANH TOÁN DỊCH VỤ");
         sb.AppendLine("========================================");
-        sb.AppendLine($"Mã HĐ:      #HĐ-{_selectedInvoice.InvoiceId:D5}");
-        sb.AppendLine($"Trạng thái: {_selectedInvoice.Status.ToUpperInvariant()}");
-        sb.AppendLine($"Khách hàng: {_selectedInvoice.CustomerName}");
-        sb.AppendLine($"Mã phiên:   #{_selectedInvoice.SessionId}");
-        sb.AppendLine($"Thời gian:  {_selectedInvoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
-        sb.AppendLine("----------------------------------------");
-        sb.AppendLine($"Tiền giờ:   {_selectedInvoice.PlayAmount:N0} đ");
-        sb.AppendLine($"Tiền dịch vụ:   {_selectedInvoice.ServiceAmount:N0} đ");
-        sb.AppendLine($"Giảm giá:  -{_selectedInvoice.DiscountAmount:N0} đ");
-        sb.AppendLine("----------------------------------------");
-        sb.AppendLine($"TỔNG CỘNG:  {_selectedInvoice.TotalAmount:N0} đ");
+        sb.AppendLine($"Mã chứng từ: {(isTopup ? $"#TOP-{_selectedInvoice.InvoiceId:D5}" : $"#HĐ-{_selectedInvoice.InvoiceId:D5}")}");
+        sb.AppendLine($"Trạng thái:  {_selectedInvoice.Status.ToUpperInvariant()}");
+        sb.AppendLine($"Khách hàng:  {_selectedInvoice.CustomerName}");
+        if (isTopup)
+        {
+            sb.AppendLine($"Nghiệp vụ:   Nạp tiền ví hội viên");
+            sb.AppendLine($"Thời gian:   {_selectedInvoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
+            sb.AppendLine($"Hình thức:   {FormatMethod(_selectedInvoice.PaymentMethod)}");
+            sb.AppendLine($"Ghi chú:     {_selectedInvoice.Note}");
+            sb.AppendLine("----------------------------------------");
+            sb.AppendLine($"SỐ TIỀN NẠP: {_selectedInvoice.TotalAmount:N0} đ");
+        }
+        else
+        {
+            sb.AppendLine($"Mã phiên:    #{_selectedInvoice.SessionId} (Máy {_selectedInvoice.ComputerCode})");
+            sb.AppendLine($"Thời gian:   {_selectedInvoice.IssuedAt:dd/MM/yyyy HH:mm:ss}");
+            sb.AppendLine($"Hình thức:   {FormatMethod(_selectedInvoice.PaymentMethod)}");
+            sb.AppendLine("----------------------------------------");
+            sb.AppendLine($"Tiền giờ:    {_selectedInvoice.PlayAmount:N0} đ");
+            sb.AppendLine($"Tiền dịch vụ:{_selectedInvoice.ServiceAmount:N0} đ");
+            sb.AppendLine($"Giảm giá:   -{_selectedInvoice.DiscountAmount:N0} đ");
+            sb.AppendLine("----------------------------------------");
+            sb.AppendLine($"TỔNG CỘNG:   {_selectedInvoice.TotalAmount:N0} đ");
+        }
         sb.AppendLine("========================================");
 
         Clipboard.SetText(sb.ToString());
-        MessageBox.Show($"Đã sao chép thông tin phiếu thu #{_selectedInvoice.InvoiceId} vào clipboard!", "Đã sao chép", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show($"Đã sao chép thông tin chứng từ #{_selectedInvoice.InvoiceId} vào clipboard!", "Đã sao chép", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task ExportPdfAsync()
@@ -794,6 +885,16 @@ public partial class InvoicesView : AdminViewBase
     {
         if (_selectedInvoice is null)
         {
+            return;
+        }
+        if (_selectedInvoice.InvoiceType == "topup")
+        {
+            MessageBox.Show(
+                FindForm(),
+                "Phiếu thu nạp tiền ví đã được cộng trực tiếp vào số dư hội viên; không thể hủy tại mục hóa đơn.",
+                "Không thể hủy",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
             return;
         }
         if (!_selectedInvoice.Status.Equals("paid", StringComparison.OrdinalIgnoreCase))

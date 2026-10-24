@@ -118,8 +118,41 @@ public sealed class ComputerActionDialog : Form
             _primaryActionButton.Enabled = false;
         }
 
-        _customerButton.Text = "👤 Quản lý hội viên";
-        CyberTheme.StyleButton(_customerButton, CyberTheme.Primary);
+        if (_context.IsTechnician)
+        {
+            _customerButton.Text = "🔒 Cấm truy cập ví";
+            CyberTheme.StyleButton(_customerButton, CyberTheme.MutedText);
+            _customerButton.Enabled = false;
+        }
+        else if (_computer.ComputerStatus == "in_use")
+        {
+            if (_computer.CurrentCustomerId.HasValue)
+            {
+                _customerButton.Text = "💳 Nạp tiền cho khách";
+                CyberTheme.StyleButton(_customerButton, CyberTheme.Success);
+                _customerButton.Enabled = _context.CanManageCustomers;
+                _customerButton.Click += async (_, _) => await TopUpForCurrentCustomerAsync();
+            }
+            else
+            {
+                _customerButton.Text = "👤 Khách vãng lai";
+                CyberTheme.StyleButton(_customerButton, CyberTheme.SurfaceRaised);
+                _customerButton.Enabled = false;
+            }
+        }
+        else if (_computer.ComputerStatus == "available")
+        {
+            _customerButton.Text = "👥 Hội viên & Nạp ví";
+            CyberTheme.StyleButton(_customerButton, CyberTheme.Primary);
+            _customerButton.Enabled = _context.CanManageCustomers;
+            _customerButton.Click += async (_, _) => await HandleMemberActionAsync();
+        }
+        else
+        {
+            _customerButton.Text = "👤 Hội viên";
+            CyberTheme.StyleButton(_customerButton, CyberTheme.MutedText);
+            _customerButton.Enabled = false;
+        }
 
         if (_computer.ComputerStatus is "maintenance" or "broken")
         {
@@ -155,14 +188,8 @@ public sealed class ComputerActionDialog : Form
 
         Controls.Add(root);
 
-        _customerButton.Click += (_, _) =>
-        {
-            Close();
-            _context.NavigateToView?.Invoke("Customers");
-        };
         _maintenanceButton.Click += async (_, _) => await ToggleMaintenanceAsync();
         _refreshButton.Click += async (_, _) => await RefreshAsync();
-        _customerButton.Enabled = !_context.IsTechnician && _context.CanManageCustomers;
         var canMaintain = (_context.IsAdmin || _context.IsManager || _context.IsTechnician) && _computer.ComputerStatus != "in_use";
         _maintenanceButton.Enabled = canMaintain;
     }
@@ -227,6 +254,108 @@ public sealed class ComputerActionDialog : Form
         catch (Exception exception)
         {
             _messageLabel.Text = DbRepository.ParseException(exception).Message;
+        }
+    }
+
+    private async Task TopUpForCurrentCustomerAsync()
+    {
+        if (!_computer.CurrentCustomerId.HasValue || !_context.CanManageCustomers || _context.IsTechnician)
+        {
+            _messageLabel.Text = "Không thể nạp tiền cho phiên chơi này.";
+            return;
+        }
+
+        try
+        {
+            var customer = new CustomerItem
+            {
+                CustomerId = _computer.CurrentCustomerId.Value,
+                FullName = _computer.CurrentCustomerName ?? "Hội viên",
+                Username = _computer.CurrentUsername ?? "member",
+                Balance = _computer.CurrentBalance ?? 0,
+                Phone = "",
+                IsActive = true
+            };
+
+            using var dialog = new TopUpDialog(customer);
+            if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Amount <= 0)
+            {
+                return;
+            }
+
+            var note = string.IsNullOrWhiteSpace(dialog.Note)
+                ? $"Nạp tiền tại máy {_computer.ComputerCode}"
+                : dialog.Note;
+
+            var newBalance = await _context.Repository.TopUpAsync(
+                customer.CustomerId,
+                _context.CurrentEmployeeId,
+                dialog.Amount,
+                dialog.PaymentMethod,
+                note);
+
+            _computer.CurrentBalance = newBalance;
+            _messageLabel.Text = $"Đã nạp {dialog.Amount:N0} đ thành công. Số dư mới: {newBalance:N0} đ (Đã lưu vào Sổ quỹ).";
+            await _context.RefreshComputersAsync();
+        }
+        catch (Exception ex)
+        {
+            _messageLabel.Text = DbRepository.ParseException(ex).Message;
+        }
+    }
+
+    private async Task HandleMemberActionAsync()
+    {
+        try
+        {
+            var customers = await _context.Repository.GetCustomersAsync();
+            var activeCustomers = customers.Where(c => c.IsActive).ToList();
+
+            using var picker = new MemberQuickActionDialog(activeCustomers, _computer.ComputerCode);
+            var result = picker.ShowDialog(this);
+            if (result == DialogResult.OK && picker.SelectedCustomer is not null)
+            {
+                if (picker.ActionChoice == MemberActionChoice.TopUp)
+                {
+                    using var topUpDialog = new TopUpDialog(picker.SelectedCustomer);
+                    if (topUpDialog.ShowDialog(this) == DialogResult.OK && topUpDialog.Amount > 0)
+                    {
+                        var note = string.IsNullOrWhiteSpace(topUpDialog.Note)
+                            ? $"Nạp tiền hội viên trước khi mở máy {_computer.ComputerCode}"
+                            : topUpDialog.Note;
+
+                        var newBalance = await _context.Repository.TopUpAsync(
+                            picker.SelectedCustomer.CustomerId,
+                            _context.CurrentEmployeeId,
+                            topUpDialog.Amount,
+                            topUpDialog.PaymentMethod,
+                            note);
+
+                        _messageLabel.Text = $"Đã nạp {topUpDialog.Amount:N0} đ cho {picker.SelectedCustomer.FullName}. Số dư mới: {newBalance:N0} đ.";
+                        await _context.RefreshComputersAsync();
+                    }
+                }
+                else if (picker.ActionChoice == MemberActionChoice.OpenSession)
+                {
+                    var sessionId = await _context.Repository.OpenSessionAsync(
+                        picker.SelectedCustomer.CustomerId,
+                        _computer.ComputerId,
+                        _context.CurrentEmployeeId);
+
+                    _messageLabel.Text = $"Đã mở máy thành công cho {picker.SelectedCustomer.FullName} (Mã phiên: {sessionId}).";
+                    await _context.RefreshComputersAsync();
+                    _primaryActionButton.Enabled = false;
+                }
+            }
+            else if (picker.ActionChoice == MemberActionChoice.NavigateToCustomers)
+            {
+                Close();
+                _context.NavigateToView?.Invoke("Customers");
+            }
+        }
+        catch (Exception ex)
+        {
+            _messageLabel.Text = DbRepository.ParseException(ex).Message;
         }
     }
 
