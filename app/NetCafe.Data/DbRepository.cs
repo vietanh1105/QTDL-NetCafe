@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -26,7 +27,13 @@ namespace NetCafe.Data
         {
             try
             {
-                var builder = new NpgsqlConnectionStringBuilder(connectionString);
+                var sanitized = Regex.Replace(
+                    connectionString,
+                    @"\b(min|max)\s+pool\s+size\s*=\s*\d+;?",
+                    "",
+                    RegexOptions.IgnoreCase);
+
+                var builder = new NpgsqlConnectionStringBuilder(sanitized);
                 if (builder.Timeout < 30) builder.Timeout = 30;
                 if (builder.CommandTimeout < 60) builder.CommandTimeout = 60;
                 if (builder.KeepAlive <= 0) builder.KeepAlive = 15;
@@ -36,7 +43,6 @@ namespace NetCafe.Data
                 builder.ConnectionIdleLifetime = 45;
                 builder.ConnectionPruningInterval = 10;
                 builder.Pooling = true;
-                if (builder.MinPoolSize < 1) builder.MinPoolSize = 1;
                 if (builder.MaxPoolSize <= 0 || builder.MaxPoolSize > 50) builder.MaxPoolSize = 25;
                 builder.IncludeErrorDetail = true;
                 return builder.ConnectionString;

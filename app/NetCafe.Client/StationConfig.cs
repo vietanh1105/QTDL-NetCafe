@@ -2,6 +2,7 @@
 // Credential chỉ đến từ environment, .env cục bộ hoặc station.json; không hard-code trong source.
 
 using System.Text.Json;
+using Npgsql;
 
 namespace NetCafe.Client;
 
@@ -99,10 +100,37 @@ public sealed class StationConfig
         }
     }
 
-    public string ConnectionString =>
-        $"Host={Host};Port={Port};Database={Database};Username={Username};Password={Password};" +
-        $"SSL Mode={SslMode};Include Error Detail=true;" +
-        "Timeout=30;Command Timeout=60;Keepalive=15;Tcp Keepalive=true;Tcp Keepalive Time=30;" +
-        "Tcp Keepalive Interval=5;Connection Idle Lifetime=45;Connection Pruning Interval=10;" +
-        "Pooling=true;Min Pool Size=1;Max Pool Size=25;";
+    public string ConnectionString
+    {
+        get
+        {
+            var builder = new NpgsqlConnectionStringBuilder
+            {
+                Host = Host,
+                Port = Port,
+                Database = Database,
+                Username = Username,
+                Password = Password,
+                Timeout = 30,
+                CommandTimeout = 60,
+                KeepAlive = 15,
+                TcpKeepAlive = true,
+                TcpKeepAliveTime = 30,
+                TcpKeepAliveInterval = 5,
+                ConnectionIdleLifetime = 45,
+                ConnectionPruningInterval = 10,
+                Pooling = true,
+                MaxPoolSize = 25,
+                IncludeErrorDetail = true
+            };
+
+            if (!string.IsNullOrEmpty(SslMode) &&
+                Enum.TryParse<SslMode>(SslMode, true, out var parsedSsl))
+            {
+                builder.SslMode = parsedSsl;
+            }
+
+            return builder.ConnectionString;
+        }
+    }
 }

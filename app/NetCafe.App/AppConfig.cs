@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Npgsql;
 
 namespace NetCafe.App
 {
@@ -67,8 +69,14 @@ namespace NetCafe.App
             Username = Environment.GetEnvironmentVariable("DB_USER") ?? Username;
             Password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? Password;
             SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? SslMode;
-            if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId)) StationServiceEmployeeId = envEmployeeId;
-            if (int.TryParse(Environment.GetEnvironmentVariable("DB_ADMIN_EMPLOYEE_ID"), out var envAdminEmployeeId)) AdminEmployeeId = envAdminEmployeeId;
+            if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId))
+            {
+                StationServiceEmployeeId = envEmployeeId;
+            }
+            if (int.TryParse(Environment.GetEnvironmentVariable("DB_ADMIN_EMPLOYEE_ID"), out var envAdminEmployeeId))
+            {
+                AdminEmployeeId = envAdminEmployeeId;
+            }
         }
 
         private static void LoadFromFile(string path)
@@ -94,8 +102,14 @@ namespace NetCafe.App
                     else if (key == "DB_USER") Username = val;
                     else if (key == "DB_PASSWORD") Password = val;
                     else if (key == "DB_SSL_MODE") SslMode = val;
-                    else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId)) StationServiceEmployeeId = employeeId;
-                    else if (key == "DB_ADMIN_EMPLOYEE_ID" && int.TryParse(val, out var adminEmployeeId)) AdminEmployeeId = adminEmployeeId;
+                    else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId))
+                    {
+                        StationServiceEmployeeId = employeeId;
+                    }
+                    else if (key == "DB_ADMIN_EMPLOYEE_ID" && int.TryParse(val, out var adminEmployeeId))
+                    {
+                        AdminEmployeeId = adminEmployeeId;
+                    }
                 }
             }
         }
@@ -111,11 +125,33 @@ namespace NetCafe.App
         {
             var u = user ?? Username;
             var p = pwd ?? Password;
-            var ssl = !string.IsNullOrEmpty(SslMode) ? $";SSL Mode={SslMode};Trust Server Certificate={TrustServerCertificate}" : "";
-            var resilience = ";Timeout=30;Command Timeout=60;Keepalive=15;Tcp Keepalive=true;Tcp Keepalive Time=30;"
-                + "Tcp Keepalive Interval=5;Connection Idle Lifetime=45;Connection Pruning Interval=10;"
-                + "Pooling=true;Min Pool Size=1;Max Pool Size=25";
-            return $"Host={Host};Port={Port};Database={Database};Username={u};Password={p};Include Error Detail=true{ssl}{resilience};";
+            var builder = new NpgsqlConnectionStringBuilder
+            {
+                Host = Host,
+                Port = Port,
+                Database = Database,
+                Username = u,
+                Password = p,
+                Timeout = 30,
+                CommandTimeout = 60,
+                KeepAlive = 15,
+                TcpKeepAlive = true,
+                TcpKeepAliveTime = 30,
+                TcpKeepAliveInterval = 5,
+                ConnectionIdleLifetime = 45,
+                ConnectionPruningInterval = 10,
+                Pooling = true,
+                MaxPoolSize = 25,
+                IncludeErrorDetail = true
+            };
+
+            if (!string.IsNullOrEmpty(SslMode) &&
+                Enum.TryParse<SslMode>(SslMode, true, out var parsedSsl))
+            {
+                builder.SslMode = parsedSsl;
+            }
+
+            return builder.ConnectionString;
         }
 
         public static string GetConfiguredRolePassword(string role)
