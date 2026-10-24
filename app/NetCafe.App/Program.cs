@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -35,7 +36,14 @@ static class Program
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     [DllImport("user32.dll")]
-    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int X,
+        int Y,
+        int cx,
+        int cy,
+        uint uFlags);
 
     private const uint GENERIC_READ = 0x80000000;
     private const uint GENERIC_WRITE = 0x40000000;
@@ -44,11 +52,8 @@ static class Program
     private const int STD_OUTPUT_HANDLE = -11;
     private const int SW_SHOW = 5;
 
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
-    static void Main()
+    static void Main(string[]? args)
     {
         var viCulture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo("vi-VN").Clone();
         viCulture.NumberFormat.NumberGroupSeparator = ".";
@@ -61,6 +66,13 @@ static class Program
         System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = viCulture;
         System.Threading.Thread.CurrentThread.CurrentCulture = viCulture;
         System.Threading.Thread.CurrentThread.CurrentUICulture = viCulture;
+
+        if (args != null && args.Length > 0 && args[0] == "--verify-layout")
+        {
+            RunLayoutVerification();
+            return;
+        }
+
         // 1. Tách khỏi terminal hiện tại và ép Windows tạo một CỬA SỔ CMD ĐỘC LẬP MỚI
         FreeConsole();
         AllocConsole();
@@ -106,5 +118,91 @@ static class Program
         // 3. Khởi chạy giao diện chính Windows Forms
         ApplicationConfiguration.Initialize();
         Application.Run(new MainForm());
-    }    
+    }
+
+    private static void RunLayoutVerification()
+    {
+        ApplicationConfiguration.Initialize();
+        using var form = new Form
+        {
+            Size = new System.Drawing.Size(1200, 800),
+            StartPosition = FormStartPosition.CenterScreen,
+            Text = "Verification"
+        };
+        var view = new Views.ComputersView();
+        view.Dock = DockStyle.Fill;
+        form.Controls.Add(view);
+
+        var cardsField = typeof(Views.ComputersView).GetField("_cards", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var cardsGridField = typeof(Views.ComputersView).GetField("_cardsGrid", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var updateKpiMethod = typeof(Views.ComputersView).GetMethod("UpdateKpiSummary", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var rebuildGridMethod = typeof(Views.ComputersView).GetMethod("RebuildGridPositions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        var cards = (Dictionary<int, Controls.ComputerCardControl>)cardsField.GetValue(view)!;
+        var cardsGrid = (FlowLayoutPanel)cardsGridField.GetValue(view)!;
+
+        var items = new List<Data.ComputerGridItem>();
+        for (int i = 1; i <= 20; i++)
+        {
+            var item = new Data.ComputerGridItem
+            {
+                ComputerId = i,
+                ComputerCode = $"PC{i:D3}",
+                ComputerName = $"Máy {i:D2}",
+                RoomName = i <= 8 ? "Khu Hút Thuốc" : "Khu Máy Lạnh",
+                TypeName = i <= 8 ? "Tiêu Chuẩn" : "Nâng Cao",
+                HourlyRate = i <= 8 ? 8000 : 12000,
+                ComputerStatus = (i % 4 == 1) ? "in_use" : (i % 6 == 0 ? "maintenance" : "available"),
+                CurrentCustomerName = (i % 4 == 1) ? "Khách VIP" : null,
+                PlayedMinutes = (i % 4 == 1) ? 45 : null
+            };
+            items.Add(item);
+            var card = new Controls.ComputerCardControl();
+            card.Bind(item);
+            cards.Add(i, card);
+            cardsGrid.Controls.Add(card);
+        }
+
+        updateKpiMethod.Invoke(view, new object[] { items });
+        form.Show();
+        Application.DoEvents();
+        rebuildGridMethod.Invoke(view, null);
+        Application.DoEvents();
+
+        var card1 = cards[1];
+        var card2 = cards[2];
+        var card3 = cards[3];
+        var card4 = cards[4];
+        var headerPanel = (Panel)typeof(Views.ComputersView).GetField("_headerTitlePanel", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(view)!;
+        var actionsPanel = (FlowLayoutPanel)typeof(Views.AdminDataViewBase).GetField("ActionsPanel", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(view)!;
+        var infoLabel = (Label)typeof(Views.AdminDataViewBase).GetField("InfoLabel", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(view)!;
+
+        Console.WriteLine($"[CARDS] Card1 Bounds={card1.Bounds} Margin={card1.Margin}");
+        Console.WriteLine($"[CARDS] Card2 Bounds={card2.Bounds} Margin={card2.Margin}");
+        Console.WriteLine($"[CARDS] Card3 Bounds={card3.Bounds} Margin={card3.Margin}");
+        Console.WriteLine($"[CARDS] Card4 Bounds={card4.Bounds} Margin={card4.Margin}");
+        var card5 = cards[5];
+        var card8 = cards[8];
+        Console.WriteLine($"[CARDS] Card5 Bounds={card5.Bounds} Margin={card5.Margin}");
+        Console.WriteLine($"[CARDS] Card8 Bounds={card8.Bounds} Margin={card8.Margin}");
+        Console.WriteLine($"[ALIGNMENT_LEFT] Header Left: {headerPanel.Left}, Card 1 Left in Grid: {card1.Left}, Grid Padding Left: {cardsGrid.Padding.Left}");
+        Console.WriteLine($"[ALIGNMENT_RIGHT] Card 4 Right in Grid: {card4.Right}, Grid Usable Width: {cardsGrid.ClientSize.Width - cardsGrid.Padding.Horizontal}");
+        Console.WriteLine($"[ACTIONS_PANEL] Dock: {actionsPanel.Dock}, Bounds: {actionsPanel.Bounds}");
+        Console.WriteLine($"[BOTTOM_UI] InfoLabel Visible: {infoLabel.Visible}, Height: {infoLabel.Height}, Grid Padding Bottom: {cardsGrid.Padding.Bottom}");
+        foreach (Control c in actionsPanel.Controls)
+        {
+            Console.WriteLine($"[BADGE/CONTROL] '{c.Text}' ForeColor={c.ForeColor} BackColor={c.BackColor} Bounds={c.Bounds}");
+        }
+
+        using var bmp = new System.Drawing.Bitmap(form.Width, form.Height);
+        form.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
+        var outDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            @".gemini\antigravity\brain\ae94d5fa-5717-4e9a-9076-a7e423e82306\scratch");
+        Directory.CreateDirectory(outDir);
+        var outPath = Path.Combine(outDir, "computers_view_rendered.png");
+        bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+
+        Console.WriteLine($"[VERIFY_SUCCESS] Rendered screenshot to {outPath}");
+        form.Close();
+    }
 }

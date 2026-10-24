@@ -59,7 +59,7 @@ public sealed class ComputerActionDialog : Form
 
         var statusText = _computer.ComputerStatus switch
         {
-            "available" => "⚪ Sẵn sàng (Máy trống)",
+            "available" => "🟡 Sẵn sàng (Máy trống)",
             "in_use" => "🟢 Đang sử dụng (Đang chơi)",
             "maintenance" => "🔴 Đang bảo trì",
             "broken" => "🔴 Bị hỏng",

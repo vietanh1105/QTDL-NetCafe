@@ -3,6 +3,7 @@
 
 using System.Drawing;
 using System.Windows.Forms;
+using NetCafe.Data;
 
 namespace NetCafe.App.Views;
 
@@ -52,16 +53,27 @@ public partial class SettingsView : AdminCardViewBase
         }
     }
 
-    public override Task RefreshAsync(CancellationToken cancellationToken = default)
+    public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var context = RequiredContext;
         if (context.IsCashier || context.IsTechnician)
         {
             UpdateRolePermissions(context);
-            return Task.CompletedTask;
+            return;
         }
 
         UpdateRolePermissions(context);
+
+        DbaStatisticsInfo dbaStats;
+        try
+        {
+            dbaStats = await context.Repository.GetDbaStatisticsAsync(cancellationToken);
+        }
+        catch
+        {
+            dbaStats = new DbaStatisticsInfo();
+        }
+
         var cards = new[]
         {
             new AdminCardModel(
@@ -69,6 +81,24 @@ public partial class SettingsView : AdminCardViewBase
                 "Kết nối đang sử dụng",
                 $"{context.ConnectionSummary}\nKhông hiển thị password.",
                 "Đang kết nối",
+                CyberTheme.Primary),
+            new AdminCardModel(
+                "Hiệu năng Cache RAM",
+                $"Tỉ lệ trúng: {dbaStats.CacheHitRatio:N1}%",
+                "Tỉ lệ truy vấn đọc trực tiếp từ bộ nhớ đệm Shared Buffers trong RAM PostgreSQL. Đạt chuẩn tối ưu QTDL (> 99%).",
+                dbaStats.CacheHitRatio >= 95 ? "Tối ưu xuất sắc" : "Cần tăng RAM",
+                CyberTheme.Success),
+            new AdminCardModel(
+                "Lưu trữ & Rác dữ liệu",
+                $"Size: {dbaStats.DatabaseSize} · Rác: {dbaStats.TotalDeadTuples:N0} dòng",
+                $"Tổng số dead tuples hiện tại: {dbaStats.TotalDeadTuples:N0} dòng.\nBấm nút VACUUM ANALYZE bên trên để thu hồi dung lượng đĩa và cập nhật Query Planner.",
+                dbaStats.TotalDeadTuples > 0 ? "Cần VACUUM" : "Đã tối ưu",
+                dbaStats.TotalDeadTuples > 0 ? CyberTheme.Warning : CyberTheme.Success),
+            new AdminCardModel(
+                "Kết nối PostgreSQL",
+                $"Tổng: {dbaStats.TotalConnections} kết nối",
+                $"Đang chạy truy vấn: {dbaStats.ActiveConnections} · Đang chờ (Idle): {dbaStats.IdleConnections}\nConnection Pooling Npgsql điều phối giữ kết nối tái sử dụng.",
+                "Pool hoạt động tốt",
                 CyberTheme.Primary),
             new AdminCardModel(
                 "Tài khoản và quyền",
@@ -95,8 +125,7 @@ public partial class SettingsView : AdminCardViewBase
                 context.IsAdmin ? "Quyền DBA" : "Chỉ xem",
                 context.IsAdmin ? CyberTheme.Warning : CyberTheme.SurfaceRaised)
         };
-        SetCards(cards, card => card, $"{cards.Length} nhóm thông tin hệ thống");
-        return Task.CompletedTask;
+        SetCards(cards, card => card, $"{cards.Length} nhóm thông tin và chỉ số DBA hệ thống");
     }
 
     private async Task RunVacuumAsync()
@@ -117,10 +146,11 @@ public partial class SettingsView : AdminCardViewBase
             await RequiredContext.Repository.RunVacuumAnalyzeAsync();
             MessageBox.Show(
                 FindForm(),
-                "Đã chạy VACUUM ANALYZE cho các bảng vận hành thành công.",
-                "Dọn dẹp thành công",
+                "Đã chạy VACUUM ANALYZE cho các bảng vận hành thành công.\nCác dead tuples đã được dọn sạch và chỉ số thống kê bộ lập lịch truy vấn đã được cập nhật.",
+                "Dọn dẹp DBA thành công",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
+            await RefreshAsync();
         }
         catch (Exception exception)
         {

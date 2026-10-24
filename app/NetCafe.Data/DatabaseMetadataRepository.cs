@@ -59,4 +59,49 @@ public partial class DbRepository
         command.Parameters.AddWithValue("signature", qualifiedSignature);
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }
+
+    public async Task<DbaStatisticsInfo> GetDbaStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        return await ExecuteWithRetryAsync(async () =>
+        {
+            const string sql = @"
+            SELECT
+                pg_size_pretty(pg_database_size(current_database())),
+                COALESCE((SELECT round(100.0 * sum(blks_hit) / nullif(sum(blks_hit + blks_read), 0), 2)
+                          FROM pg_stat_database WHERE datname = current_database()), 100.0),
+                COALESCE((SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state = 'active'), 0),
+                COALESCE((SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state = 'idle'), 0),
+                COALESCE((SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()), 0),
+                COALESCE((SELECT sum(n_dead_tup) FROM pg_stat_user_tables), 0);";
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return new DbaStatisticsInfo();
+            }
+
+            return new DbaStatisticsInfo
+            {
+                DatabaseSize = reader.GetString(0),
+                CacheHitRatio = reader.IsDBNull(1) ? 100.0m : reader.GetDecimal(1),
+                ActiveConnections = Convert.ToInt32(reader.GetInt64(2)),
+                IdleConnections = Convert.ToInt32(reader.GetInt64(3)),
+                TotalConnections = Convert.ToInt32(reader.GetInt64(4)),
+                TotalDeadTuples = Convert.ToInt64(reader.GetInt64(5))
+            };
+        });
+    }
+}
+
+public sealed record DbaStatisticsInfo
+{
+    public string DatabaseSize { get; init; } = "N/A";
+    public decimal CacheHitRatio { get; init; } = 100.0m;
+    public int ActiveConnections { get; init; }
+    public int IdleConnections { get; init; }
+    public int TotalConnections { get; init; }
+    public long TotalDeadTuples { get; init; }
 }

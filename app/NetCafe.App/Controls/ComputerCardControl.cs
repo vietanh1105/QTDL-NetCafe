@@ -31,23 +31,27 @@ public partial class ComputerCardControl : UserControl
         _typeLabel.Text = $"{model.TypeName} · {model.HourlyRate:N0} đ/giờ";
         var statusColor = model.ComputerStatus switch
         {
-            "available" => CyberTheme.Success,
-            "in_use" => CyberTheme.Danger,
-            "maintenance" => CyberTheme.Warning,
-            "broken" => CyberTheme.MutedText,
+            "in_use" => CyberTheme.Success,
+            "available" => Color.FromArgb(234, 179, 8),
+            "maintenance" => CyberTheme.Danger,
+            "broken" => CyberTheme.Danger,
             _ => CyberTheme.MutedText
         };
         _statusLabel.Text = model.ComputerStatus switch
         {
-            "available" => "● Sẵn sàng",
-            "in_use" => "● Đang sử dụng",
+            "in_use" => "● Đang chơi",
+            "available" => "● Máy trống",
             "maintenance" => "● Bảo trì",
             "broken" => "● Hỏng",
             _ => $"● {model.ComputerStatus}"
         };
         _statusLabel.ForeColor = statusColor;
-        _customerLabel.Text = string.IsNullOrWhiteSpace(model.CurrentCustomerName) ? "Chưa có khách" : model.CurrentCustomerName;
-        _costLabel.Text = model.PlayedMinutes is null ? "Chưa có phiên" : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0} đ / {model.PlayedMinutes:N0} phút";
+        _customerLabel.Text = string.IsNullOrWhiteSpace(model.CurrentCustomerName)
+            ? "Chưa có khách"
+            : model.CurrentCustomerName;
+        _costLabel.Text = model.PlayedMinutes is null
+            ? "Chưa có phiên"
+            : $"~{model.HourlyRate * model.PlayedMinutes.Value / 60:N0} đ / {model.PlayedMinutes:N0} phút";
         _baseColor = CyberTheme.Surface;
         SetSelected(_selected);
     }

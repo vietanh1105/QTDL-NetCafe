@@ -25,7 +25,7 @@ public partial class ComputersView
             AutoScroll = true,
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
-            Padding = new Padding(16, 16, 24, 24),
+            Padding = new Padding(16, 12, 16, 36),
             BackColor = CyberTheme.Background
         };
         _cardsGrid.Resize += (_, _) => RebuildGridPositions();
@@ -34,8 +34,9 @@ public partial class ComputersView
         // Dock sau thanh công cụ để hàng đầu không bị che viền.
         _cardsViewport.BringToFront();
         Grid.Visible = false;
+        InfoLabel.Visible = false;
+        InfoLabel.Height = 0;
         Name = "ComputersView";
         TabIndex = 0;
     }
-
 }
