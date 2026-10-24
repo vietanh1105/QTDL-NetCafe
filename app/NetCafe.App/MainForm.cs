@@ -1,4 +1,4 @@
-﻿// Trách nhiệm: shell điều phối navigation, role thật, listener và refresh Admin.
+// Trách nhiệm: shell điều phối navigation, role thật, listener và refresh Admin.
 // Liên kết: MainForm.Designer.cs, Views/*.cs, AppConfig.cs và DbRepository.
 
 using System.Drawing;
@@ -15,7 +15,10 @@ public partial class MainForm : Form
     private readonly Dictionary<string, string> _viewLabels = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Button> _navigationButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pendingNotificationChannels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _employeeIdCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DbRepository> _roleRepositoryCache = new(StringComparer.OrdinalIgnoreCase);
     private DbRepository _repository = null!;
+    private DbRepository? _listenerRepository;
     private CancellationTokenSource _listenerCancellation = new();
     private AdminViewContext _viewContext = null!;
     private string _currentUser = string.Empty;
@@ -37,6 +40,11 @@ public partial class MainForm : Form
         _currentUser = AppConfig.Username;
         _currentEmployeeId = AppConfig.AdminEmployeeId;
         _repository = new DbRepository(AppConfig.GetConnectionString());
+        _roleRepositoryCache[_currentUser] = _repository;
+        _employeeIdCache["nv_admin"] = AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1;
+        _employeeIdCache["nv_thao"] = 2;
+        _employeeIdCache["nv_hung"] = 3;
+        _employeeIdCache["nv_manager"] = 4;
         InitializeComponent();
         InitializeShell();
         Shown += async (_, _) => await StartAsync();
@@ -246,11 +254,17 @@ public partial class MainForm : Form
             _runtimeContractStatus = runtime.ContractStatus;
             _databaseContractReady = runtime.IsStationContractReady;
             _reconcileAvailable = runtime.HasReconcileFunction && _databaseContractReady;
-            if (_currentEmployeeId <= 0)
+            var employees = await _repository.GetEmployeesAsync();
+            foreach (var employee in employees)
             {
-                var employees = await _repository.GetEmployeesAsync();
-                var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, _currentUser, StringComparison.OrdinalIgnoreCase));
-                _currentEmployeeId = employee?.EmployeeId ?? 0;
+                if (!string.IsNullOrWhiteSpace(employee.DbUsername))
+                {
+                    _employeeIdCache[employee.DbUsername] = employee.EmployeeId;
+                }
+            }
+            if (_currentEmployeeId <= 0 && _employeeIdCache.TryGetValue(_currentUser, out var empId))
+            {
+                _currentEmployeeId = empId;
             }
             ApplyContext();
             UpdateHeaderStatus();
@@ -273,7 +287,7 @@ public partial class MainForm : Form
         }
     }
 
-    private async Task RefreshVisibleAsync()
+    private async Task RefreshVisibleAsync(bool force = false)
     {
         if (!_databaseContractReady)
         {
@@ -283,10 +297,21 @@ public partial class MainForm : Form
                 return;
             }
         }
-        if (_activeView is null || !await _refreshGate.WaitAsync(0))
+
+        if (_activeView is null)
         {
             return;
         }
+
+        if (force)
+        {
+            await _refreshGate.WaitAsync(_lifetimeCancellation.Token);
+        }
+        else if (!await _refreshGate.WaitAsync(0))
+        {
+            return;
+        }
+
         try
         {
             await _activeView.RefreshAsync(_lifetimeCancellation.Token);
@@ -349,6 +374,15 @@ public partial class MainForm : Form
         {
             return;
         }
+
+        var canReconcile = _currentUser.Contains("admin", StringComparison.OrdinalIgnoreCase) ||
+                           _currentUser.Contains("manager", StringComparison.OrdinalIgnoreCase);
+        if (!canReconcile)
+        {
+            await RefreshVisibleAsync();
+            return;
+        }
+
         try
         {
             await _repository.ReconcileStaleSessionsAsync(90, _lifetimeCancellation.Token);
@@ -375,6 +409,11 @@ public partial class MainForm : Form
 
     private async Task SwitchRoleAsync(string user)
     {
+        if (string.Equals(_currentUser, user, StringComparison.OrdinalIgnoreCase) && _repository is not null)
+        {
+            return;
+        }
+
         _loadingRole = true;
         try
         {
@@ -384,19 +423,49 @@ public partial class MainForm : Form
                 ShowError(new InvalidOperationException($"Vai trò {user} chưa được cấu hình thông tin đăng nhập."));
                 return;
             }
-            var nextRepository = new DbRepository(AppConfig.GetConnectionString(user, password));
-            var employees = await nextRepository.GetEmployeesAsync();
-            var employee = employees.FirstOrDefault(item => string.Equals(item.DbUsername, user, StringComparison.OrdinalIgnoreCase));
-            _listenerCancellation.Cancel();
-            _listenerCancellation.Dispose();
-            _listenerCancellation = new CancellationTokenSource();
+
+            if (!_roleRepositoryCache.TryGetValue(user, out var nextRepository))
+            {
+                nextRepository = new DbRepository(AppConfig.GetConnectionString(user, password));
+                _roleRepositoryCache[user] = nextRepository;
+            }
+
+            if (!_employeeIdCache.TryGetValue(user, out var empId))
+            {
+                empId = user switch
+                {
+                    "nv_admin" => AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1,
+                    "nv_thao" => 2,
+                    "nv_hung" => 3,
+                    "nv_manager" => 4,
+                    _ => 0
+                };
+            }
+
             _repository = nextRepository;
             _currentUser = user;
-            _currentEmployeeId = employee?.EmployeeId ?? 0;
+            _currentEmployeeId = empId;
+            if (_runtimeInfo is not null)
+            {
+                _runtimeInfo = new DatabaseRuntimeInfo
+                {
+                    Database = _runtimeInfo.Database,
+                    User = user,
+                    Host = _runtimeInfo.Host,
+                    ServerVersion = _runtimeInfo.ServerVersion,
+                    HasStationMigration = _runtimeInfo.HasStationMigration,
+                    HasReconcileFunction = _runtimeInfo.HasReconcileFunction,
+                    HasComputerGridContract = _runtimeInfo.HasComputerGridContract,
+                    HasCustomerMenuContract = _runtimeInfo.HasCustomerMenuContract,
+                    HasStationLogoutContract = _runtimeInfo.HasStationLogoutContract
+                };
+            }
+            _runtimeSummary = $"Máy chủ={AppConfig.Host}:{AppConfig.Port} | CSDL={AppConfig.Database} | Role={user}";
+            ClearError();
             ApplyContext();
-            await RefreshDatabaseStatusAsync();
-            await RestartListenerAsync();
-            await RefreshVisibleAsync();
+            UpdateHeaderStatus($"Đã chuyển vai trò: {user}");
+
+            await RefreshVisibleAsync(force: true);
         }
         catch (Exception exception)
         {
@@ -410,11 +479,14 @@ public partial class MainForm : Form
 
     private async Task RestartListenerAsync()
     {
+        if (_listenerRepository is null)
+        {
+            _listenerRepository = new DbRepository(AppConfig.GetConnectionString());
+            _listenerRepository.OnNotificationReceived += HandleNotification;
+            _ = Task.Run(() => _listenerRepository.StartListeningAsync(_listenerCancellation.Token));
+        }
         _listenerStatus = "Đang hoạt động";
         UpdateHeaderStatus();
-        _repository.OnNotificationReceived -= HandleNotification;
-        _repository.OnNotificationReceived += HandleNotification;
-        _ = Task.Run(() => _repository.StartListeningAsync(_listenerCancellation.Token));
         ApplyContext();
         await Task.CompletedTask;
     }

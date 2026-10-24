@@ -39,6 +39,17 @@ public partial class EmployeesView : AdminCardViewBase
         CardDoubleClicked += async (_, _) => await EditEmployeeAsync();
     }
 
+    public override void SetContext(AdminViewContext context)
+    {
+        base.SetContext(context);
+        if (_showSalary && !context.CurrentUser.Contains("admin", StringComparison.OrdinalIgnoreCase))
+        {
+            _showSalary = false;
+            _salaryButton.Text = "👁️ Xem bảng lương & Thông tin nhạy cảm";
+            CyberTheme.StyleButton(_salaryButton, CyberTheme.Warning);
+        }
+    }
+
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetEmployeesAsync();

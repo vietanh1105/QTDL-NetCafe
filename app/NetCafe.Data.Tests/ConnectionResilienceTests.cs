@@ -48,3 +48,4 @@ public sealed class ConnectionResilienceTests
         Assert.NotNull(conn);
     }
 }
+
