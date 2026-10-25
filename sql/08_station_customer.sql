@@ -151,10 +151,10 @@ BEGIN
     SELECT * INTO v_session
     FROM core.gaming_session
     WHERE session_id = p_session_id
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Phiên chơi ID % không tồn tại!', p_session_id;
+        RAISE EXCEPTION 'Phiên chơi ID % không tồn tại hoặc đang được xử lý!', p_session_id;
     END IF;
     IF v_session.status <> 'active' THEN
         RAISE EXCEPTION 'Phiên chơi ID % đã đóng (trạng thái: %)!', p_session_id, v_session.status;
@@ -188,11 +188,25 @@ BEGIN
           AND is_active = TRUE
           AND v_end_time BETWEEN valid_from AND valid_to;
         IF FOUND THEN
-            v_applied_promo_id := v_promo.promotion_id;
-            IF v_promo.promo_type IN ('percent', 'happy_hour') THEN
-                v_discount_amount := ROUND((v_play_amount * v_promo.value) / 100.0);
-            ELSIF v_promo.promo_type = 'fixed' THEN
-                v_discount_amount := LEAST(v_promo.value, v_play_amount);
+            IF (
+                v_promo.conditions->>'required_tier' IS NULL
+                OR lower(v_promo.conditions->>'required_tier') = lower(v_customer.membership_tier)
+            )
+            AND (
+                v_promo.conditions->>'min_bill' IS NULL
+                OR (v_play_amount + v_service_amount) >= (v_promo.conditions->>'min_bill')::NUMERIC
+            )
+            AND (
+                v_promo.promo_type <> 'happy_hour'
+                OR (v_end_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::TIME >= TIME '22:00'
+                OR (v_end_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::TIME < TIME '06:00'
+            ) THEN
+                v_applied_promo_id := v_promo.promotion_id;
+                IF v_promo.promo_type IN ('percent', 'happy_hour') THEN
+                    v_discount_amount := ROUND((v_play_amount * v_promo.value) / 100.0);
+                ELSIF v_promo.promo_type = 'fixed' THEN
+                    v_discount_amount := LEAST(v_promo.value, v_play_amount);
+                END IF;
             END IF;
         END IF;
     END IF;
@@ -330,9 +344,9 @@ BEGIN
     SELECT * INTO v_computer
     FROM core.computer c
     WHERE c.computer_code = p_computer_code
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Máy % không tồn tại!', p_computer_code;
+        RAISE EXCEPTION 'Máy % không tồn tại hoặc đang được sử dụng!', p_computer_code;
     END IF;
     SELECT ct.hourly_rate INTO v_rate
     FROM core.computer_type AS ct

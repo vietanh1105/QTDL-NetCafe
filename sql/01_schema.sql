@@ -18,6 +18,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;      -- Mã hóa mật khẩu, UUID, hàm băm
 CREATE EXTENSION IF NOT EXISTS pg_trgm;       -- Tìm kiếm mờ trigram, đo độ tương đồng similarity
 CREATE EXTENSION IF NOT EXISTS unaccent;      -- Bỏ dấu tiếng Việt phục vụ tìm kiếm
+CREATE EXTENSION IF NOT EXISTS btree_gist;    -- EXCLUDE chống chồng phiên trên cùng máy
 
 -- ----------------------------------------------------------------------------
 -- 2. KHỞI TẠO 8 SCHEMAS NGHIỆP VỤ
@@ -165,6 +166,18 @@ CREATE TABLE core.gaming_session (
     )
 );
 COMMENT ON TABLE core.gaming_session IS 'Phiên chơi máy: hourly_rate_applied bảo lưu giá tại thời điểm mở phiên';
+
+ALTER TABLE core.gaming_session
+    ADD CONSTRAINT ex_gaming_session_computer_time
+    EXCLUDE USING gist (
+        computer_id WITH =,
+        tstzrange(
+            start_time,
+            COALESCE(end_time, 'infinity'::timestamptz),
+            '[)'
+        ) WITH &&
+    )
+    WHERE (status IN ('active', 'finished'));
 
 -- ----------------------------------------------------------------------------
 -- 5. SCHEMA INVENTORY (Quản lý F&B, Tồn kho & Đơn gọi món)

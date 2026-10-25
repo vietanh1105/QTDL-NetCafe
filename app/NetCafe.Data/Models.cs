@@ -33,6 +33,7 @@ namespace NetCafe.Data
         public bool HasComputerGridContract { get; init; }
         public bool HasCustomerMenuContract { get; init; }
         public bool HasStationLogoutContract { get; init; }
+        public bool CanRunVacuum { get; init; }
         public bool IsStationContractReady => HasStationMigration
             && HasReconcileFunction
             && HasComputerGridContract

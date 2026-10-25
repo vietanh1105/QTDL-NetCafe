@@ -69,7 +69,7 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
 │   ├── 06_seed_base.sql
 │   ├── 07_ai_modules.sql
 │   ├── 08_station_customer.sql # heartbeat, role station, support, wallet
-│   └── netcafe_full.sql  # Toàn bộ mã nguồn hợp nhất 00–08
+│   └── netcafe_full.sql  # Toàn bộ mã nguồn hợp nhất 00–08, 10 và 11
 ├── scripts/
 │   ├── reset-qa.ps1      # Chỉ reset database netcafe_qa
 │   ├── run-qa.ps1        # reset + station contract + build + test
@@ -98,7 +98,7 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
    $env:DB_PASSWORD = "<cấp ngoài source>"
    powershell -ExecutionPolicy Bypass -File .\scripts\reset-qa.ps1
    ```
-   Script áp dụng schema/migration/seed 01–08 và ghi marker QA.
+   Script áp dụng schema/migration/seed 01–08, 10 và 11 rồi ghi marker QA.
 
 ### 2. Chạy Admin và Station (C# .NET 10)
 

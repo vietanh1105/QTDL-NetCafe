@@ -60,7 +60,7 @@ flowchart TD
 
             subgraph RepSchema ["Schema: reporting (Báo cáo & Phân tích)"]
                 V_REP["Views: Doanh thu, Hiệu suất, Top khách"]
-                MV_REP["Materialized Views: mv_hourly_usage, mv_monthly_revenue"]
+                MV_REP["Materialized Views: mv_revenue_daily, mv_hourly_usage, mv_monthly_revenue, mv_top_customers"]
             end
 
             subgraph StgSchema ["Schema: staging (ETL & Dữ liệu bẩn)"]
@@ -86,7 +86,7 @@ flowchart TD
 
 ## 2. DANH SÁCH BẢNG VÀ PHÂN LOẠI CHI TIẾT (22 BẢNG)
 
-Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sát/AI hỗ trợ** (chưa tính các bảng tạm `staging.*` phục vụ ETL).
+Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sát/AI hỗ trợ**. Ngoài ra còn có bảng cấu hình station, hai bảng `staging.*` phục vụ ETL và các partition của `audit.audit_log`; các view/materialized view báo cáo được quản lý riêng trong schema `reporting`.
 
 ### 2.1. Schema `core` (6 bảng)
 1. **`core.room` (Phòng/Khu vực):**

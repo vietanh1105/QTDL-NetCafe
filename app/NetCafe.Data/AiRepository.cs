@@ -11,10 +11,11 @@ public partial class DbRepository
     {
         var sql = module switch
         {
-            "index" => "SELECT ai.fn_recommend_indexes();",
+            "index" => "SELECT ai.fn_auto_optimize_indexes();",
             "duplicate" => "SELECT ai.fn_detect_duplicates(0.65);",
             "anomaly" => "SELECT ai.fn_detect_anomalies(2.0);",
             "promotion" => "SELECT ai.fn_suggest_promotions();",
+            "security" => "SELECT count(*) FROM ai.fn_security_guard();",
             _ => throw new ArgumentException($"Module AI không hợp lệ: {module}", nameof(module))
         };
 
@@ -88,7 +89,7 @@ public partial class DbRepository
 
     public async Task RunAiModulesAsync(CancellationToken ct = default)
     {
-        const string sql = "SELECT count(*) FROM ai.fn_recommend_indexes(); SELECT count(*) FROM ai.fn_detect_duplicates(0.65); SELECT count(*) FROM ai.fn_detect_anomalies(2.0); SELECT count(*) FROM ai.fn_suggest_promotions();";
+        const string sql = "SELECT count(*) FROM ai.fn_security_guard(); SELECT count(*) FROM ai.fn_auto_optimize_indexes(); SELECT count(*) FROM ai.fn_detect_duplicates(0.65); SELECT count(*) FROM ai.fn_detect_anomalies(2.0); SELECT count(*) FROM ai.fn_suggest_promotions();";
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(ct);
         await using var command = new NpgsqlCommand(sql, connection);

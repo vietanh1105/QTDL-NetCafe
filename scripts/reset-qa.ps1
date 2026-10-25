@@ -46,7 +46,8 @@ $files = @(
     "sql/06_seed_base.sql",
     "sql/07_ai_modules.sql",
     "sql/08_station_customer.sql",
-    "sql/10_admin_operations.sql"
+    "sql/10_admin_operations.sql",
+    "sql/11_report_alignment.sql"
 )
 
 foreach ($relativePath in $files) {

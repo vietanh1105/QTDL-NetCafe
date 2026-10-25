@@ -263,7 +263,8 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_recommend_indexes IS 'Module AI 2: Công cụ tự động khuyến nghị chỉ mục từ thống kê catalog';
 
@@ -328,7 +329,8 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_detect_duplicates IS 'Module AI 3: Tự động phát hiện cặp khách hàng trùng lặp bằng pg_trgm';
 
@@ -447,7 +449,8 @@ BEGIN
         END LOOP;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_detect_anomalies IS 'Module AI 4: Phát hiện ngoại lai thống kê bằng thuật toán Z-score';
 
@@ -566,6 +569,62 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_suggest_promotions IS 'Module AI 5: Đề xuất ưu đãi thông minh từ phân tích RFM và khung giờ thấp điểm';
+
+-- Tên contract trong báo cáo bảo vệ; giữ function cũ để không phá API hiện hữu.
+CREATE OR REPLACE FUNCTION ai.fn_auto_optimize_indexes()
+RETURNS TABLE(
+    recommendation_id INT,
+    table_name VARCHAR(100),
+    column_list VARCHAR(255),
+    reason TEXT,
+    suggested_sql TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM ai.fn_recommend_indexes();
+END;
+$$;
+
+COMMENT ON FUNCTION ai.fn_auto_optimize_indexes IS 'Contract báo cáo: module tự động tối ưu chỉ mục, chỉ trả SQL đề xuất readonly';
+
+CREATE OR REPLACE FUNCTION ai.fn_security_guard()
+RETURNS TABLE(
+    alert_id INT,
+    risk_score INT,
+    risk_level VARCHAR(10),
+    reason TEXT,
+    status VARCHAR(20),
+    created_at TIMESTAMPTZ
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, ai
+AS $$
+    SELECT a.alert_id, a.risk_score, a.risk_level, a.reason, a.status, a.created_at
+    FROM ai.ai_alert AS a
+    ORDER BY a.created_at DESC
+    LIMIT 100;
+$$;
+
+COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh báo do audit trigger chấm điểm và ghi vào ai.ai_alert';
+
+REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_auto_optimize_indexes() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_detect_duplicates(REAL) FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_detect_anomalies(REAL) FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_suggest_promotions() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_security_guard() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ai.fn_recommend_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_auto_optimize_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;

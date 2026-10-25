@@ -97,7 +97,21 @@ ORDER BY total_hours_played DESC;
 -- 2. MATERIALIZED VIEWS (BÁO CÁO NẶNG TỐI ƯU VỚI UNIQUE INDEX)
 -- ----------------------------------------------------------------------------
 
--- 2.1. Doanh thu theo tháng (Cần UNIQUE INDEX để REFRESH CONCURRENTLY)
+-- 2.1. Doanh thu theo ngày (hợp đồng báo cáo và lọc khoảng ngày trên Admin)
+DROP MATERIALIZED VIEW IF EXISTS reporting.mv_revenue_daily CASCADE;
+CREATE MATERIALIZED VIEW reporting.mv_revenue_daily AS
+SELECT
+    revenue_date,
+    total_invoices,
+    total_play_amount,
+    total_service_amount,
+    total_discount_amount,
+    net_revenue
+FROM reporting.vw_daily_revenue;
+
+CREATE UNIQUE INDEX idx_mv_revenue_daily_date ON reporting.mv_revenue_daily (revenue_date);
+
+-- 2.2. Doanh thu theo tháng (Cần UNIQUE INDEX để REFRESH CONCURRENTLY)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_monthly_revenue CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_monthly_revenue AS
 SELECT 
@@ -114,7 +128,7 @@ ORDER BY revenue_month DESC;
 
 CREATE UNIQUE INDEX idx_mv_monthly_revenue_month ON reporting.mv_monthly_revenue (revenue_month);
 
--- 2.2. Top khách hàng thân thiết và chi tiêu cao nhất (kèm lần chơi gần nhất cho RFM)
+-- 2.3. Top khách hàng thân thiết và chi tiêu cao nhất (kèm lần chơi gần nhất cho RFM)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_top_customers CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_top_customers AS
 SELECT 
@@ -134,7 +148,7 @@ ORDER BY total_spent DESC;
 
 CREATE UNIQUE INDEX idx_mv_top_customers_id ON reporting.mv_top_customers (customer_id);
 
--- 2.3. Thống kê tần suất chơi theo giờ trong tuần (Phục vụ Module AI 5: Dự báo Happy Hour)
+-- 2.4. Thống kê tần suất chơi theo giờ trong tuần (Phục vụ Module AI 5: Dự báo Happy Hour)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_hourly_usage CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_hourly_usage AS
 SELECT 

@@ -9,7 +9,7 @@ public partial class DbRepository
 {
     public async Task<IReadOnlyList<DailyRevenueItem>> GetDailyRevenueAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT revenue_date, total_invoices, total_play_amount, total_service_amount, total_discount_amount, net_revenue FROM reporting.vw_daily_revenue LIMIT 365;";
+        const string sql = "SELECT revenue_date, total_invoices, total_play_amount, total_service_amount, total_discount_amount, net_revenue FROM reporting.mv_revenue_daily ORDER BY revenue_date DESC LIMIT 365;";
         return await ReadAsync(sql, reader => new DailyRevenueItem
         {
             RevenueDate = reader.GetFieldValue<DateTime>(0),

@@ -25,7 +25,10 @@ public partial class DbRepository
                                            'current_balance',
                                            'last_heartbeat_at']::text[])),
                                     to_regprocedure('inventory.fn_customer_menu_v2()') IS NOT NULL,
-                                    to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NOT NULL;";
+                                    to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NOT NULL,
+                                    has_table_privilege(current_user, 'core.customer', 'MAINTAIN')
+                                    AND has_table_privilege(current_user, 'core.computer', 'MAINTAIN')
+                                    AND has_table_privilege(current_user, 'core.gaming_session', 'MAINTAIN');";
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
@@ -45,7 +48,8 @@ public partial class DbRepository
             HasReconcileFunction = reader.GetBoolean(5),
             HasComputerGridContract = reader.GetBoolean(6),
             HasCustomerMenuContract = reader.GetBoolean(7),
-            HasStationLogoutContract = reader.GetBoolean(8)
+            HasStationLogoutContract = reader.GetBoolean(8),
+            CanRunVacuum = reader.GetBoolean(9)
             };
         });
     }
@@ -86,7 +90,7 @@ public partial class DbRepository
             return new DbaStatisticsInfo
             {
                 DatabaseSize = reader.GetString(0),
-                CacheHitRatio = reader.IsDBNull(1) ? 100.0m : reader.GetDecimal(1),
+                CacheHitRatio = reader.IsDBNull(1) ? null : reader.GetDecimal(1),
                 ActiveConnections = Convert.ToInt32(reader.GetInt64(2)),
                 IdleConnections = Convert.ToInt32(reader.GetInt64(3)),
                 TotalConnections = Convert.ToInt32(reader.GetInt64(4)),
@@ -99,7 +103,7 @@ public partial class DbRepository
 public sealed record DbaStatisticsInfo
 {
     public string DatabaseSize { get; init; } = "N/A";
-    public decimal CacheHitRatio { get; init; } = 100.0m;
+    public decimal? CacheHitRatio { get; init; }
     public int ActiveConnections { get; init; }
     public int IdleConnections { get; init; }
     public int TotalConnections { get; init; }

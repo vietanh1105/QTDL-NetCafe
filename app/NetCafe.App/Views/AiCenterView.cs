@@ -10,6 +10,7 @@ public partial class AiCenterView : AdminCardViewBase
     private readonly Button _runDuplicateButton = new();
     private readonly Button _runAnomalyButton = new();
     private readonly Button _runPromotionButton = new();
+    private readonly Button _runSecurityButton = new();
     private readonly Button _reviewAlertButton = new();
     private readonly Button _mergeDuplicateButton = new();
     private readonly Button _ignoreDuplicateButton = new();
@@ -30,6 +31,7 @@ public partial class AiCenterView : AdminCardViewBase
         ConfigureButton(_runDuplicateButton, "Tìm trùng lặp");
         ConfigureButton(_runAnomalyButton, "Phát hiện dị thường");
         ConfigureButton(_runPromotionButton, "Gợi ý khuyến mãi");
+        ConfigureButton(_runSecurityButton, "Kiểm tra bảo mật");
         ConfigureButton(_reviewAlertButton, "Đã xem cảnh báo");
         ConfigureButton(_mergeDuplicateButton, "Đánh dấu đã gộp");
         ConfigureButton(_ignoreDuplicateButton, "Đánh dấu bỏ qua");
@@ -38,6 +40,7 @@ public partial class AiCenterView : AdminCardViewBase
         _runDuplicateButton.Click += async (_, _) => await RunModuleAsync("duplicate");
         _runAnomalyButton.Click += async (_, _) => await RunModuleAsync("anomaly");
         _runPromotionButton.Click += async (_, _) => await RunModuleAsync("promotion");
+        _runSecurityButton.Click += async (_, _) => await RunModuleAsync("security");
         _reviewAlertButton.Click += async (_, _) => await UpdateSelectedAsync("reviewed");
         _mergeDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("merged");
         _ignoreDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("ignored");
@@ -47,6 +50,7 @@ public partial class AiCenterView : AdminCardViewBase
         ActionsPanel.Controls.Add(_runDuplicateButton);
         ActionsPanel.Controls.Add(_runAnomalyButton);
         ActionsPanel.Controls.Add(_runPromotionButton);
+        ActionsPanel.Controls.Add(_runSecurityButton);
         ActionsPanel.Controls.Add(_reviewAlertButton);
         ActionsPanel.Controls.Add(_mergeDuplicateButton);
         ActionsPanel.Controls.Add(_ignoreDuplicateButton);
@@ -66,6 +70,7 @@ public partial class AiCenterView : AdminCardViewBase
         _runDuplicateButton.Enabled = canAccess;
         _runAnomalyButton.Enabled = canAccess;
         _runPromotionButton.Enabled = canAccess;
+        _runSecurityButton.Enabled = canAccess;
         _reviewAlertButton.Enabled = canAccess;
         _mergeDuplicateButton.Enabled = canAccess;
         _ignoreDuplicateButton.Enabled = canAccess;

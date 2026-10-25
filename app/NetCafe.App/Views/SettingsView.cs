@@ -31,19 +31,25 @@ public partial class SettingsView : AdminCardViewBase
 
     private void UpdateRolePermissions(AdminViewContext context)
     {
-        if (context.IsAdmin)
+        var canVacuum = context.IsAdmin && context.RuntimeInfo?.CanRunVacuum == true;
+        if (canVacuum)
         {
             _vacuumButton.Visible = true;
             _vacuumButton.Enabled = true;
             _vacuumButton.Text = "🧹 VACUUM ANALYZE (DBA)";
             CyberTheme.StyleButton(_vacuumButton, CyberTheme.Warning);
         }
-        else if (context.IsManager)
+        else if (context.IsAdmin)
         {
             _vacuumButton.Visible = true;
             _vacuumButton.Enabled = false;
-            _vacuumButton.Text = "🔒 VACUUM (Chỉ Admin/DBA)";
+            _vacuumButton.Text = "🔒 VACUUM (Thiếu quyền MAINTAIN)";
             CyberTheme.StyleButton(_vacuumButton, CyberTheme.MutedText);
+        }
+        else if (context.IsManager)
+        {
+            _vacuumButton.Visible = false;
+            _vacuumButton.Enabled = false;
         }
         else
         {
@@ -84,10 +90,10 @@ public partial class SettingsView : AdminCardViewBase
                 CyberTheme.Primary),
             new AdminCardModel(
                 "Hiệu năng Cache RAM",
-                $"Tỉ lệ trúng: {dbaStats.CacheHitRatio:N1}%",
-                "Tỉ lệ truy vấn đọc trực tiếp từ bộ nhớ đệm Shared Buffers trong RAM PostgreSQL. Đạt chuẩn tối ưu QTDL (> 99%).",
-                dbaStats.CacheHitRatio >= 95 ? "Tối ưu xuất sắc" : "Cần tăng RAM",
-                CyberTheme.Success),
+                dbaStats.CacheHitRatio.HasValue ? $"Tỉ lệ trúng: {dbaStats.CacheHitRatio.Value:N1}%" : "Chưa có số liệu",
+                "Tỉ lệ truy vấn đọc từ Shared Buffers của PostgreSQL; chỉ kết luận đạt >99% sau khi có số liệu thực tế.",
+                dbaStats.CacheHitRatio is null ? "Chưa đo" : dbaStats.CacheHitRatio >= 99 ? "Đạt >99%" : "Cần theo dõi",
+                dbaStats.CacheHitRatio is null ? CyberTheme.MutedText : dbaStats.CacheHitRatio >= 99 ? CyberTheme.Success : CyberTheme.Warning),
             new AdminCardModel(
                 "Lưu trữ & Rác dữ liệu",
                 $"Size: {dbaStats.DatabaseSize} · Rác: {dbaStats.TotalDeadTuples:N0} dòng",
@@ -98,7 +104,7 @@ public partial class SettingsView : AdminCardViewBase
                 "Kết nối PostgreSQL",
                 $"Tổng: {dbaStats.TotalConnections} kết nối",
                 $"Đang chạy truy vấn: {dbaStats.ActiveConnections} · Đang chờ (Idle): {dbaStats.IdleConnections}\nConnection Pooling Npgsql điều phối giữ kết nối tái sử dụng.",
-                "Pool hoạt động tốt",
+                "Đã quan sát",
                 CyberTheme.Primary),
             new AdminCardModel(
                 "Tài khoản và quyền",
@@ -121,9 +127,9 @@ public partial class SettingsView : AdminCardViewBase
             new AdminCardModel(
                 "Dọn dẹp và bảo mật",
                 "VACUUM ANALYZE theo yêu cầu",
-                "Autovacuum do PostgreSQL quản lý. Chỉ Chủ quán (role_admin / DBA) có quyền chạy VACUUM thủ công.",
-                context.IsAdmin ? "Quyền DBA" : "Chỉ xem",
-                context.IsAdmin ? CyberTheme.Warning : CyberTheme.SurfaceRaised)
+                "Autovacuum do PostgreSQL quản lý. VACUUM thủ công chỉ bật khi tài khoản hiện tại có quyền MAINTAIN trên các bảng vận hành.",
+                context.RuntimeInfo?.CanRunVacuum == true ? "Có quyền MAINTAIN" : "Chỉ xem",
+                context.RuntimeInfo?.CanRunVacuum == true ? CyberTheme.Warning : CyberTheme.SurfaceRaised)
         };
         SetCards(cards, card => card, $"{cards.Length} nhóm thông tin và chỉ số DBA hệ thống");
     }
@@ -134,7 +140,7 @@ public partial class SettingsView : AdminCardViewBase
         {
             MessageBox.Show(
                 FindForm(),
-                "Chỉ Chủ quán (nhóm DBA / role_admin) mới có quyền chạy lệnh VACUUM ANALYZE trên CSDL.",
+                "Tài khoản hiện tại chưa có quyền MAINTAIN để chạy VACUUM ANALYZE.",
                 "Từ chối quyền DBA",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -146,7 +152,7 @@ public partial class SettingsView : AdminCardViewBase
             await RequiredContext.Repository.RunVacuumAnalyzeAsync();
             MessageBox.Show(
                 FindForm(),
-                "Đã chạy VACUUM ANALYZE cho các bảng vận hành thành công.\nCác dead tuples đã được dọn sạch và chỉ số thống kê bộ lập lịch truy vấn đã được cập nhật.",
+                "Đã chạy VACUUM ANALYZE cho các bảng vận hành.\nChỉ số thống kê Query Planner đã được cập nhật; dead tuples sẽ được đo lại khi làm mới màn hình.",
                 "Dọn dẹp DBA thành công",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);

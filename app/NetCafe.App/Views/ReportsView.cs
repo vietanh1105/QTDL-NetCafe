@@ -182,7 +182,7 @@ public partial class ReportsView : AdminDataViewBase
             await RequiredContext.Repository.RefreshMaterializedViewsAsync();
             await RefreshAsync();
             MessageBox.Show(FindForm(),
-                "Đã chạy lệnh REFRESH MATERIALIZED VIEW (mv_hourly_usage, mv_top_customers, mv_monthly_revenue) thành công!\nDữ liệu báo cáo đã được làm mới.",
+                "Đã chạy lệnh REFRESH MATERIALIZED VIEW (mv_revenue_daily, mv_hourly_usage, mv_top_customers, mv_monthly_revenue) thành công!\nDữ liệu báo cáo đã được làm mới.",
                 "Cập nhật số liệu thành công",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);

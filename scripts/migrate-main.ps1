@@ -1,4 +1,4 @@
-﻿# Trách nhiệm: backup, preflight và áp dụng migration 08 cùng contract Admin cho netcafe_db.
+# Trách nhiệm: backup, preflight và áp dụng các migration AI/station/Admin/report cho netcafe_db.
 # Không reset, seed, ETL overwrite hoặc chạy sql/00_create_database.sql trên database chính.
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -74,8 +74,10 @@ UNION ALL SELECT 'gaming_session', count(*) FROM core.gaming_session;
 if ($LASTEXITCODE -ne 0) { throw 'Preflight row-count failed; migration was not started.' }
 
 $migrationPaths = @(
+    (Join-Path $repoRoot 'sql\07_ai_modules.sql'),
     (Join-Path $repoRoot 'sql\08_station_customer.sql'),
-    (Join-Path $repoRoot 'sql\10_admin_operations.sql')
+    (Join-Path $repoRoot 'sql\10_admin_operations.sql'),
+    (Join-Path $repoRoot 'sql\11_report_alignment.sql')
 )
 foreach ($migrationPath in $migrationPaths) {
     $migrationText = Get-Content -Raw -LiteralPath $migrationPath
@@ -156,7 +158,10 @@ BEGIN
        OR to_regprocedure('core.sp_update_service_request_status(bigint,character varying,integer)') IS NULL
        OR to_regprocedure('billing.sp_void_invoice(bigint,integer)') IS NULL
        OR to_regprocedure('reporting.sp_refresh_materialized_views()') IS NULL
-       OR to_regprocedure('hr.sp_create_maintenance(integer,integer,text)') IS NULL THEN
+       OR to_regprocedure('hr.sp_create_maintenance(integer,integer,text)') IS NULL
+       OR to_regprocedure('ai.fn_auto_optimize_indexes()') IS NULL
+       OR to_regprocedure('ai.fn_security_guard()') IS NULL
+       OR to_regclass('reporting.mv_revenue_daily') IS NULL THEN
         RAISE EXCEPTION 'Station contract function is missing after migration.';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'role_station') THEN

@@ -158,7 +158,8 @@ BEGIN
     -- 1. Kiểm tra khách hàng
     SELECT is_active, balance INTO v_cust_active, v_cust_balance
     FROM core.customer 
-    WHERE customer_id = p_customer_id;
+    WHERE customer_id = p_customer_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Khách hàng ID % không tồn tại!', p_customer_id;
@@ -186,7 +187,8 @@ BEGIN
     INTO v_comp_status, v_hourly_rate
     FROM core.computer c
     JOIN core.computer_type ct ON c.type_id = ct.type_id
-    WHERE c.computer_id = p_computer_id;
+    WHERE c.computer_id = p_computer_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Máy tính ID % không tồn tại!', p_computer_id;

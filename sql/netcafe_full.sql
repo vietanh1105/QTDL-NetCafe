@@ -73,6 +73,7 @@ COMMENT ON DATABASE netcafe_db IS 'Database quản lý phòng game/net - Đề t
 CREATE EXTENSION IF NOT EXISTS pgcrypto;      -- Mã hóa mật khẩu, UUID, hàm băm
 CREATE EXTENSION IF NOT EXISTS pg_trgm;       -- Tìm kiếm mờ trigram, đo độ tương đồng similarity
 CREATE EXTENSION IF NOT EXISTS unaccent;      -- Bỏ dấu tiếng Việt phục vụ tìm kiếm
+CREATE EXTENSION IF NOT EXISTS btree_gist;    -- EXCLUDE chống chồng phiên trên cùng máy
 
 -- ----------------------------------------------------------------------------
 -- 2. KHỞI TẠO 8 SCHEMAS NGHIỆP VỤ
@@ -220,6 +221,18 @@ CREATE TABLE core.gaming_session (
     )
 );
 COMMENT ON TABLE core.gaming_session IS 'Phiên chơi máy: hourly_rate_applied bảo lưu giá tại thời điểm mở phiên';
+
+ALTER TABLE core.gaming_session
+    ADD CONSTRAINT ex_gaming_session_computer_time
+    EXCLUDE USING gist (
+        computer_id WITH =,
+        tstzrange(
+            start_time,
+            COALESCE(end_time, 'infinity'::timestamptz),
+            '[)'
+        ) WITH &&
+    )
+    WHERE (status IN ('active', 'finished'));
 
 -- ----------------------------------------------------------------------------
 -- 5. SCHEMA INVENTORY (Quản lý F&B, Tồn kho & Đơn gọi món)
@@ -704,7 +717,8 @@ BEGIN
     -- 1. Kiểm tra khách hàng
     SELECT is_active, balance INTO v_cust_active, v_cust_balance
     FROM core.customer 
-    WHERE customer_id = p_customer_id;
+    WHERE customer_id = p_customer_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Khách hàng ID % không tồn tại!', p_customer_id;
@@ -732,7 +746,8 @@ BEGIN
     INTO v_comp_status, v_hourly_rate
     FROM core.computer c
     JOIN core.computer_type ct ON c.type_id = ct.type_id
-    WHERE c.computer_id = p_computer_id;
+    WHERE c.computer_id = p_computer_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Máy tính ID % không tồn tại!', p_computer_id;
@@ -1084,7 +1099,21 @@ ORDER BY total_hours_played DESC;
 -- 2. MATERIALIZED VIEWS (BÁO CÁO NẶNG TỐI ƯU VỚI UNIQUE INDEX)
 -- ----------------------------------------------------------------------------
 
--- 2.1. Doanh thu theo tháng (Cần UNIQUE INDEX để REFRESH CONCURRENTLY)
+-- 2.1. Doanh thu theo ngày (hợp đồng báo cáo và lọc khoảng ngày trên Admin)
+DROP MATERIALIZED VIEW IF EXISTS reporting.mv_revenue_daily CASCADE;
+CREATE MATERIALIZED VIEW reporting.mv_revenue_daily AS
+SELECT
+    revenue_date,
+    total_invoices,
+    total_play_amount,
+    total_service_amount,
+    total_discount_amount,
+    net_revenue
+FROM reporting.vw_daily_revenue;
+
+CREATE UNIQUE INDEX idx_mv_revenue_daily_date ON reporting.mv_revenue_daily (revenue_date);
+
+-- 2.2. Doanh thu theo tháng (Cần UNIQUE INDEX để REFRESH CONCURRENTLY)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_monthly_revenue CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_monthly_revenue AS
 SELECT 
@@ -1101,7 +1130,7 @@ ORDER BY revenue_month DESC;
 
 CREATE UNIQUE INDEX idx_mv_monthly_revenue_month ON reporting.mv_monthly_revenue (revenue_month);
 
--- 2.2. Top khách hàng thân thiết và chi tiêu cao nhất (kèm lần chơi gần nhất cho RFM)
+-- 2.3. Top khách hàng thân thiết và chi tiêu cao nhất (kèm lần chơi gần nhất cho RFM)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_top_customers CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_top_customers AS
 SELECT 
@@ -1121,7 +1150,7 @@ ORDER BY total_spent DESC;
 
 CREATE UNIQUE INDEX idx_mv_top_customers_id ON reporting.mv_top_customers (customer_id);
 
--- 2.3. Thống kê tần suất chơi theo giờ trong tuần (Phục vụ Module AI 5: Dự báo Happy Hour)
+-- 2.4. Thống kê tần suất chơi theo giờ trong tuần (Phục vụ Module AI 5: Dự báo Happy Hour)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_hourly_usage CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_hourly_usage AS
 SELECT 
@@ -1268,6 +1297,8 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 -- 5.6. Admin toàn quyền
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
+GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
+GRANT pg_read_all_stats TO role_admin, role_manager;
 
 -- Manager được quản lý dữ liệu vận hành nhưng không được đọc/sửa salary hoặc password_hash.
 REVOKE ALL ON hr.employee FROM role_manager;
@@ -1732,6 +1763,7 @@ VALUES
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
 -- 10. LÀM MỚI MATERIALIZED VIEWS
+REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
 REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
 REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
 REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
@@ -2007,7 +2039,8 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_recommend_indexes IS 'Module AI 2: Công cụ tự động khuyến nghị chỉ mục từ thống kê catalog';
 
@@ -2072,7 +2105,8 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_detect_duplicates IS 'Module AI 3: Tự động phát hiện cặp khách hàng trùng lặp bằng pg_trgm';
 
@@ -2191,7 +2225,8 @@ BEGIN
         END LOOP;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_detect_anomalies IS 'Module AI 4: Phát hiện ngoại lai thống kê bằng thuật toán Z-score';
 
@@ -2310,9 +2345,65 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_suggest_promotions IS 'Module AI 5: Đề xuất ưu đãi thông minh từ phân tích RFM và khung giờ thấp điểm';
+
+-- Tên contract trong báo cáo bảo vệ; giữ function cũ để không phá API hiện hữu.
+CREATE OR REPLACE FUNCTION ai.fn_auto_optimize_indexes()
+RETURNS TABLE(
+    recommendation_id INT,
+    table_name VARCHAR(100),
+    column_list VARCHAR(255),
+    reason TEXT,
+    suggested_sql TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM ai.fn_recommend_indexes();
+END;
+$$;
+
+COMMENT ON FUNCTION ai.fn_auto_optimize_indexes IS 'Contract báo cáo: module tự động tối ưu chỉ mục, chỉ trả SQL đề xuất readonly';
+
+CREATE OR REPLACE FUNCTION ai.fn_security_guard()
+RETURNS TABLE(
+    alert_id INT,
+    risk_score INT,
+    risk_level VARCHAR(10),
+    reason TEXT,
+    status VARCHAR(20),
+    created_at TIMESTAMPTZ
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, ai
+AS $$
+    SELECT a.alert_id, a.risk_score, a.risk_level, a.reason, a.status, a.created_at
+    FROM ai.ai_alert AS a
+    ORDER BY a.created_at DESC
+    LIMIT 100;
+$$;
+
+COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh báo do audit trigger chấm điểm và ghi vào ai.ai_alert';
+
+REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_auto_optimize_indexes() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_detect_duplicates(REAL) FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_detect_anomalies(REAL) FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_suggest_promotions() FROM PUBLIC;
+REVOKE ALL ON FUNCTION ai.fn_security_guard() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ai.fn_recommend_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_auto_optimize_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;
 
 
 
@@ -2473,10 +2564,10 @@ BEGIN
     SELECT * INTO v_session
     FROM core.gaming_session
     WHERE session_id = p_session_id
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Phiên chơi ID % không tồn tại!', p_session_id;
+        RAISE EXCEPTION 'Phiên chơi ID % không tồn tại hoặc đang được xử lý!', p_session_id;
     END IF;
     IF v_session.status <> 'active' THEN
         RAISE EXCEPTION 'Phiên chơi ID % đã đóng (trạng thái: %)!', p_session_id, v_session.status;
@@ -2510,11 +2601,25 @@ BEGIN
           AND is_active = TRUE
           AND v_end_time BETWEEN valid_from AND valid_to;
         IF FOUND THEN
-            v_applied_promo_id := v_promo.promotion_id;
-            IF v_promo.promo_type IN ('percent', 'happy_hour') THEN
-                v_discount_amount := ROUND((v_play_amount * v_promo.value) / 100.0);
-            ELSIF v_promo.promo_type = 'fixed' THEN
-                v_discount_amount := LEAST(v_promo.value, v_play_amount);
+            IF (
+                v_promo.conditions->>'required_tier' IS NULL
+                OR lower(v_promo.conditions->>'required_tier') = lower(v_customer.membership_tier)
+            )
+            AND (
+                v_promo.conditions->>'min_bill' IS NULL
+                OR (v_play_amount + v_service_amount) >= (v_promo.conditions->>'min_bill')::NUMERIC
+            )
+            AND (
+                v_promo.promo_type <> 'happy_hour'
+                OR (v_end_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::TIME >= TIME '22:00'
+                OR (v_end_time AT TIME ZONE 'Asia/Ho_Chi_Minh')::TIME < TIME '06:00'
+            ) THEN
+                v_applied_promo_id := v_promo.promotion_id;
+                IF v_promo.promo_type IN ('percent', 'happy_hour') THEN
+                    v_discount_amount := ROUND((v_play_amount * v_promo.value) / 100.0);
+                ELSIF v_promo.promo_type = 'fixed' THEN
+                    v_discount_amount := LEAST(v_promo.value, v_play_amount);
+                END IF;
             END IF;
         END IF;
     END IF;
@@ -2652,9 +2757,9 @@ BEGIN
     SELECT * INTO v_computer
     FROM core.computer c
     WHERE c.computer_code = p_computer_code
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Máy % không tồn tại!', p_computer_code;
+        RAISE EXCEPTION 'Máy % không tồn tại hoặc đang được sử dụng!', p_computer_code;
     END IF;
     SELECT ct.hourly_rate INTO v_rate
     FROM core.computer_type AS ct
@@ -3219,6 +3324,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, reporting
 AS $$
 BEGIN
+    REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
     REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
     REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
     REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
@@ -3391,9 +3497,80 @@ GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT)
 GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
 GRANT EXECUTE ON FUNCTION billing.sp_void_invoice(BIGINT, INT) TO role_admin;
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
 GRANT EXECUTE ON FUNCTION hr.sp_create_employee(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- BẮT ĐẦU NỘI DUNG TỪ: sql/11_report_alignment.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+-- ============================================================================
+-- CONTRACT BỔ SUNG CHO BÁO CÁO VÀ TELEMETRY DBA
+-- Mục đích: đồng bộ database chính đã tồn tại với schema nguồn mới.
+-- Tính chất: idempotent, không reset hoặc xóa dữ liệu nghiệp vụ.
+-- ============================================================================
+
+\c netcafe_db;
+
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'core.gaming_session'::regclass
+          AND conname = 'ex_gaming_session_computer_time'
+    ) THEN
+        ALTER TABLE core.gaming_session
+            ADD CONSTRAINT ex_gaming_session_computer_time
+            EXCLUDE USING gist (
+                computer_id WITH =,
+                tstzrange(
+                    start_time,
+                    COALESCE(end_time, 'infinity'::timestamptz),
+                    '[)'
+                ) WITH &&
+            )
+            WHERE (status IN ('active', 'finished'));
+    END IF;
+END $$;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS reporting.mv_revenue_daily AS
+SELECT
+    revenue_date,
+    total_invoices,
+    total_play_amount,
+    total_service_amount,
+    total_discount_amount,
+    net_revenue
+FROM reporting.vw_daily_revenue;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_revenue_daily_date
+    ON reporting.mv_revenue_daily (revenue_date);
+
+CREATE OR REPLACE FUNCTION reporting.sp_refresh_materialized_views()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, reporting
+AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
+    REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
+    REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
+    REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
+GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
+GRANT pg_read_all_stats TO role_admin, role_manager;

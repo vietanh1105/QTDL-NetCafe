@@ -14,6 +14,7 @@
 | Database preflight | Admin không biết đang trỏ database nào và timer gọi function thiếu. | Preflight hiển thị host/database/user và capability migration trước khi timer chạy. | Không phát sinh truy vấn reconcile lỗi lặp lại trên DB legacy. |
 | Card máy | Grid dựng lại datasource toàn bộ sau mỗi lần refresh. | Dictionary `ComputerId -> ComputerCardControl`, chỉ bind thêm/sửa/xóa card thay đổi. | Giảm tạo control và giữ trạng thái chọn/hover của card. |
 | AI promotion | Mở AI Center có thể gọi function kèm refresh materialized view. | Snapshot đọc bảng; chạy function chỉ khi bấm nút. | Tránh side effect và query nặng ngoài ý muốn. |
+| Daily revenue snapshot | Admin đọc trực tiếp `vw_daily_revenue` trong khi báo cáo yêu cầu materialized view ngày. | Thêm `reporting.mv_revenue_daily`, unique key theo ngày và đưa vào refresh contract. | Lọc khoảng ngày vẫn do Admin thực hiện sau khi đọc snapshot. |
 
 ## Số liệu và cách đo
 

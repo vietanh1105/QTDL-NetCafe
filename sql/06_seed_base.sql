@@ -140,6 +140,7 @@ VALUES
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
 -- 10. LÀM MỚI MATERIALIZED VIEWS
+REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
 REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
 REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
 REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;

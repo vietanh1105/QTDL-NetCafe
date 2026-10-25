@@ -159,6 +159,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, reporting
 AS $$
 BEGIN
+    REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
     REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
     REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
     REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
@@ -331,8 +332,8 @@ GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT)
 GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
 GRANT EXECUTE ON FUNCTION billing.sp_void_invoice(BIGINT, INT) TO role_admin;
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
 GRANT EXECUTE ON FUNCTION hr.sp_create_employee(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;

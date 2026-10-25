@@ -462,7 +462,8 @@ public partial class MainForm : Form
                     HasReconcileFunction = _runtimeInfo.HasReconcileFunction,
                     HasComputerGridContract = _runtimeInfo.HasComputerGridContract,
                     HasCustomerMenuContract = _runtimeInfo.HasCustomerMenuContract,
-                    HasStationLogoutContract = _runtimeInfo.HasStationLogoutContract
+                    HasStationLogoutContract = _runtimeInfo.HasStationLogoutContract,
+                    CanRunVacuum = _runtimeInfo.CanRunVacuum && ResolveRole(user) == "role_admin"
                 };
             }
             _runtimeSummary = $"Máy chủ={AppConfig.Host}:{AppConfig.Port} | CSDL={AppConfig.Database} | Role={user}";

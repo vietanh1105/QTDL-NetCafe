@@ -17,6 +17,7 @@ SQL_FILES = [
     "sql/07_ai_modules.sql",
     "sql/08_station_customer.sql",
     "sql/10_admin_operations.sql",
+    "sql/11_report_alignment.sql",
 ]
 
 TARGET_FILE = "sql/netcafe_full.sql"

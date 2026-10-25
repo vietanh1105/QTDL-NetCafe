@@ -83,8 +83,8 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `sql/06_seed_base.sql`: seed dữ liệu chuẩn.
 - `sql/07_ai_modules.sql`: 5 module AI PL/pgSQL và notification.
 - `sql/08_station_customer.sql`: migration idempotent cho station, heartbeat, wallet, support và role giới hạn.
-- `sql/netcafe_full.sql`: file tổng hợp 00–08 được tạo bởi build_full_sql.py.
-- `python/build_full_sql.py`: ghép SQL theo thứ tự, gồm migration 08.
+- `sql/netcafe_full.sql`: file tổng hợp 00–08, 10 và 11 được tạo bởi build_full_sql.py.
+- `python/build_full_sql.py`: ghép SQL theo thứ tự, gồm AI, station, Admin và report alignment.
 - `python/apply_sql_neon.py`: áp dụng file SQL theo connection do environment cấp.
 - `python/etl.py`: ETL dữ liệu bẩn và activity fixture.
 - `python/generate_dirty_data.py`: sinh dữ liệu bẩn cho staging.
@@ -95,10 +95,10 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 
 ## QA, backup và tài liệu
 
-- `scripts/reset-qa.ps1`: chỉ drop/create `netcafe_qa`, strip psql connect directive và apply 01–08.
+- `scripts/reset-qa.ps1`: chỉ drop/create `netcafe_qa`, strip psql connect directive và apply 01–08, 10, 11.
 - `scripts/run-qa.ps1`: reset QA, build solution và chạy xUnit.
 - `scripts/run-station.cmd`: wrapper Windows PowerShell 5.1 để chạy station khi máy không có `pwsh`.
-- `scripts/migrate-main.ps1`: backup/preflight và chỉ áp dụng migration 08 trên `netcafe_db`.
+- `scripts/migrate-main.ps1`: backup/preflight và áp dụng migration AI/station/Admin/report alignment trên `netcafe_db`.
 - `scripts/run-station.ps1`: nạp station credential từ `.env` và chạy Client theo `computer_code`.
 - `tests/station_customer.sql`: assertion SQL cho contract station/RLS/AI, chỉ chạy trên QA.
 - `tests/verify_qa_station_prepare.sql`: tạo fixture station `test_station_qa` trên QA.
@@ -109,7 +109,7 @@ Mỗi dòng dưới đây mô tả một file nguồn, cấu hình, script, test
 - `app/NetCafe.Data.Tests/IntegrationTests.cs`: integration test có guard database `netcafe_qa`.
 - `app/NetCafe.Data.Tests/AssemblyInfo.cs`: tắt chạy song song để fixture test_xunit_* không tranh chấp máy.
 - `tests/verify_main_station.py`: test main có fixture `test_station_*`, privilege station và login/heartbeat/logout.
-- `scripts/migrate-main.ps1`: backup/preflight và chỉ áp dụng migration 08 trên `netcafe_db`.
+- `scripts/migrate-main.ps1`: backup/preflight và áp dụng migration AI/station/Admin/report alignment trên `netcafe_db`.
 - `backup/backup.ps1`: backup PostgreSQL Windows, password lấy từ PGPASSWORD.
 - `backup/backup.sh`: backup PostgreSQL Linux, password lấy từ PGPASSWORD.
 - `backup/test_disaster_recovery.py`: kiểm thử restore với DB do environment cấp.

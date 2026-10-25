@@ -2,7 +2,7 @@
 
 > **Dự án:** Quản trị Cơ sở Dữ liệu Phòng Game/Net (`netcafe_db`)  
 > **Chuẩn mô hình hóa:** ERD Crow's Foot Notation (Mermaid)  
-> **Quy mô:** 21 bảng (15 bảng nghiệp vụ, 6 bảng giám sát & AI)
+> **Quy mô:** 16 bảng nghiệp vụ, 6 bảng giám sát & AI; bảng cấu hình station, staging và các partition được ghi riêng trong kiến trúc triển khai.
 
 ---
 

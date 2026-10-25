@@ -125,6 +125,8 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 -- 5.6. Admin toàn quyền
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
+GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
+GRANT pg_read_all_stats TO role_admin, role_manager;
 
 -- Manager được quản lý dữ liệu vận hành nhưng không được đọc/sửa salary hoặc password_hash.
 REVOKE ALL ON hr.employee FROM role_manager;

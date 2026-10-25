@@ -223,7 +223,7 @@ public partial class ComputersView : AdminDataViewBase
 
             int clientWidth = _cardsGrid.ClientSize.Width;
             int horizontalPadding = _cardsGrid.Padding.Horizontal;
-            int scrollbarWidth = _cardsGrid.VerticalScroll.Visible ? 0 : SystemInformation.VerticalScrollBarWidth;
+            int scrollbarWidth = SystemInformation.VerticalScrollBarWidth;
             int availableWidth = Math.Max(minimumCardWidth, clientWidth - horizontalPadding - scrollbarWidth);
 
             var columnCount = availableWidth >= (minimumCardWidth + gap) * 4
