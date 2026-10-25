@@ -166,7 +166,7 @@ BEGIN
     SELECT * INTO v_customer
     FROM core.customer
     WHERE customer_id = v_session.customer_id
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
 
     v_play_amount := core.fn_calc_session_amount(
         v_session.start_time, v_end_time, v_session.hourly_rate_applied
@@ -327,7 +327,7 @@ BEGIN
     WHERE c.username = p_username
       AND c.is_active = TRUE
       AND c.password_hash = public.crypt(p_password, c.password_hash::TEXT)
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Sai tài khoản hoặc mật khẩu!';
     END IF;

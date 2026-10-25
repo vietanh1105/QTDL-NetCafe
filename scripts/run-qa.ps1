@@ -6,10 +6,11 @@ $ErrorActionPreference = "Stop"
 $env:DB_NAME = "netcafe_qa"
 $env:DB_HOST = if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }
 $env:DB_PORT = if ($env:DB_PORT) { $env:DB_PORT } else { "5432" }
-$env:DB_USER = if ($env:DB_USER) { $env:DB_USER } else { "postgres" }
+$env:DB_USER = if ($env:DB_OWNER_USER) { $env:DB_OWNER_USER } elseif ($env:DB_USER) { $env:DB_USER } else { "postgres" }
+if ($env:DB_OWNER_PASSWORD) { $env:DB_PASSWORD = $env:DB_OWNER_PASSWORD }
 if (-not $env:DB_PASSWORD) { $env:DB_PASSWORD = "" }
 if ([string]::IsNullOrWhiteSpace($env:DB_PASSWORD)) {
-    throw "QA bị dừng trước khi kết nối: cần đặt DB_PASSWORD cho PostgreSQL local để tránh treo chờ nhập."
+    throw "QA bị dừng trước khi kết nối: cần đặt DB_OWNER_PASSWORD cho PostgreSQL local để tránh treo chờ nhập."
 }
 $env:PGPASSWORD = $env:DB_PASSWORD
 

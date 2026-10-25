@@ -91,14 +91,22 @@ Dự án tập trung vào thiết kế, triển khai, bảo mật và tối ưu 
    Copy-Item .env.example .env
    ```
    Chỉnh sửa thông tin kết nối trong file `.env` cho phù hợp với máy của bạn.
+   Admin chỉ dùng ba role ứng dụng: `admin`, `manager`, `cashier`. Đặt riêng
+   `DB_ADMIN_PASSWORD`, `DB_MANAGER_PASSWORD`, `DB_CASHIER_PASSWORD` ngoài source;
+   không dùng `neondb_owner` cho ứng dụng.
 
 2. Reset duy nhất database QA, không chạy trên Neon chính:
    ```powershell
    $env:DB_NAME = "netcafe_qa"
-   $env:DB_PASSWORD = "<cấp ngoài source>"
+   $env:DB_OWNER_USER = "postgres"
+   $env:DB_OWNER_PASSWORD = "<cấp ngoài source>"
+   $env:DB_ADMIN_PASSWORD = "<cấp ngoài source>"
+   $env:DB_MANAGER_PASSWORD = "<cấp ngoài source>"
+   $env:DB_CASHIER_PASSWORD = "<cấp ngoài source>"
    powershell -ExecutionPolicy Bypass -File .\scripts\reset-qa.ps1
    ```
-   Script áp dụng schema/migration/seed 01–08, 10 và 11 rồi ghi marker QA.
+   Script áp dụng schema/migration/seed 01–08, 10, 11 và hardening role 12 rồi ghi marker QA.
+   Với database đã tồn tại, chạy `scripts/migrate-main.ps1` sau backup; nếu chỉ cần cấp lại login role, dùng `scripts/provision-app-roles.ps1`.
 
 ### 2. Chạy Admin và Station (C# .NET 10)
 

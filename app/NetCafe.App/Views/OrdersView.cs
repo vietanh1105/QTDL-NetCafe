@@ -232,7 +232,7 @@ public partial class OrdersView : AdminViewBase
             _serveButton.Enabled = true;
             _cancelOrderButton.Enabled = true;
         }
-        else // Kỹ thuật viên: Không có quyền trên inventory
+        else
         {
             _receiveStockButton.Enabled = false;
             _orderForStationButton.Enabled = false;
@@ -248,7 +248,7 @@ public partial class OrdersView : AdminViewBase
         _cardsPanel.Controls.Clear();
         var emptyLabel = new Label
         {
-            Text = "🔒 Kỹ thuật viên không có quyền truy cập Gọi món & Bếp (Cơ chế CSDL: Table Grant inventory).",
+            Text = "🔒 Role hiện tại không có quyền truy cập Gọi món & Bếp.",
             ForeColor = CyberTheme.MutedText,
             Font = new Font("Segoe UI", 10F, FontStyle.Italic),
             AutoSize = true,
@@ -263,7 +263,7 @@ public partial class OrdersView : AdminViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (RequiredContext.IsTechnician)
+        if (RequiredContext.UserRole == "role_unknown")
         {
             ClearForbiddenState();
             return;

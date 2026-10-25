@@ -465,13 +465,21 @@ public partial class InvoicesView : AdminViewBase
 
     private void UpdateRolePermissions(AdminViewContext context)
     {
-        if (context.IsAdmin || context.IsManager)
+        if (context.IsAdmin)
         {
             _voidInvoiceButton.Enabled = true;
             _exportExcelButton.Enabled = true;
             _printReceiptButton.Enabled = true;
             _copyReceiptButton.Enabled = true;
-            _subtitleLabel.Text = "Theo dõi doanh thu phòng máy, xem 100% hóa đơn toàn hệ thống.";
+            _subtitleLabel.Text = "Theo dõi doanh thu phòng máy, xem 100% hóa đơn toàn hệ thống và void có kiểm soát.";
+        }
+        else if (context.IsManager)
+        {
+            _voidInvoiceButton.Enabled = false;
+            _exportExcelButton.Enabled = true;
+            _printReceiptButton.Enabled = true;
+            _copyReceiptButton.Enabled = true;
+            _subtitleLabel.Text = "Quản lý xem toàn bộ hóa đơn; chỉ Siêu quản trị được void hóa đơn.";
         }
         else if (context.IsCashier)
         {
@@ -481,13 +489,13 @@ public partial class InvoicesView : AdminViewBase
             _copyReceiptButton.Enabled = true;
             _subtitleLabel.Text = "🔒 Chỉ hiển thị hóa đơn ca làm việc của bạn (Cơ chế CSDL: Row-Level Security p_invoice_cashier).";
         }
-        else // Kỹ thuật viên: Cấm truy cập bill
+        else
         {
             _voidInvoiceButton.Enabled = false;
             _exportExcelButton.Enabled = false;
             _printReceiptButton.Enabled = false;
             _copyReceiptButton.Enabled = false;
-            _subtitleLabel.Text = "🔒 Kỹ thuật viên không có quyền truy cập Hóa đơn & Sổ quỹ (Cơ chế CSDL: RLS & Grant).";
+            _subtitleLabel.Text = "🔒 Role hiện tại không có quyền truy cập Hóa đơn & Sổ quỹ.";
             _allInvoices.Clear();
             _filteredInvoices.Clear();
             _grid.DataSource = null;
@@ -497,13 +505,13 @@ public partial class InvoicesView : AdminViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (RequiredContext.IsTechnician)
+        if (RequiredContext.UserRole == "role_unknown")
         {
             _allInvoices.Clear();
             _filteredInvoices.Clear();
             _grid.DataSource = null;
             UpdateKpis(_allInvoices);
-            _subtitleLabel.Text = "🔒 Kỹ thuật viên không có quyền truy cập Hóa đơn & Sổ quỹ (Cơ chế CSDL: RLS & Grant).";
+            _subtitleLabel.Text = "🔒 Role hiện tại không có quyền truy cập Hóa đơn & Sổ quỹ.";
             return;
         }
 
@@ -747,7 +755,7 @@ public partial class InvoicesView : AdminViewBase
             _receiptPlayLabel.Text = $"🎮 Tiền giờ chơi: {inv.PlayAmount:N0} đ";
             _receiptServiceLabel.Text = $"🍜 Tiền dịch vụ: {inv.ServiceAmount:N0} đ";
             _receiptDiscountLabel.Text = $"🏷️ Giảm giá: -{inv.DiscountAmount:N0} đ";
-            _voidInvoiceButton.Enabled = (RequiredContext.IsAdmin || RequiredContext.IsManager) && inv.Status == "paid";
+            _voidInvoiceButton.Enabled = RequiredContext.IsAdmin && inv.Status == "paid";
         }
         _receiptTotalLabel.Text = $"{inv.TotalAmount:N0} đ";
     }

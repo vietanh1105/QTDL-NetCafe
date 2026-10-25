@@ -41,10 +41,6 @@ public partial class MainForm : Form
         _currentEmployeeId = AppConfig.AdminEmployeeId;
         _repository = new DbRepository(AppConfig.GetConnectionString());
         _roleRepositoryCache[_currentUser] = _repository;
-        _employeeIdCache["nv_admin"] = AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1;
-        _employeeIdCache["nv_thao"] = 2;
-        _employeeIdCache["nv_hung"] = 3;
-        _employeeIdCache["nv_manager"] = 4;
         InitializeComponent();
         InitializeShell();
         Shown += async (_, _) => await StartAsync();
@@ -216,7 +212,7 @@ public partial class MainForm : Form
     private void ApplyContext()
     {
         var role = ResolveRole(_currentUser);
-        var isTech = role == "role_technician";
+        var canOperate = role is "role_admin" or "role_manager" or "role_cashier";
         _viewContext = new AdminViewContext
         {
             Repository = _repository,
@@ -229,8 +225,8 @@ public partial class MainForm : Form
             ListenerStatus = _listenerStatus,
             RuntimeInfo = _runtimeInfo,
             UserRole = role,
-            CanManageCustomers = !isTech && _currentEmployeeId > 0,
-            CanManageSessions = !isTech && _currentEmployeeId > 0
+            CanManageCustomers = canOperate && _currentEmployeeId > 0,
+            CanManageSessions = canOperate && _currentEmployeeId > 0
         };
         foreach (var view in _views.Values)
         {
@@ -241,6 +237,19 @@ public partial class MainForm : Form
 
     private async Task RefreshDatabaseStatusAsync()
     {
+        var role = ResolveRole(_currentUser);
+        if (role == "role_unknown")
+        {
+            _databaseContractReady = false;
+            _reconcileAvailable = false;
+            _runtimeSummary = "Tài khoản CSDL chưa được cấp role ứng dụng";
+            UpdateHeaderStatus();
+            ApplyContext();
+            ShowError(new InvalidOperationException(
+                "Tài khoản hiện tại không thuộc 3 role admin/manager/cashier. " +
+                "Hãy cấu hình DB_ADMIN_*, DB_MANAGER_* hoặc DB_CASHIER_*; không dùng database owner."));
+            return;
+        }
         if (string.IsNullOrWhiteSpace(AppConfig.Password))
         {
             _databaseContractReady = false;
@@ -267,7 +276,7 @@ public partial class MainForm : Form
                     _employeeIdCache[employee.DbUsername] = employee.EmployeeId;
                 }
             }
-            if (_currentEmployeeId <= 0 && _employeeIdCache.TryGetValue(_currentUser, out var empId))
+            if (_employeeIdCache.TryGetValue(_currentUser, out var empId))
             {
                 _currentEmployeeId = empId;
             }
@@ -276,6 +285,11 @@ public partial class MainForm : Form
             if (!_databaseContractReady)
             {
                 ShowError(new InvalidOperationException(_runtimeContractStatus));
+            }
+            else if (_currentEmployeeId <= 0)
+            {
+                ShowError(new InvalidOperationException(
+                    $"Tài khoản {_currentUser} chưa được ánh xạ vào hr.employee.db_username."));
             }
             else
             {
@@ -380,8 +394,7 @@ public partial class MainForm : Form
             return;
         }
 
-        var canReconcile = _currentUser.Contains("admin", StringComparison.OrdinalIgnoreCase) ||
-                           _currentUser.Contains("manager", StringComparison.OrdinalIgnoreCase);
+        var canReconcile = ResolveRole(_currentUser) is "role_admin" or "role_manager";
         if (!canReconcile)
         {
             await RefreshVisibleAsync();
@@ -422,6 +435,11 @@ public partial class MainForm : Form
         _loadingRole = true;
         try
         {
+            if (ResolveRole(user) == "role_unknown")
+            {
+                ShowError(new InvalidOperationException("Chỉ được chuyển giữa admin, manager và cashier."));
+                return;
+            }
             var password = AppConfig.GetConfiguredRolePassword(user);
             if (string.IsNullOrWhiteSpace(password))
             {
@@ -435,17 +453,7 @@ public partial class MainForm : Form
                 _roleRepositoryCache[user] = nextRepository;
             }
 
-            if (!_employeeIdCache.TryGetValue(user, out var empId))
-            {
-                empId = user switch
-                {
-                    "nv_admin" => AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1,
-                    "nv_thao" => 2,
-                    "nv_hung" => 3,
-                    "nv_manager" => 4,
-                    _ => 0
-                };
-            }
+            _employeeIdCache.TryGetValue(user, out var empId);
 
             _repository = nextRepository;
             _currentUser = user;
@@ -463,6 +471,7 @@ public partial class MainForm : Form
                     HasComputerGridContract = _runtimeInfo.HasComputerGridContract,
                     HasCustomerMenuContract = _runtimeInfo.HasCustomerMenuContract,
                     HasStationLogoutContract = _runtimeInfo.HasStationLogoutContract,
+                    HasDailyRevenueMaterializedView = _runtimeInfo.HasDailyRevenueMaterializedView,
                     CanRunVacuum = _runtimeInfo.CanRunVacuum && ResolveRole(user) == "role_admin"
                 };
             }
@@ -476,6 +485,7 @@ public partial class MainForm : Form
             }
             UpdateHeaderStatus($"Đã chuyển vai trò: {user}");
 
+            await RestartListenerAsync();
             await RefreshVisibleAsync(force: true);
         }
         catch (Exception exception)
@@ -490,12 +500,15 @@ public partial class MainForm : Form
 
     private async Task RestartListenerAsync()
     {
-        if (_listenerRepository is null)
-        {
-            _listenerRepository = new DbRepository(AppConfig.GetConnectionString());
-            _listenerRepository.OnNotificationReceived += HandleNotification;
-            _ = Task.Run(() => _listenerRepository.StartListeningAsync(_listenerCancellation.Token));
-        }
+        _listenerCancellation.Cancel();
+        _listenerCancellation.Dispose();
+        _listenerCancellation = new CancellationTokenSource();
+        _listenerRepository = new DbRepository(
+            AppConfig.GetConnectionString(
+                _currentUser,
+                AppConfig.GetConfiguredRolePassword(_currentUser)));
+        _listenerRepository.OnNotificationReceived += HandleNotification;
+        _ = Task.Run(() => _listenerRepository.StartListeningAsync(_listenerCancellation.Token));
         _listenerStatus = "Đang hoạt động";
         UpdateHeaderStatus();
         ApplyContext();
@@ -555,17 +568,16 @@ public partial class MainForm : Form
     private void ShowError(Exception exception)
     {
         var error = DbRepository.ParseException(exception);
-        _errorLabel.Text = $"SQLSTATE {error.SqlState}: {error.Message} {error.ConstraintName}";
+        var constraint = string.IsNullOrWhiteSpace(error.ConstraintName)
+            ? string.Empty
+            : $" (Ràng buộc: {error.ConstraintName})";
+        _errorLabel.Text = $"SQLSTATE {error.SqlState}: Thao tác CSDL không thành công{constraint}.";
         _errorBanner.Visible = true;
     }
 
     public static string ResolveRole(string user)
     {
-        var u = (user ?? string.Empty).ToLowerInvariant();
-        if (u.Contains("manager")) return "role_manager";
-        if (u.Contains("thao") || u.Contains("cashier") || u.Contains("nam")) return "role_cashier";
-        if (u.Contains("hung") || u.Contains("tech")) return "role_technician";
-        return "role_admin";
+        return AppConfig.ResolveRole(user);
     }
 
     public static bool IsTabForbidden(string key, string role)
@@ -575,11 +587,7 @@ public partial class MainForm : Form
         {
             return key is "Reports" or "Maintenance" or "AiCenter" or "Settings";
         }
-        if (role == "role_technician")
-        {
-            return key is "Orders" or "Invoices" or "Reports" or "AiCenter" or "Settings";
-        }
-        return false;
+        return true;
     }
 
     private void UpdateNavigationStates(string role)
@@ -607,12 +615,12 @@ public partial class MainForm : Form
         var role = ResolveRole(user);
         var label = role switch
         {
-            "role_manager" => "Vai trò demo: Quản lý",
-            "role_cashier" => "Vai trò demo: Thu ngân",
-            "role_technician" => "Vai trò demo: Kỹ thuật viên",
-            _ => "Vai trò demo: Siêu quản trị"
+            "role_admin" => "Siêu quản trị",
+            "role_manager" => "Quản lý",
+            "role_cashier" => "Nhân viên",
+            _ => "Tài khoản chưa được cấp role"
         };
-        return new RoleOption(user, $"{label} ({role})");
+        return new RoleOption(user, $"{label} ({user})");
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

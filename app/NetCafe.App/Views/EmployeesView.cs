@@ -20,7 +20,7 @@ public partial class EmployeesView : AdminCardViewBase
     public EmployeesView()
     {
         InitializeComponent();
-        SetTitle("Nhân viên & Phân quyền", "Lương chỉ hiển thị khi PostgreSQL cho phép; Cashier/Technician không đọc được cột salary.");
+        SetTitle("Nhân viên & Phân quyền", "Lương chỉ hiển thị cho Siêu quản trị; Quản lý và Nhân viên không đọc được cột salary.");
         ConfigureButton(_salaryButton, "👁️ Xem bảng lương & Thông tin nhạy cảm", CyberTheme.Warning, 250);
         ConfigureButton(_createButton, "+ Thêm NV / Phân quyền", CyberTheme.Primary, 165);
         ConfigureButton(_editButton, "Chỉnh sửa", CyberTheme.SurfaceRaised, 86);
@@ -66,17 +66,15 @@ public partial class EmployeesView : AdminCardViewBase
         else if (context.IsManager)
         {
             _salaryButton.Visible = false;
-            _createButton.Enabled = true;
-            _editButton.Enabled = true;
-            _toggleButton.Enabled = true;
-            _resetPasswordButton.Enabled = true;
+            _createButton.Enabled = false;
+            _editButton.Enabled = false;
+            _toggleButton.Enabled = false;
+            _resetPasswordButton.Enabled = false;
         }
         else
         {
-            _salaryButton.Visible = true;
-            _salaryButton.Enabled = true;
-            _salaryButton.Text = "👁️ Xem bảng lương (Yêu cầu quyền DBA)";
-            CyberTheme.StyleButton(_salaryButton, CyberTheme.Warning);
+            _salaryButton.Visible = false;
+            _salaryButton.Enabled = false;
             _createButton.Enabled = false;
             _editButton.Enabled = false;
             _toggleButton.Enabled = false;
@@ -96,9 +94,7 @@ public partial class EmployeesView : AdminCardViewBase
         {
             "admin" => "Quản trị viên",
             "manager" => "Quản lý",
-            "cashier" => "Thu ngân",
-            "staff" => "Nhân viên",
-            "technician" => "Kỹ thuật viên",
+            "cashier" => "Nhân viên",
             _ => employee.EmpRole
         };
         var salaryText = _showSalary && employee.Salary.HasValue
@@ -262,7 +258,7 @@ internal sealed class EmployeeEditorDialog : Form
     public string Username => _usernameBox.Text.Trim();
     public string DbUsername => _dbUsernameBox.Text.Trim();
     public string Password => _passwordBox.Text;
-    public string Role => _roleBox.SelectedItem?.ToString() ?? "staff";
+    public string Role => _roleBox.SelectedItem?.ToString() ?? "cashier";
     public string Shift => _shiftBox.SelectedItem?.ToString() ?? "morning";
     public decimal Salary => _salaryBox.Value;
 
@@ -279,8 +275,10 @@ internal sealed class EmployeeEditorDialog : Form
         MinimizeBox = false;
 
         _roleBox.DropDownStyle = ComboBoxStyle.DropDownList;
-        _roleBox.Items.AddRange(new object[] { "admin", "manager", "cashier", "staff", "technician" });
-        _roleBox.SelectedItem = employee?.EmpRole ?? "staff";
+        _roleBox.Items.AddRange(new object[] { "admin", "manager", "cashier" });
+        _roleBox.SelectedItem = employee?.EmpRole is "admin" or "manager" or "cashier"
+            ? employee.EmpRole
+            : "cashier";
         _shiftBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _shiftBox.Items.AddRange(new object[] { "morning", "afternoon", "night" });
         _shiftBox.SelectedItem = employee?.DefaultShift ?? "morning";
@@ -440,8 +438,7 @@ internal sealed class EmployeeSalaryDialog : Form
             {
                 "admin" => "Quản trị viên",
                 "manager" => "Quản lý",
-                "cashier" => "Thu ngân",
-                "technician" => "Kỹ thuật viên",
+                "cashier" => "Nhân viên",
                 _ => emp.EmpRole
             };
             var sal = emp.Salary ?? 0;

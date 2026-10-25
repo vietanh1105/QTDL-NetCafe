@@ -44,7 +44,7 @@ namespace NetCafe.Data
                 builder.ConnectionPruningInterval = 10;
                 builder.Pooling = true;
                 if (builder.MaxPoolSize <= 0 || builder.MaxPoolSize > 50) builder.MaxPoolSize = 25;
-                builder.IncludeErrorDetail = true;
+                builder.IncludeErrorDetail = false;
                 return builder.ConnectionString;
             }
             catch

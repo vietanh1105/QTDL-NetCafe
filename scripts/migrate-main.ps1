@@ -21,14 +21,16 @@ function Read-EnvFile([string]$path) {
 $envPath = if ($env:NETCAFE_ENV_FILE) { $env:NETCAFE_ENV_FILE } else { Join-Path $repoRoot '.env' }
 if (-not (Test-Path -LiteralPath $envPath)) { throw "Không tìm thấy .env: $envPath" }
 $config = Read-EnvFile $envPath
-foreach ($key in @('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_SSL_MODE', 'STATION_SERVICE_EMPLOYEE_ID', 'STATION_DB_USER', 'STATION_DB_PASSWORD')) {
+foreach ($key in @('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_OWNER_USER', 'DB_OWNER_PASSWORD', 'DB_SSL_MODE', 'DB_ADMIN_USER', 'DB_ADMIN_PASSWORD', 'DB_MANAGER_USER', 'DB_MANAGER_PASSWORD', 'DB_CASHIER_USER', 'DB_CASHIER_PASSWORD', 'STATION_SERVICE_EMPLOYEE_ID', 'STATION_DB_USER', 'STATION_DB_PASSWORD')) {
     $environmentValue = [Environment]::GetEnvironmentVariable($key)
     if ($environmentValue) { $config[$key] = $environmentValue }
 }
 
 $dbName = $config['DB_NAME']
 if ($dbName -ne 'netcafe_db') { throw "Migration chính bị chặn: DB_NAME phải là netcafe_db, hiện là $dbName." }
-if (-not $config['DB_PASSWORD']) { throw "Thiếu DB_PASSWORD; không ghi credential vào source hoặc log." }
+$ownerUser = if ($config['DB_OWNER_USER']) { $config['DB_OWNER_USER'] } else { $config['DB_USER'] }
+$ownerPassword = if ($config['DB_OWNER_PASSWORD']) { $config['DB_OWNER_PASSWORD'] } else { $config['DB_PASSWORD'] }
+if (-not $ownerPassword) { throw "Thiếu DB_OWNER_PASSWORD; không ghi credential vào source hoặc log." }
 if (-not $config['STATION_SERVICE_EMPLOYEE_ID']) { throw "Thiếu STATION_SERVICE_EMPLOYEE_ID; phải trỏ nhân viên active hiện có." }
 $serviceEmployeeId = 0
 if (-not [int]::TryParse($config['STATION_SERVICE_EMPLOYEE_ID'], [ref]$serviceEmployeeId) -or $serviceEmployeeId -le 0) {
@@ -37,6 +39,9 @@ if (-not [int]::TryParse($config['STATION_SERVICE_EMPLOYEE_ID'], [ref]$serviceEm
 $stationRole = if ($config['STATION_DB_USER']) { $config['STATION_DB_USER'] } else { 'station_runtime' }
 if ($stationRole -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw "STATION_DB_USER có ký tự không hợp lệ." }
 if (-not $config['STATION_DB_PASSWORD']) { throw "Thiếu STATION_DB_PASSWORD; station không được dùng DB owner." }
+foreach ($key in @('DB_ADMIN_PASSWORD', 'DB_MANAGER_PASSWORD', 'DB_CASHIER_PASSWORD')) {
+    if (-not $config[$key]) { throw "Thiếu $key; cần cấp password riêng cho ba role ứng dụng." }
+}
 
 $pgBin = if ($env:PG_BIN) { Join-Path $env:PG_BIN 'psql.exe' } else { $null }
 $pgDump = if ($env:PG_BIN) { Join-Path $env:PG_BIN 'pg_dump.exe' } else { $null }
@@ -53,11 +58,11 @@ if (-not (Test-Path $pgBin) -or -not (Test-Path $pgDump)) { throw 'psql.exe and 
 $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $backupDir = Join-Path $repoRoot "backup\main-migration-$timestamp"
 New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-$env:PGPASSWORD = $config['DB_PASSWORD']
+$env:PGPASSWORD = $ownerPassword
 $env:PGSSLMODE = if ($config['DB_SSL_MODE']) { $config['DB_SSL_MODE'].ToLowerInvariant() } else { 'require' }
 $hostName = $config['DB_HOST']
 $port = $config['DB_PORT']
-$user = $config['DB_USER']
+$user = $ownerUser
 
 $dumpPath = Join-Path $backupDir 'netcafe_db_before_08.dump'
 & $pgDump -h $hostName -p $port -U $user -d $dbName --format=custom --file=$dumpPath
@@ -77,7 +82,8 @@ $migrationPaths = @(
     (Join-Path $repoRoot 'sql\07_ai_modules.sql'),
     (Join-Path $repoRoot 'sql\08_station_customer.sql'),
     (Join-Path $repoRoot 'sql\10_admin_operations.sql'),
-    (Join-Path $repoRoot 'sql\11_report_alignment.sql')
+    (Join-Path $repoRoot 'sql\11_report_alignment.sql'),
+    (Join-Path $repoRoot 'sql\12_security_hardening.sql')
 )
 foreach ($migrationPath in $migrationPaths) {
     $migrationText = Get-Content -Raw -LiteralPath $migrationPath
@@ -117,6 +123,29 @@ $configureSql = $configureSql.Replace('__QUOTED_ROLE__', $quotedRole)
 $configureSql = $configureSql.Replace('__STATION_PASSWORD__', $escapedStationPassword)
 & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -c $configureSql
 if ($LASTEXITCODE -ne 0) { throw 'Service employee/station role configuration failed.' }
+
+$humanRoles = @(
+    @{ Group = 'role_admin'; User = $(if ($config['DB_ADMIN_USER']) { $config['DB_ADMIN_USER'] } else { 'nv_admin' }); Password = $config['DB_ADMIN_PASSWORD'] },
+    @{ Group = 'role_manager'; User = $(if ($config['DB_MANAGER_USER']) { $config['DB_MANAGER_USER'] } else { 'nv_manager' }); Password = $config['DB_MANAGER_PASSWORD'] },
+    @{ Group = 'role_cashier'; User = $(if ($config['DB_CASHIER_USER']) { $config['DB_CASHIER_USER'] } else { 'nv_thao' }); Password = $config['DB_CASHIER_PASSWORD'] }
+)
+foreach ($account in $humanRoles) {
+    if ($account.User -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw "DB role có ký tự không hợp lệ: $($account.User)" }
+    $quotedUser = '"' + $account.User.Replace('"', '""') + '"'
+    $escapedPassword = $account.Password.Replace("'", "''")
+    $roleSql = @"
+DO `$`$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$($account.User)') THEN
+        CREATE ROLE $quotedUser LOGIN;
+    END IF;
+END `$`$;
+ALTER ROLE $quotedUser WITH LOGIN PASSWORD '$escapedPassword';
+GRANT $($account.Group) TO $quotedUser;
+"@
+    & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -c $roleSql
+    if ($LASTEXITCODE -ne 0) { throw "Provision role thất bại: $($account.User)" }
+}
 
 $verifySql = @'
 SELECT current_database(), current_user;

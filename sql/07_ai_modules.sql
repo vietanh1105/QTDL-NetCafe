@@ -52,12 +52,12 @@ BEGIN
 
     -- Trích xuất JSON và kiểm tra rủi ro
     IF (TG_OP = 'DELETE') THEN
-        v_old_json := to_jsonb(OLD);
+        v_old_json := to_jsonb(OLD) - 'password_hash' - 'salary';
         v_risk_score := v_risk_score + 30;
         v_reason := v_reason || '[Hành động xóa dữ liệu nhạy cảm] ';
     ELSIF (TG_OP = 'UPDATE') THEN
-        v_old_json := to_jsonb(OLD);
-        v_new_json := to_jsonb(NEW);
+        v_old_json := to_jsonb(OLD) - 'password_hash' - 'salary';
+        v_new_json := to_jsonb(NEW) - 'password_hash' - 'salary';
         
         -- Kiểm tra thay đổi lương nhân viên
         IF TG_TABLE_NAME = 'employee' THEN
@@ -72,7 +72,7 @@ BEGIN
             END IF;
         END IF;
     ELSIF (TG_OP = 'INSERT') THEN
-        v_new_json := to_jsonb(NEW);
+        v_new_json := to_jsonb(NEW) - 'password_hash' - 'salary';
 
         -- Kiểm tra giao dịch nạp tiền hoặc thanh toán lớn bất thường (>= 5.000.000 VNĐ)
         IF TG_TABLE_NAME = 'payment' THEN

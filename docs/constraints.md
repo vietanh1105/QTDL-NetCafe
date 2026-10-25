@@ -15,7 +15,7 @@
 | `hr.employee` | `username` | **CHECK (Regex)** | `CHECK (username ~ '^[a-z][a-z0-9_]{3,29}$')` | Chuẩn hóa tài khoản chữ thường 4-30 ký tự | Chèn username bắt đầu bằng số `123admin` |
 | `hr.employee` | `phone` | **CHECK (Regex)** | `CHECK (phone ~ '^0[35789][0-9]{8}$')` | Chuẩn hóa SĐT di động Việt Nam 10 chữ số | Chèn SĐT quá ngắn `12345` hoặc đầu số `01...` |
 | `hr.employee` | `salary` | **CHECK** | `CHECK (salary >= 0)` | Lương không được âm | Nhập lương `-5000000` |
-| `hr.employee` | `emp_role` | **CHECK** | `CHECK (emp_role IN ('admin','manager','cashier','staff','technician'))` | Giới hạn 5 vai trò hệ thống hợp lệ | Gán quyền không xác định `super_user` |
+| `hr.employee` | `emp_role` | **CHECK** | `CHECK (emp_role IN ('admin','manager','cashier'))` | Giới hạn 3 vai trò người dùng hợp lệ | Gán quyền không xác định `super_user` |
 | `hr.employee` | `default_shift` | **CHECK** | `CHECK (default_shift IN ('morning','afternoon','night'))` | Chuẩn hóa 3 ca làm việc | Gán ca `midnight` |
 | `core.room` | `room_name` | **UNIQUE** | `CONSTRAINT uq_room_name UNIQUE (room_name)` | Không trùng tên khu vực phòng | Tạo 2 phòng cùng tên "VIP 1" |
 | `core.computer_type` | `hourly_rate` | **CHECK** | `CHECK (hourly_rate >= 0)` | Đơn giá thuê giờ không được âm | Nhập giá giờ `-10000` |

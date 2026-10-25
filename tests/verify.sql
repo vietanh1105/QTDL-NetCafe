@@ -42,7 +42,7 @@ BEGIN
     -- BƯỚC 1: DỮ LIỆU CƠ BẢN HỢP LỆ (HAPPY PATH)
     -- ------------------------------------------------------------------------
     INSERT INTO hr.employee (full_name, phone, username, db_username, password_hash, emp_role, default_shift, salary)
-    VALUES ('Nguyen Van An', '0981234567', 'an_nguyen', 'nv_an', crypt('Demo@123', gen_salt('bf')), 'admin', 'morning', 15000000)
+    VALUES ('Nguyen Van An', '0981234567', 'an_nguyen', 'nv_an', crypt(gen_random_uuid()::text, gen_salt('bf')), 'admin', 'morning', 15000000)
     RETURNING employee_id INTO v_emp_id;
 
     INSERT INTO core.room (room_name, description)
@@ -58,7 +58,7 @@ BEGIN
     RETURNING computer_id INTO v_comp_id;
 
     INSERT INTO core.customer (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier)
-    VALUES ('Tran Van Binh', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt('Pass@123', gen_salt('bf')), 50000, 100, 'silver')
+    VALUES ('Tran Van Binh', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 100, 'silver')
     RETURNING customer_id INTO v_cust_id;
 
     INSERT INTO inventory.product_category (category_name)

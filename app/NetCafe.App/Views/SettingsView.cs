@@ -62,7 +62,7 @@ public partial class SettingsView : AdminCardViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var context = RequiredContext;
-        if (context.IsCashier || context.IsTechnician)
+        if (context.IsCashier)
         {
             UpdateRolePermissions(context);
             return;

@@ -22,11 +22,12 @@ if (-not $psql) {
 if (-not $psql) { throw "Không tìm thấy psql.exe; đặt PG_BIN trước khi chạy QA." }
 $hostName = if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }
 $port = if ($env:DB_PORT) { $env:DB_PORT } else { "5432" }
-$user = if ($env:DB_USER) { $env:DB_USER } else { "postgres" }
-if ([string]::IsNullOrWhiteSpace($env:DB_PASSWORD)) {
-    throw "QA reset bị dừng trước khi kết nối: cần đặt DB_PASSWORD cho PostgreSQL local."
+$user = if ($env:DB_OWNER_USER) { $env:DB_OWNER_USER } elseif ($env:DB_USER) { $env:DB_USER } else { "postgres" }
+$ownerPassword = if ($env:DB_OWNER_PASSWORD) { $env:DB_OWNER_PASSWORD } else { $env:DB_PASSWORD }
+if ([string]::IsNullOrWhiteSpace($ownerPassword)) {
+    throw "QA reset bị dừng trước khi kết nối: cần đặt DB_OWNER_PASSWORD cho PostgreSQL local."
 }
-$env:PGPASSWORD = $env:DB_PASSWORD
+$env:PGPASSWORD = $ownerPassword
 
 function Invoke-QA([string]$sql) {
     & $psql -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d postgres -c $sql
@@ -47,7 +48,8 @@ $files = @(
     "sql/07_ai_modules.sql",
     "sql/08_station_customer.sql",
     "sql/10_admin_operations.sql",
-    "sql/11_report_alignment.sql"
+    "sql/11_report_alignment.sql",
+    "sql/12_security_hardening.sql"
 )
 
 foreach ($relativePath in $files) {
@@ -95,6 +97,34 @@ if ($stationPassword) { $configSql += "`nALTER ROLE $quotedStationRole WITH LOGI
 & $psql -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $qaDatabase -c $configSql
 if ($LASTEXITCODE -ne 0) { throw "Cấu hình station QA thất bại." }
 
+$humanRoles = @(
+    @{ Group = 'role_admin'; User = $(if ($env:DB_ADMIN_USER) { $env:DB_ADMIN_USER } else { 'nv_admin' }); Password = $env:DB_ADMIN_PASSWORD },
+    @{ Group = 'role_manager'; User = $(if ($env:DB_MANAGER_USER) { $env:DB_MANAGER_USER } else { 'nv_manager' }); Password = $env:DB_MANAGER_PASSWORD },
+    @{ Group = 'role_cashier'; User = $(if ($env:DB_CASHIER_USER) { $env:DB_CASHIER_USER } else { 'nv_thao' }); Password = $env:DB_CASHIER_PASSWORD }
+)
+foreach ($account in $humanRoles) {
+    if ($account.User -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+        throw "DB role có ký tự không hợp lệ: $($account.User)"
+    }
+    if ([string]::IsNullOrWhiteSpace($account.Password)) {
+        throw "Thiếu password cho $($account.Group). Đặt DB_ADMIN_PASSWORD/DB_MANAGER_PASSWORD/DB_CASHIER_PASSWORD ngoài source."
+    }
+    $quotedUser = '"' + $account.User.Replace('"', '""') + '"'
+    $escapedPassword = $account.Password.Replace("'", "''")
+    $roleSql = @"
+DO `$`$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$($account.User)') THEN
+        CREATE ROLE $quotedUser LOGIN;
+    END IF;
+END `$`$;
+ALTER ROLE $quotedUser WITH LOGIN PASSWORD '$escapedPassword';
+GRANT $($account.Group) TO $quotedUser;
+"@
+    & $psql -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $qaDatabase -c $roleSql
+    if ($LASTEXITCODE -ne 0) { throw "Provision role thất bại: $($account.User)" }
+}
+
 & $psql -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $qaDatabase -c @"
 CREATE TABLE IF NOT EXISTS core.qa_reset_marker (
     marker_id INTEGER PRIMARY KEY,
@@ -102,7 +132,7 @@ CREATE TABLE IF NOT EXISTS core.qa_reset_marker (
     reset_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 INSERT INTO core.qa_reset_marker (marker_id, schema_version)
-VALUES (1, '10_admin_operations')
+VALUES (1, '12_security_hardening')
 ON CONFLICT (marker_id) DO UPDATE SET schema_version = EXCLUDED.schema_version, reset_at = clock_timestamp();
 "@
 if ($LASTEXITCODE -ne 0) { throw "QA marker failed" }

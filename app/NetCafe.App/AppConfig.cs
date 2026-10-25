@@ -14,10 +14,17 @@ namespace NetCafe.App
         public static string Host { get; set; } = "localhost";
         public static int Port { get; set; } = 5432;
         public static string Database { get; set; } = "netcafe_qa";
-        public static string Username { get; set; } = "postgres";
+        public static string Username { get; set; } = string.Empty;
         public static string Password { get; set; } = string.Empty;
         public static string SslMode { get; set; } = "Disable";
         public static bool TrustServerCertificate { get; set; } = true;
+        public static bool IncludeErrorDetail { get; private set; }
+        public static string AdminUser { get; private set; } = "nv_admin";
+        public static string ManagerUser { get; private set; } = "nv_manager";
+        public static string CashierUser { get; private set; } = "nv_thao";
+        public static string AdminPassword { get; private set; } = string.Empty;
+        public static string ManagerPassword { get; private set; } = string.Empty;
+        public static string CashierPassword { get; private set; } = string.Empty;
         public static int StationServiceEmployeeId { get; private set; }
         public static int AdminEmployeeId { get; private set; }
         public static string LoadedEnvFile { get; private set; } = string.Empty;
@@ -69,6 +76,24 @@ namespace NetCafe.App
             Username = Environment.GetEnvironmentVariable("DB_USER") ?? Username;
             Password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? Password;
             SslMode = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? SslMode;
+            AdminUser = Environment.GetEnvironmentVariable("DB_ADMIN_USER") ?? AdminUser;
+            ManagerUser = Environment.GetEnvironmentVariable("DB_MANAGER_USER") ?? ManagerUser;
+            CashierUser = Environment.GetEnvironmentVariable("DB_CASHIER_USER") ?? CashierUser;
+            AdminPassword = Environment.GetEnvironmentVariable("DB_ADMIN_PASSWORD") ?? AdminPassword;
+            ManagerPassword = Environment.GetEnvironmentVariable("DB_MANAGER_PASSWORD") ?? ManagerPassword;
+            CashierPassword = Environment.GetEnvironmentVariable("DB_CASHIER_PASSWORD") ?? CashierPassword;
+            IncludeErrorDetail = bool.TryParse(
+                Environment.GetEnvironmentVariable("DB_INCLUDE_ERROR_DETAIL"),
+                out var includeErrorDetail) && includeErrorDetail;
+            if (string.IsNullOrWhiteSpace(Username))
+            {
+                Username = AdminUser;
+            }
+            if (string.IsNullOrWhiteSpace(Password) &&
+                string.Equals(Username, AdminUser, StringComparison.OrdinalIgnoreCase))
+            {
+                Password = AdminPassword;
+            }
             if (int.TryParse(Environment.GetEnvironmentVariable("STATION_SERVICE_EMPLOYEE_ID"), out var envEmployeeId))
             {
                 StationServiceEmployeeId = envEmployeeId;
@@ -102,6 +127,16 @@ namespace NetCafe.App
                     else if (key == "DB_USER") Username = val;
                     else if (key == "DB_PASSWORD") Password = val;
                     else if (key == "DB_SSL_MODE") SslMode = val;
+                    else if (key == "DB_ADMIN_USER") AdminUser = val;
+                    else if (key == "DB_MANAGER_USER") ManagerUser = val;
+                    else if (key == "DB_CASHIER_USER") CashierUser = val;
+                    else if (key == "DB_ADMIN_PASSWORD") AdminPassword = val;
+                    else if (key == "DB_MANAGER_PASSWORD") ManagerPassword = val;
+                    else if (key == "DB_CASHIER_PASSWORD") CashierPassword = val;
+                    else if (key == "DB_INCLUDE_ERROR_DETAIL" && bool.TryParse(val, out var includeErrorDetail))
+                    {
+                        IncludeErrorDetail = includeErrorDetail;
+                    }
                     else if (key == "STATION_SERVICE_EMPLOYEE_ID" && int.TryParse(val, out var employeeId))
                     {
                         StationServiceEmployeeId = employeeId;
@@ -142,7 +177,7 @@ namespace NetCafe.App
                 ConnectionPruningInterval = 10,
                 Pooling = true,
                 MaxPoolSize = 25,
-                IncludeErrorDetail = true
+                IncludeErrorDetail = AppConfig.IncludeErrorDetail
             };
 
             if (!string.IsNullOrEmpty(SslMode) &&
@@ -154,42 +189,63 @@ namespace NetCafe.App
             return builder.ConnectionString;
         }
 
-        public static string GetConfiguredRolePassword(string role)
+        public static string ResolveRole(string user)
         {
-            if (string.Equals(role, Username, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(user, AdminUser, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user, "nv_admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return "role_admin";
+            }
+            if (string.Equals(user, ManagerUser, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user, "nv_manager", StringComparison.OrdinalIgnoreCase))
+            {
+                return "role_manager";
+            }
+            if (string.Equals(user, CashierUser, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user, "nv_thao", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user, "nv_nam", StringComparison.OrdinalIgnoreCase))
+            {
+                return "role_cashier";
+            }
+            return "role_unknown";
+        }
+
+        public static string GetConfiguredRolePassword(string user)
+        {
+            if (string.Equals(user, Username, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(Password))
             {
                 return Password;
             }
 
-            var key = role switch
+            return ResolveRole(user) switch
             {
-                "nv_thao" => "DB_CASHIER_PASSWORD",
-                "nv_manager" => "DB_MANAGER_PASSWORD",
-                "nv_hung" => "DB_TECHNICIAN_PASSWORD",
-                _ => "DB_ADMIN_PASSWORD"
+                "role_admin" => AdminPassword,
+                "role_manager" => ManagerPassword,
+                "role_cashier" => CashierPassword,
+                _ => string.Empty
             };
-            var pwd = Environment.GetEnvironmentVariable(key);
-            if (string.IsNullOrWhiteSpace(pwd))
-            {
-                pwd = Environment.GetEnvironmentVariable("DEMO_PASSWORD");
-            }
-            return pwd ?? string.Empty;
         }
 
         public static IReadOnlyList<string> GetConfiguredRoles()
         {
             var roles = new List<string>();
-            if (!string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password))
+            foreach (var roleUser in new[] { AdminUser, ManagerUser, CashierUser })
             {
-                roles.Add(Username);
+                if (!string.IsNullOrWhiteSpace(roleUser) &&
+                    !string.IsNullOrWhiteSpace(GetConfiguredRolePassword(roleUser)) &&
+                    !roles.Contains(roleUser, StringComparer.OrdinalIgnoreCase))
+                {
+                    roles.Add(roleUser);
+                }
             }
 
-            foreach (var role in new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" })
+            if (!string.IsNullOrWhiteSpace(Username) &&
+                !string.IsNullOrWhiteSpace(Password) &&
+                ResolveRole(Username) != "role_unknown" &&
+                !roles.Contains(Username, StringComparer.OrdinalIgnoreCase))
             {
-                if (!string.IsNullOrWhiteSpace(GetConfiguredRolePassword(role)) && !roles.Contains(role))
-                {
-                    roles.Add(role);
-                }
+                roles.Add(Username);
             }
 
             return roles;

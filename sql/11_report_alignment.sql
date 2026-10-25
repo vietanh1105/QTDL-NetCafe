@@ -43,6 +43,8 @@ FROM reporting.vw_daily_revenue;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_revenue_daily_date
     ON reporting.mv_revenue_daily (revenue_date);
 
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier;
+
 CREATE OR REPLACE FUNCTION reporting.sp_refresh_materialized_views()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -58,7 +60,7 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
 GRANT pg_read_all_stats TO role_admin, role_manager;

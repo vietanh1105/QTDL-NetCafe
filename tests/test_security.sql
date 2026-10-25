@@ -83,38 +83,28 @@ SELECT count(*) AS invoices_seen_by_nam,
 FROM billing.invoice;
 RESET ROLE;
 
--- Chuẩn bị dữ liệu mẫu bảo trì nếu chưa có (1 việc cho nv_hung ID=6, 1 việc cho nv_admin ID=1)
-INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
-SELECT 1, 6, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'
-WHERE NOT EXISTS (SELECT 1 FROM hr.maintenance WHERE computer_id = 1 AND technician_id = 6);
-
-INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
-SELECT 2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL
-WHERE NOT EXISTS (SELECT 1 FROM hr.maintenance WHERE computer_id = 2 AND technician_id = 1);
-
 SELECT '--- TEST 4.1: Manager thấy toàn bộ lịch sử bảo trì ---' AS test_case;
 SET ROLE nv_manager;
 SELECT count(*) AS total_maintenance_seen_by_manager FROM hr.maintenance;
 RESET ROLE;
 
-SELECT '--- TEST 4.2: Kỹ thuật viên nv_hung (ID = 6) chỉ thấy bảo trì của mình ---' AS test_case;
-SET ROLE nv_hung;
-SELECT maintenance_id, computer_id, technician_id, issue_description, status 
-FROM hr.maintenance;
+SELECT '--- TEST 4.2: Manager được phép đọc menu vận hành ---' AS test_case;
+SET ROLE nv_manager;
+SELECT count(*) AS products_seen_by_manager FROM inventory.product;
 RESET ROLE;
 
 -- ----------------------------------------------------------------------------
 -- TEST 5: ĐẶC QUYỀN TỐI THIỂU (LEAST PRIVILEGE) & SCHEMA BOUNDARIES
 -- ----------------------------------------------------------------------------
-SELECT '--- TEST 5.1: Nhân viên phục vụ nv_tuan cố xem hóa đơn billing (Kỳ vọng: BỊ CHẶN) ---' AS test_case;
+SELECT '--- TEST 5.1: Cashier cố sửa trực tiếp số dư (Kỳ vọng: BỊ CHẶN) ---' AS test_case;
 DO $$
 BEGIN
-    SET ROLE nv_tuan;
+    SET ROLE nv_thao;
     BEGIN
-        PERFORM count(*) FROM billing.invoice;
-        RAISE EXCEPTION 'LỖI: nv_tuan không có quyền nhưng lại đọc được invoice!';
+        UPDATE core.customer SET balance = balance + 1 WHERE customer_id = 1;
+        RAISE EXCEPTION 'LỖI: cashier sửa trực tiếp được balance!';
     EXCEPTION WHEN insufficient_privilege THEN
-        RAISE NOTICE 'THÀNH CÔNG: Đã chặn nv_tuan đọc schema billing (permission denied).';
+        RAISE NOTICE 'THÀNH CÔNG: Đã chặn cashier ghi trực tiếp core.customer.';
     END;
     RESET ROLE;
 END $$;

@@ -58,13 +58,13 @@ CREATE TABLE hr.employee (
 
     -- Ràng buộc kiểm tra CHECK
     CONSTRAINT ck_employee_salary CHECK (salary >= 0),
-    CONSTRAINT ck_employee_role CHECK (emp_role IN ('admin', 'manager', 'cashier', 'staff', 'technician')),
+    CONSTRAINT ck_employee_role CHECK (emp_role IN ('admin', 'manager', 'cashier')),
     CONSTRAINT ck_employee_shift CHECK (default_shift IN ('morning', 'afternoon', 'night')),
     CONSTRAINT ck_employee_phone CHECK (phone ~ '^0[35789][0-9]{8}$'),
     CONSTRAINT ck_employee_username CHECK (username ~ '^[a-z][a-z0-9_]{3,29}$')
 );
 COMMENT ON TABLE hr.employee IS 'Bảng nhân viên và tài khoản vận hành, ánh xạ role PostgreSQL qua db_username';
-COMMENT ON COLUMN hr.employee.salary IS 'Cột nhạy cảm: Bảo vệ bằng Column-Level Security đối với cashier/staff/technician';
+COMMENT ON COLUMN hr.employee.salary IS 'Cột nhạy cảm: Bảo vệ bằng Column-Level Security đối với manager/cashier';
 
 -- ----------------------------------------------------------------------------
 -- 4. SCHEMA CORE (Nghiệp vụ phòng máy cốt lõi)

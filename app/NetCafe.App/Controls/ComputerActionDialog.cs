@@ -100,13 +100,7 @@ public sealed class ComputerActionDialog : Form
         actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
         actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-        if (_context.IsTechnician)
-        {
-            _primaryActionButton.Text = "🔒 Chỉ xem trạng thái máy";
-            CyberTheme.StyleButton(_primaryActionButton, CyberTheme.MutedText);
-            _primaryActionButton.Enabled = false;
-        }
-        else if (_computer.ComputerStatus == "in_use")
+        if (_computer.ComputerStatus == "in_use")
         {
             _primaryActionButton.Text = "⏹ Kết thúc & Tính tiền";
             CyberTheme.StyleButton(_primaryActionButton, CyberTheme.Danger);
@@ -127,13 +121,7 @@ public sealed class ComputerActionDialog : Form
             _primaryActionButton.Enabled = false;
         }
 
-        if (_context.IsTechnician)
-        {
-            _customerButton.Text = "🔒 Cấm truy cập ví";
-            CyberTheme.StyleButton(_customerButton, CyberTheme.MutedText);
-            _customerButton.Enabled = false;
-        }
-        else if (_computer.ComputerStatus == "in_use")
+        if (_computer.ComputerStatus == "in_use")
         {
             if (_computer.CurrentCustomerId.HasValue)
             {
@@ -199,7 +187,7 @@ public sealed class ComputerActionDialog : Form
 
         _maintenanceButton.Click += async (_, _) => await ToggleMaintenanceAsync();
         _refreshButton.Click += async (_, _) => await RefreshAsync();
-        var canMaintain = (_context.IsAdmin || _context.IsManager || _context.IsTechnician) && _computer.ComputerStatus != "in_use";
+        var canMaintain = (_context.IsAdmin || _context.IsManager) && _computer.ComputerStatus != "in_use";
         _maintenanceButton.Enabled = canMaintain;
     }
 
@@ -268,7 +256,7 @@ public sealed class ComputerActionDialog : Form
 
     private async Task TopUpForCurrentCustomerAsync()
     {
-        if (!_computer.CurrentCustomerId.HasValue || !_context.CanManageCustomers || _context.IsTechnician)
+        if (!_computer.CurrentCustomerId.HasValue || !_context.CanManageCustomers)
         {
             _messageLabel.Text = "Không thể nạp tiền cho phiên chơi này.";
             return;
@@ -439,7 +427,7 @@ public sealed class ComputerActionDialog : Form
             {
                 var technicians = (await _context.Repository.GetEmployeesAsync())
                     .Where(employee => employee.IsActive)
-                    .Where(employee => employee.EmpRole.Equals("technician", StringComparison.OrdinalIgnoreCase))
+                    .Where(employee => employee.EmpRole is "admin" or "manager")
                     .ToList();
                 if (technicians.Count == 0)
                 {

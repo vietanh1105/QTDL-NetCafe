@@ -83,7 +83,7 @@ public partial class AiCenterView : AdminCardViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (RequiredContext.IsCashier || RequiredContext.IsTechnician)
+        if (RequiredContext.IsCashier)
         {
             UpdateRolePermissions(RequiredContext);
             return;

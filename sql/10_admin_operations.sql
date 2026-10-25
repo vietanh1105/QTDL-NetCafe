@@ -187,9 +187,9 @@ BEGIN
         SELECT 1 FROM hr.employee
         WHERE employee_id = p_technician_id
           AND is_active = TRUE
-          AND emp_role = 'technician'
+          AND emp_role IN ('admin', 'manager')
     ) THEN
-        RAISE EXCEPTION 'Nhân viên phụ trách phải là technician đang hoạt động.' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'Người phụ trách phải là admin hoặc manager đang hoạt động.' USING ERRCODE = '23514';
     END IF;
     IF NULLIF(trim(p_issue_description), '') IS NULL THEN
         RAISE EXCEPTION 'Lý do bảo trì không được để trống.' USING ERRCODE = '22023';
@@ -327,14 +327,109 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION core.sp_create_customer(
+    p_full_name VARCHAR(100),
+    p_phone VARCHAR(20),
+    p_email VARCHAR(100),
+    p_username VARCHAR(50),
+    p_password TEXT
+) RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, public
+AS $$
+DECLARE
+    v_customer_id INT;
+BEGIN
+    IF NULLIF(trim(p_password), '') IS NULL THEN
+        RAISE EXCEPTION 'Mật khẩu hội viên không được để trống.' USING ERRCODE = '22023';
+    END IF;
+    INSERT INTO core.customer(full_name, phone, email, username, password_hash)
+    VALUES (
+        trim(p_full_name),
+        trim(p_phone),
+        NULLIF(trim(p_email), ''),
+        lower(trim(p_username)),
+        public.crypt(p_password, public.gen_salt('bf'))
+    )
+    RETURNING customer_id INTO v_customer_id;
+    RETURN v_customer_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_update_customer(
+    p_customer_id INT,
+    p_full_name VARCHAR(100),
+    p_phone VARCHAR(20),
+    p_email VARCHAR(100)
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    UPDATE core.customer
+    SET full_name = trim(p_full_name),
+        phone = trim(p_phone),
+        email = NULLIF(trim(p_email), '')
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_set_customer_active(
+    p_customer_id INT,
+    p_is_active BOOLEAN
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    UPDATE core.customer
+    SET is_active = p_is_active
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_reset_customer_password(
+    p_customer_id INT,
+    p_password TEXT
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, public
+AS $$
+BEGIN
+    IF NULLIF(trim(p_password), '') IS NULL THEN
+        RAISE EXCEPTION 'Mật khẩu hội viên không được để trống.' USING ERRCODE = '22023';
+    END IF;
+    UPDATE core.customer
+    SET password_hash = public.crypt(p_password, public.gen_salt('bf'))
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
 GRANT EXECUTE ON FUNCTION inventory.sp_receive_stock(INT, INT) TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
-GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
+GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier;
 GRANT EXECUTE ON FUNCTION billing.sp_void_invoice(BIGINT, INT) TO role_admin;
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION hr.sp_create_employee(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
+GRANT EXECUTE ON FUNCTION core.sp_create_customer(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_customer(INT, VARCHAR, VARCHAR, VARCHAR) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_set_customer_active(INT, BOOLEAN) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION core.sp_reset_customer_password(INT, TEXT) TO role_admin, role_manager;

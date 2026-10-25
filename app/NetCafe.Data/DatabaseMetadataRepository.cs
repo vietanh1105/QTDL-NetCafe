@@ -26,6 +26,7 @@ public partial class DbRepository
                                            'last_heartbeat_at']::text[])),
                                     to_regprocedure('inventory.fn_customer_menu_v2()') IS NOT NULL,
                                     to_regprocedure('core.sp_station_logout(bigint,integer,integer)') IS NOT NULL,
+                                    to_regclass('reporting.mv_revenue_daily') IS NOT NULL,
                                     has_table_privilege(current_user, 'core.customer', 'MAINTAIN')
                                     AND has_table_privilege(current_user, 'core.computer', 'MAINTAIN')
                                     AND has_table_privilege(current_user, 'core.gaming_session', 'MAINTAIN');";
@@ -49,7 +50,8 @@ public partial class DbRepository
             HasComputerGridContract = reader.GetBoolean(6),
             HasCustomerMenuContract = reader.GetBoolean(7),
             HasStationLogoutContract = reader.GetBoolean(8),
-            CanRunVacuum = reader.GetBoolean(9)
+            HasDailyRevenueMaterializedView = reader.GetBoolean(9),
+            CanRunVacuum = reader.GetBoolean(10)
             };
         });
     }
