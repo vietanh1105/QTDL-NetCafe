@@ -447,6 +447,10 @@ public partial class SettingsView : AdminViewBase
     {
         var context = RequiredContext;
         UpdateRolePermissions(context);
+        if (context.IsCashier)
+        {
+            return;
+        }
 
         DbaStatisticsInfo dbaStats;
         try

@@ -1,5 +1,5 @@
 # Trách nhiệm: ghép các SQL nguồn thành sql/netcafe_full.sql theo đúng thứ tự triển khai.
-# Liên kết: sql/00_create_database.sql đến sql/10_admin_operations.sql; không chạy migration.
+# Liên kết: sql/00_create_database.sql đến sql/13_ai_demo_situations.sql; không chạy migration production.
 
 import os
 import sys
@@ -18,6 +18,8 @@ SQL_FILES = [
     "sql/08_station_customer.sql",
     "sql/10_admin_operations.sql",
     "sql/11_report_alignment.sql",
+    "sql/12_security_hardening.sql",
+    "sql/13_ai_demo_situations.sql",
 ]
 
 TARGET_FILE = "sql/netcafe_full.sql"

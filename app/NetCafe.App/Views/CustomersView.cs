@@ -122,7 +122,7 @@ public partial class CustomersView : AdminCardViewBase
             _toggleButton.Enabled = false;
             _resetButton.Enabled = false;
         }
-        else // Kỹ thuật viên: Cấm truy cập ví
+        else
         {
             _topUpButton.Enabled = false;
             _createButton.Enabled = false;
@@ -135,7 +135,6 @@ public partial class CustomersView : AdminCardViewBase
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         var rows = await RequiredContext.Repository.GetCustomersAsync(_searchBox.Text);
-        var isTech = RequiredContext.IsTechnician;
         SetCards(
             rows,
             customer =>
@@ -148,7 +147,7 @@ public partial class CustomersView : AdminCardViewBase
                     _ => string.IsNullOrWhiteSpace(customer.MembershipTier) ? "Hạng Chuẩn" : customer.MembershipTier
                 };
 
-                var walletText = isTech ? "Số dư ví: 🔒 Cấm truy cập ví" : $"Số dư ví: {customer.Balance:N0} đ";
+                var walletText = $"Số dư ví: {customer.Balance:N0} đ";
                 return new AdminCardModel(
                     customer.FullName,
                     $"@{customer.Username} | SĐT: {customer.Phone}",
@@ -164,17 +163,6 @@ public partial class CustomersView : AdminCardViewBase
         if (RequiredContext.CurrentEmployeeId <= 0)
         {
             ReportError(new InvalidOperationException("Vai trò hiện tại chưa gắn mã nhân viên; không thể ghi nhận nạp ví."));
-            return;
-        }
-
-        if (RequiredContext.IsTechnician)
-        {
-            MessageBox.Show(
-                FindForm(),
-                "Vai trò Kỹ thuật viên không có quyền truy cập ví hoặc nạp tiền (Cơ chế CSDL: billing.sp_top_up).",
-                "Từ chối quyền truy cập ví",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
             return;
         }
 

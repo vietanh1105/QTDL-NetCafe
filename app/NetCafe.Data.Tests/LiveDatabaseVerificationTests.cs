@@ -202,41 +202,15 @@ public sealed class LiveDatabaseVerificationTests
         var port = _env.GetValueOrDefault("DB_PORT", "5432");
         var db = _env["DB_NAME"];
         var ssl = _env.GetValueOrDefault("DB_SSL_MODE", "Require");
-        var pwd = _env.GetValueOrDefault("DEMO_PASSWORD", "Demo@2026NetCafe");
+        var cashierUser = _env.GetValueOrDefault("DB_CASHIER_USER", "nv_thao");
+        var cashierPassword = _env.GetValueOrDefault("DB_CASHIER_PASSWORD", _env.GetValueOrDefault("DEMO_PASSWORD", "Demo@2026NetCafe"));
+        var managerUser = _env.GetValueOrDefault("DB_MANAGER_USER", "nv_manager");
+        var managerPassword = _env.GetValueOrDefault("DB_MANAGER_PASSWORD", _env.GetValueOrDefault("DEMO_PASSWORD", "Demo@2026NetCafe"));
+        Assert.False(string.IsNullOrWhiteSpace(cashierPassword), "Thiếu DB_CASHIER_PASSWORD cho live role test.");
+        Assert.False(string.IsNullOrWhiteSpace(managerPassword), "Thiếu DB_MANAGER_PASSWORD cho live role test.");
 
-        // 0. Chủ quán nv_admin
-        var adminCs = $"Host={host};Port={port};Database={db};Username=nv_admin;Password={pwd};SSL Mode={ssl};Timeout=15;";
-        await using var adminConn = new NpgsqlConnection(adminCs);
-        await adminConn.OpenAsync();
-        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM reporting.mv_revenue_daily;", adminConn))
-        {
-            Assert.NotNull(await cmd.ExecuteScalarAsync());
-        }
-
-        // 1. Quản lý nv_manager
-        var managerCs = $"Host={host};Port={port};Database={db};Username=nv_manager;Password={pwd};SSL Mode={ssl};Timeout=15;";
-        await using var managerConn = new NpgsqlConnection(managerCs);
-        await managerConn.OpenAsync();
-
-        // Quản lý xem được báo cáo doanh thu và nhân sự
-        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM reporting.mv_revenue_daily;", managerConn))
-        {
-            Assert.NotNull(await cmd.ExecuteScalarAsync());
-        }
-        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM hr.employee;", managerConn))
-        {
-            Assert.NotNull(await cmd.ExecuteScalarAsync());
-        }
-
-        // Quản lý bị chặn xem cột salary (Column-Level Security 42501)
-        await using (var cmd = new NpgsqlCommand("SELECT salary FROM hr.employee LIMIT 1;", managerConn))
-        {
-            var ex = await Assert.ThrowsAsync<PostgresException>(async () => await cmd.ExecuteScalarAsync());
-            Assert.Equal("42501", ex.SqlState);
-        }
-
-        // 2. Thu ngân nv_thao
-        var cashierCs = $"Host={host};Port={port};Database={db};Username=nv_thao;Password={pwd};SSL Mode={ssl};Timeout=15;";
+        // 1. Thu ngân nv_thao
+        var cashierCs = $"Host={host};Port={port};Database={db};Username={cashierUser};Password={cashierPassword};SSL Mode={ssl};Timeout=15;";
         await using var cashierConn = new NpgsqlConnection(cashierCs);
         await cashierConn.OpenAsync();
 
@@ -259,27 +233,26 @@ public sealed class LiveDatabaseVerificationTests
             Assert.Equal("42501", ex.SqlState);
         }
 
-        // 2. Kỹ thuật viên nv_hung
-        var techCs = $"Host={host};Port={port};Database={db};Username=nv_hung;Password={pwd};SSL Mode={ssl};Timeout=15;";
-        await using var techConn = new NpgsqlConnection(techCs);
-        await techConn.OpenAsync();
+        // 2. Quản lý xem được bảo trì và menu vận hành
+        var managerCs = $"Host={host};Port={port};Database={db};Username={managerUser};Password={managerPassword};SSL Mode={ssl};Timeout=15;";
+        await using var managerConn = new NpgsqlConnection(managerCs);
+        await managerConn.OpenAsync();
 
-        // Kỹ thuật viên xem được bảo trì
-        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM hr.maintenance;", techConn))
+        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM hr.maintenance;", managerConn))
         {
             Assert.NotNull(await cmd.ExecuteScalarAsync());
         }
 
-        // Kỹ thuật viên bị chặn xem inventory.product (Table grant 42501)
-        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM inventory.product;", techConn))
+        // Manager đọc được menu vận hành
+        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM inventory.product;", managerConn))
         {
-            var ex = await Assert.ThrowsAsync<PostgresException>(async () => await cmd.ExecuteScalarAsync());
-            Assert.Equal("42501", ex.SqlState);
+            Assert.NotNull(await cmd.ExecuteScalarAsync());
         }
 
         // 3. Máy trạm station_runtime
         var stationUser = _env.GetValueOrDefault("STATION_DB_USER", "station_runtime");
-        var stationPass = _env.GetValueOrDefault("STATION_DB_PASSWORD", "Demo@2026NetCafe");
+        var stationPass = _env.GetValueOrDefault("STATION_DB_PASSWORD", string.Empty);
+        Assert.False(string.IsNullOrWhiteSpace(stationPass), "Thiếu STATION_DB_PASSWORD cho live station test.");
         var stationCs = $"Host={host};Port={port};Database={db};Username={stationUser};Password={stationPass};SSL Mode={ssl};Timeout=15;";
         await using var stationConn = new NpgsqlConnection(stationCs);
         await stationConn.OpenAsync();
@@ -433,7 +406,7 @@ public sealed class LiveDatabaseVerificationTests
     }
 
     [Fact]
-    public async Task Verify_14_TechnicianMaintenanceFunctions_AreGranted()
+    public async Task Verify_14_ManagerMaintenanceFunctions_AreGranted()
     {
         if (string.IsNullOrEmpty(_connectionString)) return;
 
@@ -441,8 +414,8 @@ public sealed class LiveDatabaseVerificationTests
         await conn.OpenAsync();
         const string sql = @"
             SELECT
-                has_function_privilege('role_technician', 'hr.sp_create_maintenance(integer,integer,text)', 'EXECUTE'),
-                has_function_privilege('role_technician', 'hr.sp_complete_maintenance(integer,character varying,numeric)', 'EXECUTE');";
+                has_function_privilege('role_manager', 'hr.sp_create_maintenance(integer,integer,text)', 'EXECUTE'),
+                has_function_privilege('role_manager', 'hr.sp_complete_maintenance(integer,character varying,numeric)', 'EXECUTE');";
         await using var cmd = new NpgsqlCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());

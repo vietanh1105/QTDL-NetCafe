@@ -173,7 +173,7 @@ Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sá
 ### 2.4. Schema `hr` (2 bảng)
 15. **`hr.employee` (Nhân sự & Tài khoản hệ thống):**
     - **PK:** `employee_id INT GENERATED ALWAYS AS IDENTITY`
-    - **Thuộc tính:** `full_name VARCHAR(100)`, `phone VARCHAR(15)`, `username VARCHAR(50) UNIQUE`, `db_username VARCHAR(50) UNIQUE NULL`, `password_hash VARCHAR(255)`, `emp_role VARCHAR(20) CHECK IN ('admin','manager','cashier','staff','technician')`, `default_shift VARCHAR(20) CHECK IN ('morning','afternoon','night')`, `salary NUMERIC(12,0) CHECK (salary >= 0)`, `hired_date DATE`, `is_active BOOLEAN`
+    - **Thuộc tính:** `full_name VARCHAR(100)`, `phone VARCHAR(15)`, `username VARCHAR(50) UNIQUE`, `db_username VARCHAR(50) UNIQUE NULL`, `password_hash VARCHAR(255)`, `emp_role VARCHAR(20) CHECK IN ('admin','manager','cashier')`, `default_shift VARCHAR(20) CHECK IN ('morning','afternoon','night')`, `salary NUMERIC(12,0) CHECK (salary >= 0)`, `hired_date DATE`, `is_active BOOLEAN`
     - *Lý do thiết kế:* Cột `db_username` ánh xạ trực tiếp tài khoản nhân viên ứng dụng sang `Database Role` của PostgreSQL (ví dụ `nv_an` map với `role_cashier`), là nền tảng cốt lõi để triển khai cơ chế **Row-Level Security (RLS)** và **Column-Level Privileges**. Cột `salary` là dữ liệu nhạy cảm được bảo vệ bằng DCL.
 
 16. **`hr.maintenance` (Nhật ký bảo trì thiết bị):**
@@ -238,7 +238,7 @@ Hệ thống bao gồm **16 bảng nghiệp vụ chính** + **6 bảng giám sá
 | **1 - N** | `billing.invoice` | `billing.payment` | `payment.invoice_id` FK (NULLable) | Một hóa đơn có thể thanh toán bằng giao dịch. |
 | **1 - N** | `core.customer` | `billing.payment` | `payment.customer_id` FK | Một khách có nhiều giao dịch nạp/thanh toán. |
 | **1 - N** | `core.computer` | `hr.maintenance` | `maintenance.computer_id` FK | Một máy có lịch sử nhiều lần bảo trì. |
-| **1 - N** | `hr.employee` | `hr.maintenance` | `maintenance.technician_id` FK | Kỹ thuật viên phụ trách nhiều ca bảo trì. |
+| **1 - N** | `hr.employee` | `hr.maintenance` | `maintenance.technician_id` FK | Admin/Manager phụ trách nhiều ca bảo trì. |
 | **N - N** | `inventory.food_order` | `inventory.product` | Cầu nối: `inventory.food_order_detail` (PK ghép) | Một đơn có nhiều món; một món xuất hiện trong nhiều đơn. |
 | **N - N** | `billing.invoice` | `billing.promotion` | Cầu nối: `billing.invoice_promotion` (PK ghép) | Một hóa đơn áp dụng nhiều khuyến mãi; một khuyến mãi dùng cho nhiều hóa đơn. |
 

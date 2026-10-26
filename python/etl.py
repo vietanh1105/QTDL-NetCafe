@@ -145,7 +145,7 @@ def seed_realistic_activity():
             # 3. Tình huống bất thường 3: Khách hàng trùng tên và gần giống số điện thoại (cho Module 3 pg_trgm)
             cur.execute("""
                 INSERT INTO core.customer (full_name, phone, username, password_hash, balance)
-                VALUES ('Tran Van Binh', '0912345679', 'binh_tran_dup', crypt('Pass@123', gen_salt('bf')), 50000)
+                VALUES ('Tran Van Binh', '0912345679', 'binh_tran_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000)
                 ON CONFLICT (phone) DO NOTHING;
             """)
 

@@ -79,7 +79,7 @@ def clean_and_load():
                 seen_usernames.add(un[0])
 
             # Lấy mật khẩu hash mặc định cho các khách mới
-            cur.execute("SELECT crypt('Pass@123', gen_salt('bf'));")
+            cur.execute("SELECT crypt(gen_random_uuid()::text, gen_salt('bf'));")
             default_pwd_hash = cur.fetchone()[0]
 
             for row in raw_rows:

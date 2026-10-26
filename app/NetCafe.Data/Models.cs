@@ -33,6 +33,7 @@ namespace NetCafe.Data
         public bool HasComputerGridContract { get; init; }
         public bool HasCustomerMenuContract { get; init; }
         public bool HasStationLogoutContract { get; init; }
+        public bool HasDailyRevenueMaterializedView { get; init; }
         public bool CanRunVacuum { get; init; }
         public bool IsStationContractReady => HasStationMigration
             && HasReconcileFunction
@@ -42,6 +43,9 @@ namespace NetCafe.Data
         public string ContractStatus => IsStationContractReady
             ? "Bản cập nhật 08 đầy đủ"
             : "Bản cập nhật 08 chưa đầy đủ: thiếu cấu trúc máy trạm";
+        public string ReportContractStatus => HasDailyRevenueMaterializedView
+            ? "Bản báo cáo đầy đủ"
+            : "Thiếu migration báo cáo 11: reporting.mv_revenue_daily";
         public string Summary => $"Máy chủ: {Host} | CSDL: {Database} | Người dùng: {User} | PostgreSQL {ServerVersion}";
     }
 

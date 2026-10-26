@@ -275,7 +275,7 @@ def build_report():
         ("3. Quản lý phiên chơi", "Bảng trọng tâm hệ thống: khách hàng, máy trạm, thời điểm bắt đầu/kết thúc, thời lượng, đơn giá áp dụng, tiền giờ, trạng thái."),
         ("4. Dịch vụ F&B & Kho", "Danh mục món, sản phẩm đồ ăn/uống, quản lý đơn gọi món theo phiên chơi, trừ tồn kho tự động qua Trigger."),
         ("5. Hóa đơn & Thanh toán", "Tổng kết phiên chơi: Tiền giờ + Dịch vụ F&B + Phụ phí - Giảm giá = Tổng tiền. Thanh toán qua ví hội viên hoặc tiền mặt/chuyển khoản."),
-        ("6. Quản trị nhân sự", "Phân quyền 5 vai trò (Admin, Manager, Cashier, Staff, Technician), ca làm việc, bảo vệ mức lương tuyệt đối."),
+        ("6. Quản trị nhân sự", "Phân quyền 3 vai trò (Admin, Manager, Cashier), ca làm việc, bảo vệ mức lương tuyệt đối."),
         ("7. Bảo trì phòng máy", "Ghi nhận máy lỗi, kỹ thuật viên phụ trách, chi phí, linh kiện thay thế lưu dạng JSONB linh hoạt."),
         ("8. Khuyến mãi & Ưu đãi", "Mã giảm giá, Happy Hour khung giờ đêm, ưu đãi theo hạng thành viên Gold/VIP, lưu điều kiện áp dụng JSONB."),
         ("9. Báo cáo & Thống kê", "Doanh thu theo ngày/tháng, công suất sử dụng máy, phân tích RFM top khách hàng chi tiêu qua Materialized Views.")
@@ -488,7 +488,7 @@ def build_report():
 
     doc.add_heading("3.3. Mô hình Kiểm soát Truy cập theo Vai trò (RBAC)", level=2)
     p = doc.add_paragraph(
-        "Hệ thống phân định 5 vai trò (Roles) rõ rệt theo nguyên tắc đặc quyền tối thiểu (Least Privilege). "
+        "Hệ thống phân định 3 vai trò người dùng (Roles) rõ rệt theo nguyên tắc đặc quyền tối thiểu (Least Privilege). "
         "Mỗi vai trò chỉ được cấp đúng các quyền SELECT, INSERT, UPDATE trên các bảng thuộc phạm vi công việc của mình:"
     )
     p.paragraph_format.line_spacing = 1.15
@@ -496,9 +496,7 @@ def build_report():
     rbac_data = [
         ("role_admin", "nv_admin", "Toàn quyền quản trị CSDL, cấu hình hệ thống, xem lương nhân viên, xử lý cảnh báo an ninh."),
         ("role_manager", "nv_manager", "Quản lý kinh doanh: xem toàn bộ hóa đơn, chỉnh sửa thực đơn món ăn, xem các báo cáo doanh thu."),
-        ("role_cashier", "nv_thao, nv_nam", "Thu ngân: mở phiên, lập hóa đơn, nạp tiền, thu tiền. CHỈ ĐƯỢC THẤY HÓA ĐƠN DO MÌNH LẬP (qua RLS)."),
-        ("role_staff", "nv_tuan", "Nhân viên phục vụ: xem danh sách máy, gọi món F&B. BỊ CHẶN HOÀN TOÀN KHỎI SCHEMA BILLING."),
-        ("role_technician", "nv_hung", "Kỹ thuật viên: xem cấu hình máy trạm, cập nhật phiếu bảo trì. CHỈ THẤY PHIẾU GIAO CHO MÌNH (qua RLS).")
+        ("role_cashier", "nv_thao, nv_nam", "Nhân viên: mở phiên, lập hóa đơn, nạp tiền, thu tiền và xử lý đơn F&B; invoice/payment theo RLS."),
     ]
     tbl_rb = doc.add_table(rows=len(rbac_data) + 1, cols=3)
     tbl_rb.cell(0, 0).paragraphs[0].add_run("Role Nhóm")
@@ -520,8 +518,7 @@ def build_report():
         "• Row-Level Security (RLS): Kích hoạt với ENABLE ROW LEVEL SECURITY và FORCE ROW LEVEL SECURITY trên 4 bảng:\n"
         "   1. billing.invoice: Thu ngân nv_thao (ID 3) chỉ thấy 52 hóa đơn của mình; nv_nam (ID 4) chỉ thấy 59 hóa đơn của mình; quản lý thấy đủ 207 hóa đơn.\n"
         "   2. billing.payment: Thu ngân chỉ tra cứu được các giao dịch nạp tiền/thu tiền do chính mình tiếp nhận.\n"
-        "   3. hr.employee: Nhân viên cấp dưới chỉ thấy dòng thông tin cá nhân của chính mình.\n"
-        "   4. hr.maintenance: Kỹ thuật viên nv_hung (ID 6) chỉ thấy đúng phiếu bảo trì được giao cho mình."
+        "   3. hr.employee: Nhân viên chỉ thấy các cột công khai; salary/password_hash bị chặn."
     )
     p.paragraph_format.line_spacing = 1.15
 
@@ -699,7 +696,7 @@ def build_report():
         ("1. Kiến trúc CSDL", "1 Database netcafe_db, 8 schemas, 22 bảng, đạt chuẩn 3NF, độc lập locale OS template0.", "ĐẠT 100%"),
         ("2. Ràng buộc toàn vẹn", "16/16 Test cases PASS, bảo vệ công thức hóa đơn và dữ liệu phiên.", "ĐẠT 100%"),
         ("3. Chất lượng dữ liệu (DQ)", "4 Tiêu chuẩn Sạch - Sống - Đúng - Đủ, luồng ETL tự động hóa, lọc 6.8% dữ liệu bẩn.", "ĐẠT 100%"),
-        ("4. Bảo mật CSDL", "RBAC 5 vai trò, Column-Level Security (salary, password), RLS trên 4 bảng.", "ĐẠT 100%"),
+        ("4. Bảo mật CSDL", "RBAC 3 vai trò người dùng, role station nội bộ, Column-Level Security và RLS.", "ĐẠT 100%"),
         ("5. Tối ưu hóa hiệu năng", "5 loại chỉ mục (B-Tree, Partial, GIN Trigram, GIN JSONB, BRIN), HOT tuning fillfactor.", "ĐẠT 100%"),
         ("6. Vận hành DBA", "Tự động tạo partition audit_log theo tháng, kịch bản backup & restore khớp 100% dòng.", "ĐẠT 100%"),
         ("7. 5 Module In-Database AI", "Cảnh báo an ninh NOTIFY, tư vấn index, phát hiện khách trùng, Z-Score, gợi ý khuyến mãi.", "ĐẠT 100%"),

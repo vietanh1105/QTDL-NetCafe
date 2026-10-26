@@ -18,12 +18,10 @@ TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.inv
 -- 2. NHÂN SỰ VÀ TÀI KHOẢN HỆ THỐNG (ĐỦ 5 VAI TRÒ)
 INSERT INTO hr.employee (full_name, phone, username, db_username, password_hash, emp_role, default_shift, salary, hired_date)
 VALUES 
-    ('Nguyễn Văn An', '0981234567', 'an_nguyen', 'nv_admin', crypt('Demo@123', gen_salt('bf')), 'admin', 'morning', 20000000, '2024-01-15'),
-    ('Lê Quang Minh', '0972345678', 'minh_le', 'nv_manager', crypt('Demo@123', gen_salt('bf')), 'manager', 'morning', 15000000, '2024-03-01'),
-    ('Phạm Thu Thảo', '0913456789', 'thao_pham', 'nv_thao', crypt('Demo@123', gen_salt('bf')), 'cashier', 'morning', 8500000, '2024-06-10'),
-    ('Trần Đức Nam', '0934567890', 'nam_tran', 'nv_nam', crypt('Demo@123', gen_salt('bf')), 'cashier', 'afternoon', 8500000, '2024-06-15'),
-    ('Vũ Anh Tuấn', '0965678901', 'tuan_vu', 'nv_tuan', crypt('Demo@123', gen_salt('bf')), 'staff', 'afternoon', 7000000, '2024-08-01'),
-    ('Trần Mạnh Hùng', '0986789012', 'hung_tran', 'nv_hung', crypt('Demo@123', gen_salt('bf')), 'technician', 'morning', 11000000, '2024-04-20');
+    ('Nguyễn Văn An', '0981234567', 'an_nguyen', 'nv_admin', crypt(gen_random_uuid()::text, gen_salt('bf')), 'admin', 'morning', 20000000, '2024-01-15'),
+    ('Lê Quang Minh', '0972345678', 'minh_le', 'nv_manager', crypt(gen_random_uuid()::text, gen_salt('bf')), 'manager', 'morning', 15000000, '2024-03-01'),
+    ('Phạm Thu Thảo', '0913456789', 'thao_pham', 'nv_thao', crypt(gen_random_uuid()::text, gen_salt('bf')), 'cashier', 'morning', 8500000, '2024-06-10'),
+    ('Trần Đức Nam', '0934567890', 'nam_tran', 'nv_nam', crypt(gen_random_uuid()::text, gen_salt('bf')), 'cashier', 'afternoon', 8500000, '2024-06-15');
 
 -- 3. KHU VỰC VÀ PHÒNG MÁY
 INSERT INTO core.room (room_name, description)
@@ -122,21 +120,21 @@ VALUES
 -- 8. DANH SÁCH KHÁCH HÀNG MẪU (20 KHÁCH CÓ SỐ DƯ TÀI KHOẢN)
 INSERT INTO core.customer (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier)
 VALUES 
-    ('Trần Văn Bình', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt('Pass@123', gen_salt('bf')), 80000, 120, 'silver'),
-    ('Hoàng Đức Anh', '0983456789', 'anh.hoang@gmail.com', 'anh_hoang', crypt('Pass@123', gen_salt('bf')), 150000, 650, 'gold'),
-    ('Đặng Thùy Dung', '0974567890', 'dung.dang@gmail.com', 'dung_dang', crypt('Pass@123', gen_salt('bf')), 250000, 2200, 'vip'),
-    ('Nguyễn Hải Đăng', '0935678901', 'dang.hai@gmail.com', 'dang_hai', crypt('Pass@123', gen_salt('bf')), 50000, 45, 'regular'),
-    ('Lê Bảo Châu', '0966789012', 'chau.le@gmail.com', 'chau_le', crypt('Pass@123', gen_salt('bf')), 120000, 520, 'gold'),
-    ('Phan Thanh Tùng', '0987890123', 'tung.phan@gmail.com', 'tung_phan', crypt('Pass@123', gen_salt('bf')), 30000, 20, 'regular'),
-    ('Võ Quốc Huy', '0918901234', 'huy.vo@gmail.com', 'huy_vo', crypt('Pass@123', gen_salt('bf')), 90000, 180, 'silver'),
-    ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt('Pass@123', gen_salt('bf')), 300000, 2800, 'vip'),
-    ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt('Pass@123', gen_salt('bf')), 60000, 80, 'regular'),
-    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt('Pass@123', gen_salt('bf')), 110000, 310, 'silver');
+    ('Trần Văn Bình', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt(gen_random_uuid()::text, gen_salt('bf')), 80000, 120, 'silver'),
+    ('Hoàng Đức Anh', '0983456789', 'anh.hoang@gmail.com', 'anh_hoang', crypt(gen_random_uuid()::text, gen_salt('bf')), 150000, 650, 'gold'),
+    ('Đặng Thùy Dung', '0974567890', 'dung.dang@gmail.com', 'dung_dang', crypt(gen_random_uuid()::text, gen_salt('bf')), 250000, 2200, 'vip'),
+    ('Nguyễn Hải Đăng', '0935678901', 'dang.hai@gmail.com', 'dang_hai', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 45, 'regular'),
+    ('Lê Bảo Châu', '0966789012', 'chau.le@gmail.com', 'chau_le', crypt(gen_random_uuid()::text, gen_salt('bf')), 120000, 520, 'gold'),
+    ('Phan Thanh Tùng', '0987890123', 'tung.phan@gmail.com', 'tung_phan', crypt(gen_random_uuid()::text, gen_salt('bf')), 30000, 20, 'regular'),
+    ('Võ Quốc Huy', '0918901234', 'huy.vo@gmail.com', 'huy_vo', crypt(gen_random_uuid()::text, gen_salt('bf')), 90000, 180, 'silver'),
+    ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt(gen_random_uuid()::text, gen_salt('bf')), 300000, 2800, 'vip'),
+    ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt(gen_random_uuid()::text, gen_salt('bf')), 60000, 80, 'regular'),
+    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver');
 
 -- 9. LỊCH SỬ BẢO TRÌ MẪU (CHO DEMO RLS VÀ MODULE BẢO TRÌ)
 INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
 VALUES 
-    (1, 6, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
+    (1, 2, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
 -- 10. LÀM MỚI MATERIALIZED VIEWS

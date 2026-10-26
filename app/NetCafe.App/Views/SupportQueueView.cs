@@ -40,13 +40,7 @@ public partial class SupportQueueView : AdminCardViewBase
         {
             SetTitle(
                 "Yêu cầu hỗ trợ",
-                "Thu ngân tiếp nhận: F&B / Nạp ví / Chung (Lỗi phần cứng do Kỹ thuật viên phụ trách).");
-        }
-        else if (context.IsTechnician)
-        {
-            SetTitle(
-                "Yêu cầu hỗ trợ",
-                "Kỹ thuật viên tiếp nhận: Lỗi phần cứng & kỹ thuật máy trạm (F&B/Nạp ví do Thu ngân phụ trách).");
+                "Nhân viên tiếp nhận: F&B / Nạp ví / Chung (lỗi kỹ thuật do quản lý xử lý).");
         }
         else
         {
@@ -72,10 +66,6 @@ public partial class SupportQueueView : AdminCardViewBase
         {
             return request.RequestType is "food" or "payment" or "general";
         }
-        if (RequiredContext.IsTechnician)
-        {
-            return request.RequestType == "technical";
-        }
         return false;
     }
 
@@ -97,18 +87,7 @@ public partial class SupportQueueView : AdminCardViewBase
         {
             MessageBox.Show(
                 FindForm(),
-                "Thu ngân chỉ tiếp nhận Gọi món (F&B) và Nạp ví.\nYêu cầu lỗi phần cứng do Kỹ thuật viên phụ trách.",
-                "Phân quyền xử lý",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (RequiredContext.IsTechnician && request.RequestType != "technical")
-        {
-            MessageBox.Show(
-                FindForm(),
-                "Kỹ thuật viên chỉ tiếp nhận và xử lý Lỗi phần cứng.\nGọi món và Nạp ví do Thu ngân phụ trách.",
+                "Nhân viên chỉ tiếp nhận Gọi món (F&B) và Nạp ví.\nYêu cầu kỹ thuật do Quản lý phụ trách.",
                 "Phân quyền xử lý",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);

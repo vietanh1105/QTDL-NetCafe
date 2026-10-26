@@ -113,13 +113,13 @@ CREATE TABLE hr.employee (
 
     -- Ràng buộc kiểm tra CHECK
     CONSTRAINT ck_employee_salary CHECK (salary >= 0),
-    CONSTRAINT ck_employee_role CHECK (emp_role IN ('admin', 'manager', 'cashier', 'staff', 'technician')),
+    CONSTRAINT ck_employee_role CHECK (emp_role IN ('admin', 'manager', 'cashier')),
     CONSTRAINT ck_employee_shift CHECK (default_shift IN ('morning', 'afternoon', 'night')),
     CONSTRAINT ck_employee_phone CHECK (phone ~ '^0[35789][0-9]{8}$'),
     CONSTRAINT ck_employee_username CHECK (username ~ '^[a-z][a-z0-9_]{3,29}$')
 );
 COMMENT ON TABLE hr.employee IS 'Bảng nhân viên và tài khoản vận hành, ánh xạ role PostgreSQL qua db_username';
-COMMENT ON COLUMN hr.employee.salary IS 'Cột nhạy cảm: Bảo vệ bằng Column-Level Security đối với cashier/staff/technician';
+COMMENT ON COLUMN hr.employee.salary IS 'Cột nhạy cảm: Bảo vệ bằng Column-Level Security đối với manager/cashier';
 
 -- ----------------------------------------------------------------------------
 -- 4. SCHEMA CORE (Nghiệp vụ phòng máy cốt lõi)
@@ -1195,7 +1195,6 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
-    -- Nhóm role NOLOGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'role_admin') THEN
         CREATE ROLE role_admin NOLOGIN;
     END IF;
@@ -1205,128 +1204,64 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'role_cashier') THEN
         CREATE ROLE role_cashier NOLOGIN;
     END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'role_staff') THEN
-        CREATE ROLE role_staff NOLOGIN;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'role_technician') THEN
-        CREATE ROLE role_technician NOLOGIN;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'role_report_readonly') THEN
-        CREATE ROLE role_report_readonly NOLOGIN;
-    END IF;
-
-    -- User đăng nhập demo: Mô hình 4 vai trò chính (nv_admin, nv_manager, nv_thao, nv_hung)
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_admin') THEN
-        CREATE ROLE nv_admin WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_admin;
-    ELSE
-        ALTER ROLE nv_admin WITH PASSWORD 'Demo@2026NetCafe';
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_manager') THEN
-        CREATE ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_manager;
-    ELSE
-        ALTER ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe';
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_thao') THEN
-        CREATE ROLE nv_thao WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_cashier;
-    ELSE
-        ALTER ROLE nv_thao WITH PASSWORD 'Demo@2026NetCafe';
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_nam') THEN
-        CREATE ROLE nv_nam WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_cashier;
-    ELSE
-        ALTER ROLE nv_nam WITH PASSWORD 'Demo@2026NetCafe';
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_tuan') THEN
-        CREATE ROLE nv_tuan WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_staff;
-    ELSE
-        ALTER ROLE nv_tuan WITH PASSWORD 'Demo@2026NetCafe';
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_hung') THEN
-        CREATE ROLE nv_hung WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_technician;
-    ELSE
-        ALTER ROLE nv_hung WITH PASSWORD 'Demo@2026NetCafe';
-    END IF;
 END $$;
 
--- Gán role nhóm
-GRANT role_admin TO nv_admin;
-GRANT role_manager TO nv_manager;
-GRANT role_cashier TO nv_thao, nv_nam;
-GRANT role_staff TO nv_tuan;
-GRANT role_technician TO nv_hung;
+-- Login role được tạo và cấp password riêng bằng scripts/provision-app-roles.ps1.
 
 -- ----------------------------------------------------------------------------
 -- 4. PHÂN QUYỀN TRUY CẬP SCHEMAS (USAGE)
 -- ----------------------------------------------------------------------------
--- Admin & Manager truy cập toàn bộ các schema
 GRANT USAGE ON SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin, role_manager;
-
--- Thu ngân (Cashier)
 GRANT USAGE ON SCHEMA core, inventory, billing, hr, reporting TO role_cashier;
-
--- Nhân viên phục vụ (Staff)
-GRANT USAGE ON SCHEMA core, inventory, reporting TO role_staff;
-
--- Kỹ thuật viên (Technician)
-GRANT USAGE ON SCHEMA core, hr, reporting TO role_technician;
 
 -- ----------------------------------------------------------------------------
 -- 5. CẤP QUYỀN TRÊN BẢNG VÀ CỘT (TABLE & COLUMN-LEVEL PRIVILEGES)
 -- ----------------------------------------------------------------------------
 
--- 5.1. Quyền trên schema core
-GRANT SELECT, INSERT, UPDATE ON core.computer, core.customer, core.gaming_session TO role_cashier;
-GRANT SELECT ON core.room, core.computer_type TO role_cashier, role_staff, role_technician;
-GRANT SELECT ON core.computer, core.gaming_session TO role_staff, role_technician;
+-- 5.1. Các role vận hành chỉ đọc bảng; thao tác ghi đi qua function có kiểm tra nghiệp vụ.
+GRANT SELECT ON core.room, core.computer_type, core.computer, core.customer, core.gaming_session TO role_cashier;
+GRANT SELECT ON core.service_request TO role_cashier;
 
--- 5.2. Quyền trên schema inventory
-GRANT SELECT, INSERT, UPDATE ON inventory.food_order, inventory.food_order_detail TO role_cashier, role_staff;
-GRANT SELECT ON inventory.product_category, inventory.product TO role_cashier, role_staff;
-GRANT UPDATE (stock_qty) ON inventory.product TO role_cashier, role_staff;
+-- 5.2. Cashier đọc menu và hàng đợi; function đặt món chịu trách nhiệm ghi.
+GRANT SELECT ON inventory.food_order, inventory.food_order_detail,
+    inventory.product_category, inventory.product TO role_cashier;
 
--- 5.3. Quyền trên schema billing
-GRANT SELECT, INSERT ON billing.invoice, billing.invoice_promotion, billing.payment TO role_cashier;
-GRANT SELECT ON billing.promotion TO role_cashier;
+-- 5.3. Cashier đọc chứng từ; function thanh toán/nạp ví ghi dữ liệu.
+GRANT SELECT ON billing.invoice, billing.invoice_promotion,
+    billing.payment, billing.promotion TO role_cashier;
 
 -- 5.4. Quyền trên schema reporting
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier, role_report_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier;
 
 -- 5.5. Quyền trên schema ai (Chỉ Admin và Manager được đọc và xử lý)
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 
 -- 5.6. Admin toàn quyền
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
+GRANT SELECT ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
 GRANT pg_read_all_stats TO role_admin, role_manager;
 
--- Manager được quản lý dữ liệu vận hành nhưng không được đọc/sửa salary hoặc password_hash.
+-- Manager chỉ đọc nhân sự công khai; thay đổi tài khoản chỉ do admin thực hiện.
 REVOKE ALL ON hr.employee FROM role_manager;
 GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
     ON hr.employee TO role_manager;
-GRANT INSERT (full_name, phone, username, db_username, password_hash, emp_role, default_shift, hired_date, is_active)
-    ON hr.employee TO role_manager;
-GRANT UPDATE (full_name, phone, db_username, emp_role, default_shift, hired_date, is_active)
-    ON hr.employee TO role_manager;
 
--- 5.7. COLUMN-LEVEL SECURITY: Bảo vệ cột lương (salary) và password_hash
--- Thu ngân, nhân viên, kỹ thuật viên CHỈ được SELECT các cột không nhạy cảm của employee:
-REVOKE ALL ON hr.employee FROM role_cashier, role_staff, role_technician;
+-- 5.7. Column-level security: manager/cashier không đọc salary/password_hash.
+REVOKE ALL ON hr.employee FROM role_cashier;
 GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
-    ON hr.employee TO role_cashier, role_staff, role_technician;
+    ON hr.employee TO role_cashier;
 
 -- Cung cấp View an toàn công khai thông tin nhân viên
 CREATE OR REPLACE VIEW hr.vw_employee_public AS
 SELECT employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active
 FROM hr.employee;
-GRANT SELECT ON hr.vw_employee_public TO role_cashier, role_staff, role_technician;
+GRANT SELECT ON hr.vw_employee_public TO role_cashier;
 GRANT SELECT ON hr.vw_employee_public TO role_manager;
 
--- Cấp quyền trên hr.maintenance cho kỹ thuật viên
-GRANT SELECT, UPDATE ON hr.maintenance TO role_technician;
+GRANT SELECT ON hr.maintenance TO role_admin, role_manager;
 
--- Cấp quyền trên sequences để có thể INSERT Identity
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA core, inventory, billing, hr, ai TO role_cashier, role_staff, role_technician;
+-- Không cấp sequence cho role vận hành vì mọi thao tác ghi dùng SECURITY DEFINER function.
 
 -- 5.8. Cấp quyền thực thi Stored Functions (EXECUTE)
 GRANT EXECUTE ON FUNCTION core.fn_calc_session_amount TO role_cashier, role_manager, role_admin;
@@ -1334,7 +1269,7 @@ GRANT EXECUTE ON FUNCTION core.fn_membership_tier TO role_cashier, role_manager,
 GRANT EXECUTE ON FUNCTION core.sp_open_session TO role_cashier, role_manager, role_admin;
 GRANT EXECUTE ON FUNCTION billing.sp_close_session_and_pay TO role_cashier, role_manager, role_admin;
 GRANT EXECUTE ON FUNCTION billing.sp_top_up TO role_cashier, role_manager, role_admin;
-GRANT EXECUTE ON FUNCTION inventory.sp_place_order TO role_cashier, role_staff, role_manager, role_admin;
+GRANT EXECUTE ON FUNCTION inventory.sp_place_order TO role_cashier, role_manager, role_admin;
 
 -- ----------------------------------------------------------------------------
 -- 6. HÀM HỖ TRỢ RLS (SECURITY DEFINER, SEARCH_PATH CỐ ĐỊNH)
@@ -1356,7 +1291,7 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = hr, pg_temp;
 
 COMMENT ON FUNCTION hr.fn_get_current_employee_id IS 'Hàm helper lấy employee_id của user PostgreSQL đang đăng nhập';
-GRANT EXECUTE ON FUNCTION hr.fn_get_current_employee_id() TO role_cashier, role_staff, role_technician, role_manager, role_admin;
+GRANT EXECUTE ON FUNCTION hr.fn_get_current_employee_id() TO role_cashier, role_manager, role_admin;
 
 -- ----------------------------------------------------------------------------
 -- 7. CHÍNH SÁCH BẢO MẬT CẤP DÒNG (ROW-LEVEL SECURITY - RLS)
@@ -1414,10 +1349,10 @@ CREATE POLICY p_employee_admin_manager ON hr.employee
 DROP POLICY IF EXISTS p_employee_self ON hr.employee;
 CREATE POLICY p_employee_self ON hr.employee
     FOR SELECT
-    TO role_cashier, role_staff, role_technician
+    TO role_cashier
     USING (employee_id = hr.fn_get_current_employee_id());
 
--- 7.4. RLS trên bảng hr.maintenance: Kỹ thuật viên chỉ thấy ca bảo trì giao cho mình
+-- 7.4. RLS trên bảng hr.maintenance: Admin/Manager quản lý toàn bộ phiếu
 ALTER TABLE hr.maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hr.maintenance FORCE ROW LEVEL SECURITY;
 
@@ -1427,13 +1362,6 @@ CREATE POLICY p_maint_admin_manager ON hr.maintenance
     TO role_admin, role_manager
     USING (TRUE)
     WITH CHECK (TRUE);
-
-DROP POLICY IF EXISTS p_maint_tech ON hr.maintenance;
-CREATE POLICY p_maint_tech ON hr.maintenance
-    FOR ALL
-    TO role_technician
-    USING (technician_id = hr.fn_get_current_employee_id())
-    WITH CHECK (technician_id = hr.fn_get_current_employee_id());
 
 
 
@@ -1641,12 +1569,10 @@ TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.inv
 -- 2. NHÂN SỰ VÀ TÀI KHOẢN HỆ THỐNG (ĐỦ 5 VAI TRÒ)
 INSERT INTO hr.employee (full_name, phone, username, db_username, password_hash, emp_role, default_shift, salary, hired_date)
 VALUES 
-    ('Nguyễn Văn An', '0981234567', 'an_nguyen', 'nv_admin', crypt('Demo@123', gen_salt('bf')), 'admin', 'morning', 20000000, '2024-01-15'),
-    ('Lê Quang Minh', '0972345678', 'minh_le', 'nv_manager', crypt('Demo@123', gen_salt('bf')), 'manager', 'morning', 15000000, '2024-03-01'),
-    ('Phạm Thu Thảo', '0913456789', 'thao_pham', 'nv_thao', crypt('Demo@123', gen_salt('bf')), 'cashier', 'morning', 8500000, '2024-06-10'),
-    ('Trần Đức Nam', '0934567890', 'nam_tran', 'nv_nam', crypt('Demo@123', gen_salt('bf')), 'cashier', 'afternoon', 8500000, '2024-06-15'),
-    ('Vũ Anh Tuấn', '0965678901', 'tuan_vu', 'nv_tuan', crypt('Demo@123', gen_salt('bf')), 'staff', 'afternoon', 7000000, '2024-08-01'),
-    ('Trần Mạnh Hùng', '0986789012', 'hung_tran', 'nv_hung', crypt('Demo@123', gen_salt('bf')), 'technician', 'morning', 11000000, '2024-04-20');
+    ('Nguyễn Văn An', '0981234567', 'an_nguyen', 'nv_admin', crypt(gen_random_uuid()::text, gen_salt('bf')), 'admin', 'morning', 20000000, '2024-01-15'),
+    ('Lê Quang Minh', '0972345678', 'minh_le', 'nv_manager', crypt(gen_random_uuid()::text, gen_salt('bf')), 'manager', 'morning', 15000000, '2024-03-01'),
+    ('Phạm Thu Thảo', '0913456789', 'thao_pham', 'nv_thao', crypt(gen_random_uuid()::text, gen_salt('bf')), 'cashier', 'morning', 8500000, '2024-06-10'),
+    ('Trần Đức Nam', '0934567890', 'nam_tran', 'nv_nam', crypt(gen_random_uuid()::text, gen_salt('bf')), 'cashier', 'afternoon', 8500000, '2024-06-15');
 
 -- 3. KHU VỰC VÀ PHÒNG MÁY
 INSERT INTO core.room (room_name, description)
@@ -1745,21 +1671,21 @@ VALUES
 -- 8. DANH SÁCH KHÁCH HÀNG MẪU (20 KHÁCH CÓ SỐ DƯ TÀI KHOẢN)
 INSERT INTO core.customer (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier)
 VALUES 
-    ('Trần Văn Bình', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt('Pass@123', gen_salt('bf')), 80000, 120, 'silver'),
-    ('Hoàng Đức Anh', '0983456789', 'anh.hoang@gmail.com', 'anh_hoang', crypt('Pass@123', gen_salt('bf')), 150000, 650, 'gold'),
-    ('Đặng Thùy Dung', '0974567890', 'dung.dang@gmail.com', 'dung_dang', crypt('Pass@123', gen_salt('bf')), 250000, 2200, 'vip'),
-    ('Nguyễn Hải Đăng', '0935678901', 'dang.hai@gmail.com', 'dang_hai', crypt('Pass@123', gen_salt('bf')), 50000, 45, 'regular'),
-    ('Lê Bảo Châu', '0966789012', 'chau.le@gmail.com', 'chau_le', crypt('Pass@123', gen_salt('bf')), 120000, 520, 'gold'),
-    ('Phan Thanh Tùng', '0987890123', 'tung.phan@gmail.com', 'tung_phan', crypt('Pass@123', gen_salt('bf')), 30000, 20, 'regular'),
-    ('Võ Quốc Huy', '0918901234', 'huy.vo@gmail.com', 'huy_vo', crypt('Pass@123', gen_salt('bf')), 90000, 180, 'silver'),
-    ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt('Pass@123', gen_salt('bf')), 300000, 2800, 'vip'),
-    ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt('Pass@123', gen_salt('bf')), 60000, 80, 'regular'),
-    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt('Pass@123', gen_salt('bf')), 110000, 310, 'silver');
+    ('Trần Văn Bình', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt(gen_random_uuid()::text, gen_salt('bf')), 80000, 120, 'silver'),
+    ('Hoàng Đức Anh', '0983456789', 'anh.hoang@gmail.com', 'anh_hoang', crypt(gen_random_uuid()::text, gen_salt('bf')), 150000, 650, 'gold'),
+    ('Đặng Thùy Dung', '0974567890', 'dung.dang@gmail.com', 'dung_dang', crypt(gen_random_uuid()::text, gen_salt('bf')), 250000, 2200, 'vip'),
+    ('Nguyễn Hải Đăng', '0935678901', 'dang.hai@gmail.com', 'dang_hai', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 45, 'regular'),
+    ('Lê Bảo Châu', '0966789012', 'chau.le@gmail.com', 'chau_le', crypt(gen_random_uuid()::text, gen_salt('bf')), 120000, 520, 'gold'),
+    ('Phan Thanh Tùng', '0987890123', 'tung.phan@gmail.com', 'tung_phan', crypt(gen_random_uuid()::text, gen_salt('bf')), 30000, 20, 'regular'),
+    ('Võ Quốc Huy', '0918901234', 'huy.vo@gmail.com', 'huy_vo', crypt(gen_random_uuid()::text, gen_salt('bf')), 90000, 180, 'silver'),
+    ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt(gen_random_uuid()::text, gen_salt('bf')), 300000, 2800, 'vip'),
+    ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt(gen_random_uuid()::text, gen_salt('bf')), 60000, 80, 'regular'),
+    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver');
 
 -- 9. LỊCH SỬ BẢO TRÌ MẪU (CHO DEMO RLS VÀ MODULE BẢO TRÌ)
 INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
 VALUES 
-    (1, 6, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
+    (1, 2, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
 -- 10. LÀM MỚI MATERIALIZED VIEWS
@@ -1828,12 +1754,12 @@ BEGIN
 
     -- Trích xuất JSON và kiểm tra rủi ro
     IF (TG_OP = 'DELETE') THEN
-        v_old_json := to_jsonb(OLD);
+        v_old_json := to_jsonb(OLD) - 'password_hash' - 'salary';
         v_risk_score := v_risk_score + 30;
         v_reason := v_reason || '[Hành động xóa dữ liệu nhạy cảm] ';
     ELSIF (TG_OP = 'UPDATE') THEN
-        v_old_json := to_jsonb(OLD);
-        v_new_json := to_jsonb(NEW);
+        v_old_json := to_jsonb(OLD) - 'password_hash' - 'salary';
+        v_new_json := to_jsonb(NEW) - 'password_hash' - 'salary';
         
         -- Kiểm tra thay đổi lương nhân viên
         IF TG_TABLE_NAME = 'employee' THEN
@@ -1848,7 +1774,7 @@ BEGIN
             END IF;
         END IF;
     ELSIF (TG_OP = 'INSERT') THEN
-        v_new_json := to_jsonb(NEW);
+        v_new_json := to_jsonb(NEW) - 'password_hash' - 'salary';
 
         -- Kiểm tra giao dịch nạp tiền hoặc thanh toán lớn bất thường (>= 5.000.000 VNĐ)
         IF TG_TABLE_NAME = 'payment' THEN
@@ -2579,7 +2505,7 @@ BEGIN
     SELECT * INTO v_customer
     FROM core.customer
     WHERE customer_id = v_session.customer_id
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
 
     v_play_amount := core.fn_calc_session_amount(
         v_session.start_time, v_end_time, v_session.hourly_rate_applied
@@ -2740,7 +2666,7 @@ BEGIN
     WHERE c.username = p_username
       AND c.is_active = TRUE
       AND c.password_hash = public.crypt(p_password, c.password_hash::TEXT)
-    FOR UPDATE;
+    FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Sai tài khoản hoặc mật khẩu!';
     END IF;
@@ -3352,9 +3278,9 @@ BEGIN
         SELECT 1 FROM hr.employee
         WHERE employee_id = p_technician_id
           AND is_active = TRUE
-          AND emp_role = 'technician'
+          AND emp_role IN ('admin', 'manager')
     ) THEN
-        RAISE EXCEPTION 'Nhân viên phụ trách phải là technician đang hoạt động.' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'Người phụ trách phải là admin hoặc manager đang hoạt động.' USING ERRCODE = '23514';
     END IF;
     IF NULLIF(trim(p_issue_description), '') IS NULL THEN
         RAISE EXCEPTION 'Lý do bảo trì không được để trống.' USING ERRCODE = '22023';
@@ -3492,17 +3418,112 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION core.sp_create_customer(
+    p_full_name VARCHAR(100),
+    p_phone VARCHAR(20),
+    p_email VARCHAR(100),
+    p_username VARCHAR(50),
+    p_password TEXT
+) RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, public
+AS $$
+DECLARE
+    v_customer_id INT;
+BEGIN
+    IF NULLIF(trim(p_password), '') IS NULL THEN
+        RAISE EXCEPTION 'Mật khẩu hội viên không được để trống.' USING ERRCODE = '22023';
+    END IF;
+    INSERT INTO core.customer(full_name, phone, email, username, password_hash)
+    VALUES (
+        trim(p_full_name),
+        trim(p_phone),
+        NULLIF(trim(p_email), ''),
+        lower(trim(p_username)),
+        public.crypt(p_password, public.gen_salt('bf'))
+    )
+    RETURNING customer_id INTO v_customer_id;
+    RETURN v_customer_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_update_customer(
+    p_customer_id INT,
+    p_full_name VARCHAR(100),
+    p_phone VARCHAR(20),
+    p_email VARCHAR(100)
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    UPDATE core.customer
+    SET full_name = trim(p_full_name),
+        phone = trim(p_phone),
+        email = NULLIF(trim(p_email), '')
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_set_customer_active(
+    p_customer_id INT,
+    p_is_active BOOLEAN
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core
+AS $$
+BEGIN
+    UPDATE core.customer
+    SET is_active = p_is_active
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_reset_customer_password(
+    p_customer_id INT,
+    p_password TEXT
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, core, public
+AS $$
+BEGIN
+    IF NULLIF(trim(p_password), '') IS NULL THEN
+        RAISE EXCEPTION 'Mật khẩu hội viên không được để trống.' USING ERRCODE = '22023';
+    END IF;
+    UPDATE core.customer
+    SET password_hash = public.crypt(p_password, public.gen_salt('bf'))
+    WHERE customer_id = p_customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hội viên ID % không tồn tại.', p_customer_id;
+    END IF;
+END;
+$$;
+
 GRANT EXECUTE ON FUNCTION inventory.sp_receive_stock(INT, INT) TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
-GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier, role_staff;
+GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT) TO role_admin, role_manager, role_cashier;
 GRANT EXECUTE ON FUNCTION billing.sp_void_invoice(BIGINT, INT) TO role_admin;
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION hr.sp_create_employee(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
+GRANT EXECUTE ON FUNCTION core.sp_create_customer(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_customer(INT, VARCHAR, VARCHAR, VARCHAR) TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_set_customer_active(INT, BOOLEAN) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION core.sp_reset_customer_password(INT, TEXT) TO role_admin, role_manager;
 
 
 
@@ -3555,6 +3576,8 @@ FROM reporting.vw_daily_revenue;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_revenue_daily_date
     ON reporting.mv_revenue_daily (revenue_date);
 
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier;
+
 CREATE OR REPLACE FUNCTION reporting.sp_refresh_materialized_views()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -3570,9 +3593,284 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
-GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
-GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
 GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier, role_technician;
 GRANT ALL ON reporting.mv_revenue_daily TO role_admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier, role_technician;
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- BẮT ĐẦU NỘI DUNG TỪ: sql/12_security_hardening.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+-- Bảo vệ role và function cho bản cập nhật chỉ còn admin/manager/cashier.
+-- Role station là role kỹ thuật nội bộ, không xuất hiện trong Admin role selector.
+
+\c netcafe_db;
+
+-- Hợp nhất dữ liệu legacy trước khi siết CHECK role.
+UPDATE hr.employee SET emp_role = 'cashier' WHERE emp_role = 'staff';
+UPDATE hr.employee SET emp_role = 'manager' WHERE emp_role = 'technician';
+ALTER TABLE hr.employee DROP CONSTRAINT IF EXISTS ck_employee_role;
+ALTER TABLE hr.employee
+    ADD CONSTRAINT ck_employee_role CHECK (emp_role IN ('admin', 'manager', 'cashier'));
+
+-- Legacy login/group không còn được dùng bởi app.
+DO $$
+DECLARE
+    v_role TEXT;
+BEGIN
+    FOR v_role IN
+        SELECT rolname
+        FROM pg_roles
+        WHERE rolname IN ('role_staff', 'role_technician', 'role_report_readonly', 'nv_tuan', 'nv_hung')
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai, reporting, staging FROM %I',
+            v_role);
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA core, inventory, billing, hr, audit, ai, reporting, staging FROM %I',
+            v_role);
+        EXECUTE format('ALTER ROLE %I NOLOGIN', v_role);
+    END LOOP;
+END $$;
+
+-- Không để function mới tự cấp EXECUTE cho PUBLIC.
+ALTER DEFAULT PRIVILEGES IN SCHEMA core, inventory, billing, hr, audit, ai, reporting
+    REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA core, inventory, billing, hr, audit, ai, reporting FROM PUBLIC;
+
+-- Không cho manager/cashier ghi thẳng bảng để bypass function nghiệp vụ.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+    ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai
+    FROM role_manager, role_cashier;
+
+GRANT USAGE ON SCHEMA core, inventory, billing, hr, reporting, ai TO role_admin, role_manager;
+GRANT USAGE ON SCHEMA core, inventory, billing, hr, reporting TO role_cashier;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA core, inventory, billing, reporting, ai TO role_manager;
+GRANT SELECT ON hr.maintenance TO role_manager;
+REVOKE ALL ON hr.employee FROM role_manager;
+GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
+    ON hr.employee TO role_manager;
+GRANT SELECT ON hr.vw_employee_public TO role_manager;
+
+GRANT SELECT ON core.room, core.computer_type, core.computer, core.customer, core.gaming_session
+    TO role_cashier;
+GRANT SELECT ON core.service_request TO role_cashier;
+GRANT SELECT ON inventory.food_order, inventory.food_order_detail,
+    inventory.product_category, inventory.product TO role_cashier;
+GRANT SELECT ON billing.invoice, billing.invoice_promotion, billing.payment, billing.promotion
+    TO role_cashier;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_cashier;
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier;
+REVOKE ALL ON hr.employee FROM role_cashier;
+GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
+    ON hr.employee TO role_cashier;
+GRANT SELECT ON hr.vw_employee_public TO role_cashier;
+
+-- Core session/payment/order contracts.
+GRANT EXECUTE ON FUNCTION core.fn_calc_session_amount(TIMESTAMPTZ, TIMESTAMPTZ, NUMERIC)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.fn_membership_tier(INT)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_open_session(INT, INT, INT)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION billing.sp_close_session_and_pay(BIGINT, INT, VARCHAR, VARCHAR)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION billing.sp_top_up(INT, INT, NUMERIC, VARCHAR, VARCHAR)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION inventory.sp_place_order(BIGINT, INT, INT, INT)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION inventory.sp_update_order_status(BIGINT, VARCHAR, INT)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_service_request_status(BIGINT, VARCHAR, INT)
+    TO role_admin, role_manager, role_cashier;
+
+-- Customer CRUD contract; UI không ghi core.customer trực tiếp nữa.
+GRANT EXECUTE ON FUNCTION core.sp_create_customer(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_update_customer(INT, VARCHAR, VARCHAR, VARCHAR)
+    TO role_admin, role_manager, role_cashier;
+GRANT EXECUTE ON FUNCTION core.sp_set_customer_active(INT, BOOLEAN)
+    TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION core.sp_reset_customer_password(INT, TEXT)
+    TO role_admin, role_manager;
+
+-- Manager operational contracts.
+GRANT EXECUTE ON FUNCTION inventory.sp_receive_stock(INT, INT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
+
+-- Admin-only contracts.
+GRANT EXECUTE ON FUNCTION billing.sp_void_invoice(BIGINT, INT) TO role_admin;
+GRANT EXECUTE ON FUNCTION hr.sp_create_employee(VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, VARCHAR, NUMERIC)
+    TO role_admin;
+GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, NUMERIC)
+    TO role_admin;
+GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
+GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
+GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
+GRANT pg_read_all_stats TO role_admin, role_manager;
+
+-- AI chỉ dành cho admin/manager.
+GRANT EXECUTE ON FUNCTION ai.fn_recommend_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_auto_optimize_indexes() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;
+
+-- RLS helper chỉ cần cho ba role người dùng.
+GRANT EXECUTE ON FUNCTION hr.fn_get_current_employee_id()
+    TO role_admin, role_manager, role_cashier;
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- BẮT ĐẦU NỘI DUNG TỪ: sql/13_ai_demo_situations.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+-- ============================================================================
+-- NETCAFE MANAGEMENT SYSTEM - TÌNH HUỐNG MẪU CHO AI CENTER (GIAN LẬN & TRÙNG LẶP)
+-- ============================================================================
+
+DO $$
+DECLARE
+    v_audit_id BIGINT;
+    v_log_time TIMESTAMPTZ;
+    v_cust_a INT;
+    v_cust_b INT;
+    v_cust_c INT;
+    v_cust_d INT;
+BEGIN
+    -- 1. TÌNH HUỐNG TRÙNG LẶP HỘI VIÊN (DUPLICATE CANDIDATES)
+    -- Thêm tài khoản trùng lặp 1: Trần Văn Bình (trùng tên và 7 số cuối SĐT 2345678)
+    IF NOT EXISTS (SELECT 1 FROM core.customer WHERE username = 'binh_tran_pro') THEN
+        INSERT INTO core.customer (
+            full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier
+        ) VALUES (
+            'Trần Văn Bình', '0812345678', 'binh.tran.pro@gmail.com', 'binh_tran_pro',
+            crypt('Pass@123', gen_salt('bf')), 25000, 30, 'regular'
+        );
+    END IF;
+
+    -- Thêm tài khoản trùng lặp 2: Nguyễn Hải Đăng (trùng tên và đuôi SĐT với ID 4)
+    IF NOT EXISTS (SELECT 1 FROM core.customer WHERE username = 'haidang_gaming') THEN
+        INSERT INTO core.customer (
+            full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier
+        ) VALUES (
+            'Nguyễn Hải Đăng', '0835678901', 'haidang.gaming@gmail.com', 'haidang_gaming',
+            crypt('Pass@123', gen_salt('bf')), 15000, 10, 'regular'
+        );
+    END IF;
+
+    SELECT customer_id INTO v_cust_a FROM core.customer WHERE username = 'binh_tran' LIMIT 1;
+    SELECT customer_id INTO v_cust_b FROM core.customer WHERE username = 'binh_tran_pro' LIMIT 1;
+    SELECT customer_id INTO v_cust_c FROM core.customer WHERE username = 'dang_hai' LIMIT 1;
+    SELECT customer_id INTO v_cust_d FROM core.customer WHERE username = 'haidang_gaming' LIMIT 1;
+
+    -- Nạp cặp trùng lặp A & B vào ai.duplicate_candidate nếu chưa có
+    IF v_cust_a IS NOT NULL AND v_cust_b IS NOT NULL AND v_cust_a < v_cust_b THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM ai.duplicate_candidate
+            WHERE customer_id_a = v_cust_a AND customer_id_b = v_cust_b
+        ) THEN
+            INSERT INTO ai.duplicate_candidate (customer_id_a, customer_id_b, similarity, reason, status)
+            VALUES (
+                v_cust_a, v_cust_b, 1.000,
+                'Trùng hoàn toàn họ tên và số điện thoại liên hệ',
+                'pending'
+            );
+        END IF;
+    END IF;
+
+    -- Nạp cặp trùng lặp C & D vào ai.duplicate_candidate nếu chưa có
+    IF v_cust_c IS NOT NULL AND v_cust_d IS NOT NULL AND v_cust_c < v_cust_d THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM ai.duplicate_candidate
+            WHERE customer_id_a = v_cust_c AND customer_id_b = v_cust_d
+        ) THEN
+            INSERT INTO ai.duplicate_candidate (customer_id_a, customer_id_b, similarity, reason, status)
+            VALUES (
+                v_cust_c, v_cust_d, 0.950,
+                'Trùng khớp họ tên và giống 4 số cuối điện thoại liên hệ',
+                'pending'
+            );
+        END IF;
+    END IF;
+
+    -- 2. TÌNH HUỐNG CẢNH BÁO AN NINH & GIAN LẬN (SECURITY ALERTS)
+    -- Tình huống 1: Hủy hóa đơn đã xuất (VOID)
+    IF NOT EXISTS (
+        SELECT 1 FROM ai.ai_alert
+        WHERE reason LIKE '%Hóa đơn #104%'
+    ) THEN
+        v_log_time := clock_timestamp() - INTERVAL '2 hours';
+        INSERT INTO audit.audit_log (logged_at, actor, table_name, action, row_pk, old_data, new_data)
+        VALUES (
+            v_log_time, 'nv_thao', 'billing.invoice', 'UPDATE', '104',
+            '{"status":"paid","total_amount":350000}'::jsonb,
+            '{"status":"void","total_amount":350000}'::jsonb
+        )
+        RETURNING audit_id INTO v_audit_id;
+
+        INSERT INTO ai.ai_alert (audit_id, audit_logged_at, risk_score, risk_level, reason, status)
+        VALUES (
+            v_audit_id, v_log_time, 75, 'high',
+            'Hủy hóa đơn đã xuất VOID: Hóa đơn #104 trị giá 350.000 VNĐ bị nhân viên nv_thao hủy sau khi khách rời máy',
+            'new'
+        );
+    END IF;
+
+    -- Tình huống 2: Nạp tiền ngoài giờ bất thường
+    IF NOT EXISTS (
+        SELECT 1 FROM ai.ai_alert
+        WHERE reason LIKE '%Nạp 2.000.000 VNĐ%'
+    ) THEN
+        v_log_time := clock_timestamp() - INTERVAL '1 day' + INTERVAL '2 hours 45 minutes';
+        INSERT INTO audit.audit_log (logged_at, actor, table_name, action, row_pk, old_data, new_data)
+        VALUES (
+            v_log_time, 'nv_thao', 'billing.payment', 'INSERT', '512',
+            NULL,
+            '{"amount":2000000,"customer_id":1}'::jsonb
+        )
+        RETURNING audit_id INTO v_audit_id;
+
+        INSERT INTO ai.ai_alert (audit_id, audit_logged_at, risk_score, risk_level, reason, status)
+        VALUES (
+            v_audit_id, v_log_time, 65, 'medium',
+            'Điều chỉnh số dư ví khách hàng bất thường ngoài giờ: Nạp 2.000.000 VNĐ vào tài khoản binh_tran lúc 02:45 sáng',
+            'new'
+        );
+    END IF;
+
+    -- Tình huống 3: Can thiệp sửa giờ chơi
+    IF NOT EXISTS (
+        SELECT 1 FROM ai.ai_alert
+        WHERE reason LIKE '%VIP-02%'
+    ) THEN
+        v_log_time := clock_timestamp() - INTERVAL '2 days';
+        INSERT INTO audit.audit_log (logged_at, actor, table_name, action, row_pk, old_data, new_data)
+        VALUES (
+            v_log_time, 'nv_hung', 'core.gaming_session', 'UPDATE', '88',
+            '{"total_amount":120000}'::jsonb,
+            '{"total_amount":40000}'::jsonb
+        )
+        RETURNING audit_id INTO v_audit_id;
+
+        INSERT INTO ai.ai_alert (audit_id, audit_logged_at, risk_score, risk_level, reason, status)
+        VALUES (
+            v_audit_id, v_log_time, 85, 'high',
+            'Can thiệp nhật ký phiên chơi: Phiên chơi máy VIP-02 bị chỉnh sửa giờ chơi giảm tiền thanh toán',
+            'reviewed'
+        );
+    END IF;
+END $$;
+
+-- 3. Cập nhật khuyến mãi tự động từ số liệu hiện hữu
+SELECT count(*) FROM ai.fn_suggest_promotions();

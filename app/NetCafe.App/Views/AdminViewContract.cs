@@ -22,7 +22,6 @@ public sealed class AdminViewContext
     public bool IsAdmin => UserRole == "role_admin";
     public bool IsManager => UserRole == "role_manager";
     public bool IsCashier => UserRole == "role_cashier";
-    public bool IsTechnician => UserRole == "role_technician";
 }
 
 public interface IAdminView

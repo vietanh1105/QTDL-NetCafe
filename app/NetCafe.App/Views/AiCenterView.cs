@@ -185,7 +185,7 @@ public partial class AiCenterView : AdminCardViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (!RequiredContext.IsAdmin && !RequiredContext.IsManager)
+        if (RequiredContext.IsCashier || (!RequiredContext.IsAdmin && !RequiredContext.IsManager))
         {
             UpdateRolePermissions(RequiredContext);
             return;

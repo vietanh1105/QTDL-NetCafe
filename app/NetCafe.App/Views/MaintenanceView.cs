@@ -15,7 +15,7 @@ public partial class MaintenanceView : AdminCardViewBase
     public MaintenanceView()
     {
         InitializeComponent();
-        SetTitle("Bảo trì thiết bị", "Phiếu reported/in_progress chuyển máy sang maintenance; fixed trả máy về available qua trigger CSDL.");
+        SetTitle("Bảo trì thiết bị", "Quản trị viên và quản lý lập/hoàn tất phiếu; trigger CSDL đồng bộ trạng thái máy.");
         ConfigureButton(_createButton, "+ Lập phiếu bảo trì", CyberTheme.Primary, 150);
         ConfigureButton(_completeButton, "✅ Hoàn tất sửa chữa", CyberTheme.Success, 160);
         ActionsPanel.Controls.Add(_createButton);
@@ -28,10 +28,10 @@ public partial class MaintenanceView : AdminCardViewBase
     public override void SetContext(AdminViewContext context)
     {
         base.SetContext(context);
-        var canAccess = context.IsAdmin || context.IsTechnician;
+        var canAccess = context.IsAdmin || context.IsManager;
         if (!canAccess)
         {
-            ClearCards("🔒 Thu ngân không phụ trách bảo trì máy trạm (Cơ chế CSDL: Grant hr.maintenance).");
+            ClearCards("🔒 Nhân viên không phụ trách bảo trì máy trạm.");
             UpdateButtonsState(false);
         }
         else
@@ -44,7 +44,7 @@ public partial class MaintenanceView : AdminCardViewBase
     {
         if (RequiredContext.IsCashier)
         {
-            ClearCards("🔒 Thu ngân không phụ trách bảo trì máy trạm (Cơ chế CSDL: Grant hr.maintenance).");
+            ClearCards("🔒 Nhân viên không phụ trách bảo trì máy trạm.");
             UpdateButtonsState(false);
             return;
         }
@@ -56,7 +56,7 @@ public partial class MaintenanceView : AdminCardViewBase
                 rows,
                 maintenance => new AdminCardModel(
                     $"{maintenance.ComputerCode} · Phiếu #{maintenance.MaintenanceId}",
-                    $"Kỹ thuật viên: {maintenance.TechnicianName}",
+                    $"Người phụ trách: {maintenance.TechnicianName}",
                     $"{maintenance.IssueDescription}\nBắt đầu: {maintenance.StartedAt:dd/MM/yyyy HH:mm}\nChi phí: {maintenance.Cost:N0} đ",
                     maintenance.Status switch
                     {
@@ -85,15 +85,6 @@ public partial class MaintenanceView : AdminCardViewBase
         }
     }
 
-    private static bool CanAccessMaintenance(string user)
-    {
-        if (string.IsNullOrWhiteSpace(user))
-        {
-            return false;
-        }
-        var u = user.ToLowerInvariant();
-        return u.Contains("admin") || u.Contains("hung") || u.Contains("tech");
-    }
 
     private void UpdateButtonsState(bool canAccess)
     {
@@ -107,7 +98,7 @@ public partial class MaintenanceView : AdminCardViewBase
     {
         var computers = await RequiredContext.Repository.GetComputersAsync();
         var employees = (await RequiredContext.Repository.GetEmployeesAsync())
-            .Where(employee => employee.EmpRole.Equals("technician", StringComparison.OrdinalIgnoreCase))
+            .Where(employee => employee.EmpRole is "admin" or "manager")
             .ToList();
         using var dialog = new MaintenanceEditorDialog(computers, employees);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK || dialog.SelectedComputer is null || dialog.SelectedTechnician is null)
@@ -190,7 +181,7 @@ internal sealed class MaintenanceEditorDialog : Form
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 4 };
         layout.Controls.Add(new Label { Text = "Máy", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
         layout.Controls.Add(_computerBox, 1, 0);
-        layout.Controls.Add(new Label { Text = "Kỹ thuật viên", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 1);
+        layout.Controls.Add(new Label { Text = "Người phụ trách", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 1);
         layout.Controls.Add(_technicianBox, 1, 1);
         layout.Controls.Add(new Label { Text = "Lý do", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 2);
         layout.Controls.Add(_issueBox, 1, 2);

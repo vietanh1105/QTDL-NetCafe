@@ -121,7 +121,7 @@ public sealed class StationConfig
                 ConnectionPruningInterval = 10,
                 Pooling = true,
                 MaxPoolSize = 25,
-                IncludeErrorDetail = true
+                IncludeErrorDetail = false
             };
 
             if (!string.IsNullOrEmpty(SslMode) &&

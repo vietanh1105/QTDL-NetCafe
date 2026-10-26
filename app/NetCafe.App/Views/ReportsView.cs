@@ -112,7 +112,7 @@ public partial class ReportsView : AdminDataViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (!RequiredContext.IsAdmin && !RequiredContext.IsManager)
+        if (RequiredContext.IsCashier)
         {
             UpdateRolePermissions(RequiredContext);
             return;
@@ -120,6 +120,14 @@ public partial class ReportsView : AdminDataViewBase
 
         try
         {
+            if (RequiredContext.RuntimeInfo?.HasDailyRevenueMaterializedView != true)
+            {
+                SetRows(
+                    Array.Empty<DailyRevenueItem>(),
+                    RequiredContext.RuntimeInfo?.ReportContractStatus ??
+                    "Thiếu migration báo cáo 11: reporting.mv_revenue_daily");
+                return;
+            }
             UpdateModeButtonStyles();
             switch (_mode)
             {
