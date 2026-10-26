@@ -23,28 +23,26 @@ WHERE extname IN ('pgcrypto', 'pg_trgm', 'unaccent');
 
 -- ============================================================================
 -- PHẦN 2: DEMO PIPELINE PYTHON ETL (SINH DỮ LIỆU BẨN & CHUẨN HÓA DỮ LIỆU)
--- Bước 1 (Terminal): Chạy "python python/generate_dirty_data.py"
--- Bước 2 (Terminal): Chạy "python python/clean_data.py"
+-- Bước 1 (Terminal): Chạy "python python/generate_dirty_data.py" (20 dòng thô)
+-- Bước 2 (Terminal): Chạy "python python/clean_data.py" (Làm sạch 16 dòng, cách ly 4 dòng)
 -- Bước 3 (SQL Editor): Chạy các câu query dưới đây để chứng minh với Giảng viên:
 -- ============================================================================
 
--- 2.1. Xem dữ liệu bẩn ban đầu trong bảng Staging (chứa SĐT +84, số âm, khoảng trắng, ...):
-SELECT raw_id, raw_full_name, raw_phone, raw_balance, raw_tier, source_batch
+-- 2.1. Xem trọn vẹn 20 dòng dữ liệu bẩn ban đầu trong bảng Staging:
+SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch
 FROM staging.stg_customers
-ORDER BY raw_id
-LIMIT 10;
+ORDER BY raw_id;
 
--- 2.2. Xem các dòng bẩn không thể cứu bị Python cách ly vào bảng Rejected:
+-- 2.2. Xem 4 dòng bẩn không thể cứu bị cách ly vào bảng Rejected:
 SELECT rejected_id, source_table, error_reason, raw_record, rejected_at
 FROM staging.rejected_rows
-ORDER BY rejected_id DESC
-LIMIT 10;
+ORDER BY rejected_id;
 
--- 2.3. Xem dữ liệu sạch đã được chuẩn hóa và nạp thành công vào bảng chính core.customer:
+-- 2.3. Xem 16 dòng dữ liệu sạch đã được chuẩn hóa và nạp vào bảng chính core.customer:
 SELECT customer_id, full_name, phone, email, username, balance, membership_tier
 FROM core.customer
 ORDER BY customer_id DESC
-LIMIT 10;
+LIMIT 16;
 
 
 -- ============================================================================

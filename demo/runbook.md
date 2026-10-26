@@ -64,35 +64,41 @@ Trước khi thầy gọi nhóm lên, chuẩn bị sẵn 2 cửa sổ song song:
 #### 1.2. Sinh dữ liệu bẩn bằng Python và chuẩn hóa dữ liệu (Data Quality Pipeline)
 * **Thao tác Terminal:**
   ```powershell
-  # Bước 1: Sinh 500 bản ghi bẩn vào bảng Staging
+  # Bước 1: Sinh đúng 20 bản ghi bẩn vào bảng Staging (gọn gàng, vừa trọn 1 màn hình)
   python python/generate_dirty_data.py
   ```
 * **Thao tác DBeaver:** Xem dữ liệu bẩn thô tại bảng Staging:
   ```sql
   SELECT raw_id, raw_full_name, raw_phone, raw_balance, raw_email, source_batch 
   FROM staging.stg_customers 
-  ORDER BY raw_id 
-  LIMIT 10;
+  ORDER BY raw_id;
   ```
-  👉 **Chỉ chuột vào 6 dòng đầu tiên cho Thầy xem:**
-  - **Dòng 1:** SĐT dính mã quốc tế `+84...` (`+84539958838`).
-  - **Dòng 2:** SĐT dính dấu chấm phân cách `0339.345.092`.
+  👉 **Chỉ chuột vào màn hình cho Thầy xem trọn vẹn 20 dòng:**
+  - **Dòng 1:** SĐT dính mã quốc tế `+84...` (`+84977100001`).
+  - **Dòng 2:** SĐT dính dấu chấm phân cách `0977.100.002`.
   - **Dòng 3:** Họ tên viết hoa toàn bộ và thụt lề nhiều khoảng trắng thừa `   PHAN HẢI VI   `.
-  - **Dòng 4:** Số dư âm vô lý `-50000`.
-  - **Dòng 5:** SĐT cụt chỉ có 5 số `12345` (không thể cứu).
+  - **Dòng 4:** Số dư âm vô lý `-50000` (sẽ bị reject).
+  - **Dòng 5:** SĐT cụt chỉ có 5 số `12345` (sẽ bị reject).
   - **Dòng 6:** Email hỏng sai cấu trúc `sai-email-khong-hop-le`.
+  - **Dòng 8:** Số dư âm `-100000` (sẽ bị reject).
+  - **Dòng 9:** SĐT cụt chỉ có 4 số `8888` (sẽ bị reject).
+  - **Dòng 10:** Tên thụt lề nhiều khoảng trắng `   LÊ THÀNH VIỆT   `.
+  - **Dòng 11..20:** Các khách hàng sạch bình thường.
 
 * **Thao tác Terminal:**
   ```powershell
   # Bước 2: Chạy Python ETL làm sạch dữ liệu
   python python/clean_data.py
   ```
-  *(Terminal in bảng thống kê: Xử lý 500 dòng $\rightarrow$ Chuẩn hóa nạp 474 dòng sạch vào `core.customer`, cách ly 26 dòng lỗi nặng vào `staging.rejected_rows`).*
+  *(Terminal in bảng thống kê: Xử lý 20 dòng $\rightarrow$ Chuẩn hóa nạp 16 dòng sạch vào `core.customer` và file `evidence/cleaned_customers.csv`, cách ly 4 dòng lỗi nặng vào `staging.rejected_rows` và file `evidence/rejected_customers.csv`).*
 
 * **Thao tác DBeaver:** Cho thầy xem bảng cách ly dữ liệu lỗi:
   ```sql
   SELECT rejected_id, source_table, error_reason, raw_record 
   FROM staging.rejected_rows 
+  ORDER BY rejected_id;
+  ```
+  *(Thầy nhìn thấy đúng 4 dòng bị cách ly: 2 dòng số âm `NEGATIVE_BALANCE`, 2 dòng SĐT ngắn `PHONE_FORMAT_INVALID`).* 
   ORDER BY rejected_id 
   LIMIT 10;
   ```

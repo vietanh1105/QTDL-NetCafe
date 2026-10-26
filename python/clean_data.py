@@ -83,6 +83,8 @@ def clean_and_load():
     try:
         with conn.cursor() as cur:
             # 1. Đọc dữ liệu từ staging
+            # Xóa các khách hàng batch ETL trước đó để kết quả luôn đồng bộ chính xác
+            cur.execute("DELETE FROM core.customer WHERE username LIKE 'user_%' OR username LIKE 'cust_%' OR username LIKE 'u_%';")
             cur.execute("""
                 SELECT raw_id, raw_full_name, raw_phone, raw_email, raw_username, 
                        raw_balance, raw_points, raw_tier
