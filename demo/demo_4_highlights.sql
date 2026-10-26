@@ -31,8 +31,8 @@ WHERE specs @> '{"gpu": "RTX 4070"}'::jsonb;
 -- ----------------------------------------------------------------------------
 -- [ĐIỂM NHẤN 4.2]: LUỒNG PYTHON ETL TỰ ĐỘNG LẤY DỮ LIỆU, LÀM SẠCH VÀ NẠP LẠI
 -- Thao tác trên Terminal:
---   1. python python/generate_dirty_data.py  (Nạp 500 dòng bẩn vào staging)
---   2. python python/clean_data.py           (Làm sạch, nạp 476 dòng chuẩn, cách ly 24 dòng)
+--   1. python python/generate_dirty_data.py  (Nạp 20 dòng bẩn vào staging)
+--   2. python python/clean_data.py           (Làm sạch, nạp 16 dòng chuẩn, cách ly 4 dòng)
 -- ----------------------------------------------------------------------------
 -- Kiểm tra bảng cách ly dữ liệu bẩn (Rejected Rows) trên DBeaver / pgAdmin:
 SELECT rejected_id, source_table, error_reason, raw_record, rejected_at
@@ -73,4 +73,18 @@ SELECT
     z_score, 
     detail_info->>'mean' AS mean_val, 
     detail_info->>'stddev' AS stddev_val
-FROM ai.fn_detect_anomalies(2.0);
+FROM ai.fn_detect_anomalies(1.5);
+
+
+-- ----------------------------------------------------------------------------
+-- [ĐIỂM NHẤN 4.5 - MỞ RỘNG]: GỢI Ý CHƯƠNG TRÌNH KHUYẾN MÃI THÔNG MINH
+-- (Module AI 5: Khai phá dữ liệu giờ thấp điểm và phân nhóm RFM chống rời bỏ khách VIP)
+-- ----------------------------------------------------------------------------
+-- Hệ thống tự động phân tích hành vi khách hàng và lịch sử giờ chơi để đề xuất khuyến mãi:
+SELECT 
+    sug_id,
+    suggestion_type,
+    target,
+    details->>'recommended_action' AS recommended_action,
+    details->>'rationale' AS rationale
+FROM ai.promotion_suggestion;
