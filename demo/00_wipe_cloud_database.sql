@@ -17,3 +17,4 @@ KẾT QUẢ QUAN SÁT TRÊN DBEAVER / PGADMIN:
 - Khi nhấn F5 trên cây thư mục Schemas bên trái, toàn bộ các bảng biến mất hoàn toàn!
 - CSDL đã sẵn sàng để trình diễn luồng Khởi tạo tự động từ con số 0.
 */
+

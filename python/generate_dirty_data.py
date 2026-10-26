@@ -5,6 +5,7 @@
 # File: python/generate_dirty_data.py
 # Mục đích: Sinh dữ liệu khách hàng giả lập CHƯA CHUẨN (~12-15% bản ghi bẩn)
 #           và nạp vào staging.stg_customers để phục vụ bài toán Data Quality
+#           (Đặc biệt: 6 dòng đầu tiên LUÔN LUÔN là các trường hợp bẩn mẫu để dễ demo)
 # ============================================================================
 
 import os
@@ -61,7 +62,7 @@ def get_db_connection():
 RANDOM_SEED = 42
 random.seed(RANDOM_SEED)
 
-# Ngân hàng họ tên tiếng Việt (Fallback không cần thư viện bên ngoài)
+# Ngân hàng họ tên tiếng Việt
 HO_LIST = ["Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ", "Hồ", "Ngô", "Dương", "Lý"]
 DEM_LIST = ["Văn", "Thị", "Đình", "Đức", "Hữu", "Minh", "Quang", "Tuấn", "Ngọc", "Thanh", "Quốc", "Hải", "Xuân", "Thành"]
 TEN_LIST = ["Anh", "Bình", "Cường", "Dũng", "Giang", "Hải", "Hùng", "Huy", "Khánh", "Linh", "Long", "Minh", "Nam", "Phong", "Quân", "Sơn", "Thảo", "Tuấn", "Tùng", "Vinh", "Việt"]
@@ -83,31 +84,45 @@ def generate_dirty_customers(n=500):
         points = str(random.randint(0, 1500))
         tier = random.choice(tiers)
 
-        # Xác suất ~15% sinh dữ liệu bẩn
-        dirty_flag = random.random() < 0.15
+        # ĐẢM BẢO 6 DÒNG ĐẦU TIÊN (raw_id 1 đến 6) LUÔN CHỨA CÁC LỖI BẨN MẪU ĐỂ SHOW THẦY
+        if i == 1:
+            # Case 1: SĐT dính mã quốc tế +84 (cứu được)
+            clean_phone = "+84" + clean_phone[1:]
+        elif i == 2:
+            # Case 2: SĐT dính dấu chấm phân cách (cứu được)
+            clean_phone = f"{clean_phone[:4]}.{clean_phone[4:7]}.{clean_phone[7:]}"
+        elif i == 3:
+            # Case 3: Tên viết hoa toàn bộ và thừa nhiều khoảng trắng thụt lề (cứu được)
+            full_name = f"   {full_name.upper()}   "
+        elif i == 4:
+            # Case 4: Số dư âm vô lý (lỗi nặng, không cứu được -> đưa vào rejected_rows)
+            balance = "-50000"
+        elif i == 5:
+            # Case 5: SĐT quá ngắn chỉ có 5 số (lỗi nặng, không cứu được -> đưa vào rejected_rows)
+            clean_phone = "12345"
+        elif i == 6:
+            # Case 6: Email sai định dạng hoàn toàn (cứu được bằng cách bỏ email)
+            email = "sai-email-khong-hop-le"
+        else:
+            # Các dòng từ 7 trở đi: Xác suất ngẫu nhiên ~15% sinh dữ liệu bẩn
+            if random.random() < 0.15:
+                error_type = random.choice([
+                    'phone_plus84', 'phone_dot_space', 'phone_invalid_short',
+                    'name_casing_space', 'email_invalid', 'negative_balance'
+                ])
 
-        if dirty_flag:
-            error_type = random.choice([
-                'phone_plus84', 'phone_dot_space', 'phone_invalid_short',
-                'name_casing_space', 'email_invalid', 'negative_balance',
-                'duplicate_near'
-            ])
-
-            if error_type == 'phone_plus84':
-                clean_phone = "+84" + clean_phone[1:]
-            elif error_type == 'phone_dot_space':
-                clean_phone = f"{clean_phone[:4]}.{clean_phone[4:7]}.{clean_phone[7:]}"
-            elif error_type == 'phone_invalid_short':
-                clean_phone = "12345"
-            elif error_type == 'name_casing_space':
-                full_name = f"   {full_name.upper()}   "
-            elif error_type == 'email_invalid':
-                email = "sai-email-khong-hop-le"
-            elif error_type == 'negative_balance':
-                balance = "-50000"
-            elif error_type == 'duplicate_near':
-                full_name = "Nguyen Van Hung"
-                clean_phone = "0987654321"
+                if error_type == 'phone_plus84':
+                    clean_phone = "+84" + clean_phone[1:]
+                elif error_type == 'phone_dot_space':
+                    clean_phone = f"{clean_phone[:4]}.{clean_phone[4:7]}.{clean_phone[7:]}"
+                elif error_type == 'phone_invalid_short':
+                    clean_phone = "12345"
+                elif error_type == 'name_casing_space':
+                    full_name = f"   {full_name.upper()}   "
+                elif error_type == 'email_invalid':
+                    email = "sai-email-khong-hop-le"
+                elif error_type == 'negative_balance':
+                    balance = "-50000"
 
         rows.append((full_name, clean_phone, email, username, balance, points, tier, "BATCH_DIRTY_01"))
 
@@ -118,8 +133,8 @@ def load_to_staging(rows):
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Xóa batch cũ trong staging
-            cur.execute("DELETE FROM staging.stg_customers WHERE source_batch = 'BATCH_DIRTY_01';")
+            # Xóa và reset ID trong staging để raw_id luôn bắt đầu từ 1
+            cur.execute("TRUNCATE staging.stg_customers RESTART IDENTITY;")
             
             print(f"[*] Đang nạp {len(rows)} dòng dữ liệu bẩn vào staging.stg_customers...")
             try:
@@ -137,6 +152,7 @@ def load_to_staging(rows):
             
             conn.commit()
             print("[+] Nạp dữ liệu staging thành công (500 bản ghi thô)!")
+            print("[*] 6 dòng đầu tiên (raw_id 1..6) đã được cài đặt sẵn 6 lỗi bẩn điển hình để demo!")
     finally:
         conn.close()
 
