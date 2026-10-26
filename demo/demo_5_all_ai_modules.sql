@@ -88,3 +88,4 @@ SELECT
     details->>'recommended_action' AS hanh_dong_de_xuat,
     details->>'rationale' AS ly_do_ai_phan_tich
 FROM ai.promotion_suggestion;
+
