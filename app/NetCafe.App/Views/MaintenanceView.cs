@@ -28,7 +28,7 @@ public partial class MaintenanceView : AdminCardViewBase
     public override void SetContext(AdminViewContext context)
     {
         base.SetContext(context);
-        var canAccess = context.IsAdmin || context.IsManager || context.IsTechnician;
+        var canAccess = context.IsAdmin || context.IsTechnician;
         if (!canAccess)
         {
             ClearCards("🔒 Thu ngân không phụ trách bảo trì máy trạm (Cơ chế CSDL: Grant hr.maintenance).");
@@ -92,7 +92,7 @@ public partial class MaintenanceView : AdminCardViewBase
             return false;
         }
         var u = user.ToLowerInvariant();
-        return u.Contains("admin") || u.Contains("manager") || u.Contains("hung") || u.Contains("tech");
+        return u.Contains("admin") || u.Contains("hung") || u.Contains("tech");
     }
 
     private void UpdateButtonsState(bool canAccess)

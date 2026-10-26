@@ -8,25 +8,27 @@ namespace NetCafe.App.Views;
 
 public static class CyberTheme
 {
-    public static Color Background { get; } = Color.FromArgb(43, 46, 58); // #2B2E3A - sáng hơn, vẫn giữ nền graphite
-    public static Color Surface { get; } = Color.FromArgb(53, 58, 74); // #353A4A - card graphite
-    public static Color SurfaceRaised { get; } = Color.FromArgb(74, 74, 105); // #4A4A69 - bề mặt tím xanh
-    public static Color Border { get; } = Color.FromArgb(116, 122, 152); // #747A98 - viền dễ nhìn
-    public static Color Text { get; } = Color.FromArgb(248, 249, 255); // #F8F9FF - chữ sáng
-    public static Color MutedText { get; } = Color.FromArgb(196, 201, 219); // #C4C9DB - chữ phụ sáng
-    public static Color Primary { get; } = Color.FromArgb(143, 155, 255); // #8F9BFF - tím xanh chủ đạo
-    public static Color Success { get; } = Color.FromArgb(52, 211, 153); // #34D399 - service teal
-    public static Color Warning { get; } = Color.FromArgb(251, 191, 36); // #FBBF24 - warning amber
-    public static Color Danger { get; } = Color.FromArgb(251, 113, 133); // #FB7185 - danger pink red
+    // Bảng màu Graphite Cyber chuyên nghiệp - Độ tương phản cao, phân cấp khối rõ ràng
+    public static Color Background { get; } = Color.FromArgb(24, 26, 34); // #181A22 - Nền chính tối sâu
+    public static Color Surface { get; } = Color.FromArgb(34, 38, 50); // #222632 - Card & Toolbar graphite
+    public static Color SurfaceRaised { get; } = Color.FromArgb(46, 52, 70); // #2E3446 - Bề mặt nổi / Hover
+    public static Color Border { get; } = Color.FromArgb(62, 70, 92); // #3E465C - Viền mỏng phân chia khối
+    public static Color Text { get; } = Color.FromArgb(248, 250, 252); // #F8FAFC - Chữ chính trắng sáng
+    public static Color MutedText { get; } = Color.FromArgb(160, 170, 195); // #A0AAC3 - Chữ phụ êm mắt
+    public static Color Primary { get; } = Color.FromArgb(129, 140, 248); // #818CF8 - Tím xanh Indigo công nghệ
+    public static Color Success { get; } = Color.FromArgb(34, 197, 94); // #22C55E - Xanh lá ngọc tươi sáng
+    public static Color Warning { get; } = Color.FromArgb(245, 158, 11); // #F59E0B - Vàng hổ phách ấm áp
+    public static Color Danger { get; } = Color.FromArgb(239, 68, 68); // #EF4444 - Đỏ cảnh báo nổi bật
+    public static Color Info { get; } = Color.FromArgb(14, 165, 233); // #0EA5E9 - Xanh dương băng Sky
 
     public static void StyleButton(Button button, Color? accent = null)
     {
         var color = accent ?? Primary;
         button.BackColor = color;
-        var isLight = (color.R * 0.299 + color.G * 0.587 + color.B * 0.114) > 160;
-        button.ForeColor = isLight ? Text : Color.White;
+        var isLight = (color.R * 0.299 + color.G * 0.587 + color.B * 0.114) > 150;
+        button.ForeColor = isLight ? Color.FromArgb(15, 23, 42) : Color.White;
         button.FlatStyle = FlatStyle.Flat;
-        button.FlatAppearance.BorderColor = Border;
+        button.FlatAppearance.BorderColor = ControlPaint.Dark(color, 0.15F);
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(color, 0.12F);
         button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(color, 0.12F);

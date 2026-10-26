@@ -52,35 +52,25 @@ public partial class EmployeesView : AdminCardViewBase
             _showSalary = false;
         }
 
+        var canManage = context.IsAdmin || context.IsManager;
+        _createButton.Enabled = canManage;
+        _editButton.Enabled = canManage;
+        _toggleButton.Enabled = canManage;
+        _resetPasswordButton.Enabled = context.IsAdmin;
+
         if (context.IsAdmin)
         {
             _salaryButton.Visible = true;
             _salaryButton.Enabled = true;
             _salaryButton.Text = _showSalary ? "🙈 Ẩn thông tin lương" : "👁️ Xem bảng lương & Thông tin nhạy cảm";
             CyberTheme.StyleButton(_salaryButton, _showSalary ? CyberTheme.SurfaceRaised : CyberTheme.Warning);
-            _createButton.Enabled = true;
-            _editButton.Enabled = true;
-            _toggleButton.Enabled = true;
-            _resetPasswordButton.Enabled = true;
-        }
-        else if (context.IsManager)
-        {
-            _salaryButton.Visible = false;
-            _createButton.Enabled = true;
-            _editButton.Enabled = true;
-            _toggleButton.Enabled = true;
-            _resetPasswordButton.Enabled = true;
         }
         else
         {
             _salaryButton.Visible = true;
-            _salaryButton.Enabled = true;
-            _salaryButton.Text = "👁️ Xem bảng lương (Yêu cầu quyền DBA)";
-            CyberTheme.StyleButton(_salaryButton, CyberTheme.Warning);
-            _createButton.Enabled = false;
-            _editButton.Enabled = false;
-            _toggleButton.Enabled = false;
-            _resetPasswordButton.Enabled = false;
+            _salaryButton.Enabled = false;
+            _salaryButton.Text = "🔒 Bảng lương (Chỉ Chủ quán / DBA)";
+            CyberTheme.StyleButton(_salaryButton, CyberTheme.SurfaceRaised);
         }
     }
 

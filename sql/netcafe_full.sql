@@ -5,7 +5,7 @@
 -- Mô tả: File duy nhất cho phép giáo viên tái tạo toàn bộ hệ thống từ một máy chủ trống
 --        Bao gồm: Database -> Schemas -> Tables -> Contraints -> Functions/Triggers 
 --                 -> Views -> Security (RBAC/RLS) -> Indexes & Partition -> Seed Data -> 5 AI Modules
--- Liên kết: các file SQL nguồn trong SQL_FILES; file migration runtime sql/09_remove_booking.sql chạy riêng.
+-- Liên kết: các file SQL nguồn trong SQL_FILES; hệ thống 100% chuẩn hóa không còn contract đặt máy.
 -- Tính chất: 100% IDEMPOTENT - Có thể chạy lại nhiều lần mà không phát sinh lỗi.
 -- ============================================================================
 
@@ -1215,7 +1215,7 @@ BEGIN
         CREATE ROLE role_report_readonly NOLOGIN;
     END IF;
 
-    -- User đăng nhập demo
+    -- User đăng nhập demo: Mô hình 4 vai trò chính (nv_admin, nv_manager, nv_thao, nv_hung)
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_admin') THEN
         CREATE ROLE nv_admin WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_admin;
     ELSE
@@ -1224,7 +1224,7 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_manager') THEN
         CREATE ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_manager;
     ELSE
-        ALTER ROLE nv_manager WITH PASSWORD 'Demo@2026NetCafe';
+        ALTER ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe';
     END IF;
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_thao') THEN
         CREATE ROLE nv_thao WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_cashier;
@@ -3573,4 +3573,6 @@ GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admi
 GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager, role_technician;
 GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager, role_technician;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT pg_read_all_stats TO role_admin, role_manager;
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier, role_technician;
+GRANT ALL ON reporting.mv_revenue_daily TO role_admin;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier, role_technician;

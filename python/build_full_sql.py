@@ -33,7 +33,7 @@ def main():
 -- Mô tả: File duy nhất cho phép giáo viên tái tạo toàn bộ hệ thống từ một máy chủ trống
 --        Bao gồm: Database -> Schemas -> Tables -> Contraints -> Functions/Triggers 
 --                 -> Views -> Security (RBAC/RLS) -> Indexes & Partition -> Seed Data -> 5 AI Modules
--- Liên kết: các file SQL nguồn trong SQL_FILES; file migration runtime sql/09_remove_booking.sql chạy riêng.
+-- Liên kết: các file SQL nguồn trong SQL_FILES; hệ thống 100% chuẩn hóa không còn contract đặt máy.
 -- Tính chất: 100% IDEMPOTENT - Có thể chạy lại nhiều lần mà không phát sinh lỗi.
 -- ============================================================================
 """

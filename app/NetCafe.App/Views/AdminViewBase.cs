@@ -44,16 +44,22 @@ public abstract class AdminViewBase : UserControl, IAdminView
         grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         grid.BackgroundColor = CyberTheme.Surface;
         grid.BorderStyle = BorderStyle.None;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.GridColor = Color.FromArgb(48, 54, 72);
         grid.EnableHeadersVisualStyles = false;
-        grid.ColumnHeadersHeight = 36;
-        grid.ColumnHeadersDefaultCellStyle.BackColor = CyberTheme.SurfaceRaised;
+        grid.ColumnHeadersHeight = 38;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(28, 32, 44);
         grid.ColumnHeadersDefaultCellStyle.ForeColor = CyberTheme.Primary;
-        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        grid.RowTemplate.Height = 34;
         grid.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-        grid.DefaultCellStyle.BackColor = CyberTheme.Surface;
+        grid.DefaultCellStyle.BackColor = Color.FromArgb(34, 38, 50);
         grid.DefaultCellStyle.ForeColor = CyberTheme.Text;
-        grid.DefaultCellStyle.SelectionBackColor = CyberTheme.SurfaceRaised;
-        grid.DefaultCellStyle.SelectionForeColor = CyberTheme.Text;
-        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(30, 33, 45);
+        grid.DefaultCellStyle.Padding = new Padding(6, 2, 6, 2);
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(79, 70, 229);
+        grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(29, 32, 43);
+        grid.AlternatingRowsDefaultCellStyle.ForeColor = CyberTheme.Text;
+        grid.AlternatingRowsDefaultCellStyle.Padding = new Padding(6, 2, 6, 2);
     }
 }

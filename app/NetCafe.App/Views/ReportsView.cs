@@ -25,6 +25,8 @@ public partial class ReportsView : AdminDataViewBase
     public ReportsView()
     {
         InitializeComponent();
+        Toolbar.Height = 84;
+        TitleLabel.Width = 190;
         SetTitle("Báo cáo vận hành", "Chọn một nhóm báo cáo; dữ liệu snapshot chỉ refresh khi bấm Cập nhật.");
         ConfigureToolbar();
     }
@@ -88,7 +90,7 @@ public partial class ReportsView : AdminDataViewBase
         {
             SetRows(
                 Array.Empty<DailyRevenueItem>(),
-                "🔒 Vai trò hiện tại không có quyền xem báo cáo doanh thu (Cơ chế CSDL: Materialized Views).");
+                "🔒 Chỉ Chủ quán và Quản lý mới có quyền xem báo cáo doanh thu (Cơ chế CSDL: Materialized Views).");
         }
     }
 
@@ -110,7 +112,7 @@ public partial class ReportsView : AdminDataViewBase
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (RequiredContext.IsCashier || RequiredContext.IsTechnician)
+        if (!RequiredContext.IsAdmin && !RequiredContext.IsManager)
         {
             UpdateRolePermissions(RequiredContext);
             return;

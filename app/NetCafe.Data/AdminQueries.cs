@@ -1,16 +1,27 @@
 // Trách nhiệm: query read-only cho các Admin UserControl; không bypass repository.
 // Liên kết: reporting views và các bảng vận hành trong PostgreSQL.
 
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Npgsql;
 
 namespace NetCafe.Data;
 
 public partial class DbRepository
 {
-    public async Task<IReadOnlyList<DailyRevenueItem>> GetDailyRevenueAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DailyRevenueItem>> GetDailyRevenueAsync(
+        CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT revenue_date, total_invoices, total_play_amount, total_service_amount, total_discount_amount, net_revenue FROM reporting.mv_revenue_daily ORDER BY revenue_date DESC LIMIT 365;";
-        return await ReadAsync(sql, reader => new DailyRevenueItem
+        const string sqlMv =
+            "SELECT revenue_date, total_invoices, total_play_amount, total_service_amount, " +
+            "total_discount_amount, net_revenue FROM reporting.mv_revenue_daily ORDER BY revenue_date DESC LIMIT 365;";
+        const string sqlFallback =
+            "SELECT revenue_date, total_invoices, total_play_amount, total_service_amount, " +
+            "total_discount_amount, net_revenue FROM reporting.vw_daily_revenue ORDER BY revenue_date DESC LIMIT 365;";
+
+        DailyRevenueItem MapRow(NpgsqlDataReader reader) => new()
         {
             RevenueDate = reader.GetFieldValue<DateTime>(0),
             TotalInvoices = reader.GetInt64(1),
@@ -18,12 +29,24 @@ public partial class DbRepository
             TotalServiceAmount = reader.GetDecimal(3),
             TotalDiscountAmount = reader.GetDecimal(4),
             NetRevenue = reader.GetDecimal(5)
-        }, cancellationToken);
+        };
+
+        try
+        {
+            return await ReadAsync(sqlMv, MapRow, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            return await ReadAsync(sqlFallback, MapRow, cancellationToken);
+        }
     }
 
-    public async Task<IReadOnlyList<ComputerUsageItem>> GetComputerUsageAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ComputerUsageItem>> GetComputerUsageAsync(
+        CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT computer_id, computer_code, computer_name, room_name, total_sessions, total_hours_played, total_play_revenue FROM reporting.vw_computer_usage;";
+        const string sql =
+            "SELECT computer_id, computer_code, computer_name, room_name, " +
+            "total_sessions, total_hours_played, total_play_revenue FROM reporting.vw_computer_usage;";
         return await ReadAsync(sql, reader => new ComputerUsageItem
         {
             ComputerId = reader.GetInt32(0),
@@ -36,9 +59,12 @@ public partial class DbRepository
         }, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TopCustomerItem>> GetTopCustomersAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TopCustomerItem>> GetTopCustomersAsync(
+        CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT customer_id, full_name, phone, membership_tier, loyalty_points, total_sessions, total_spent, last_played_at FROM reporting.mv_top_customers LIMIT 100;";
+        const string sql =
+            "SELECT customer_id, full_name, phone, membership_tier, loyalty_points, " +
+            "total_sessions, total_spent, last_played_at FROM reporting.mv_top_customers LIMIT 100;";
         return await ReadAsync(sql, reader => new TopCustomerItem
         {
             CustomerId = reader.GetInt32(0),

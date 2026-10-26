@@ -76,7 +76,7 @@ public partial class InvoicesView : AdminViewBase
         _toolbar.BackColor = CyberTheme.Surface;
         _toolbar.Padding = new Padding(12, 6, 12, 6);
 
-        _titleLabel.Text = "🧾 Quản lý Hóa đơn & Sổ quỹ";
+        _titleLabel.Text = "🧾 Quản lý Hóa đơn";
         _titleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         _titleLabel.ForeColor = CyberTheme.Text;
         _titleLabel.AutoSize = true;

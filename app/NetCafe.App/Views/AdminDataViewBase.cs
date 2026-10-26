@@ -22,13 +22,13 @@ public abstract class AdminDataViewBase : AdminViewBase
         Padding = new Padding(12);
 
         Toolbar.Dock = DockStyle.Top;
-        Toolbar.Height = 100;
+        Toolbar.Height = 58;
         Toolbar.BackColor = CyberTheme.Surface;
         Toolbar.Padding = new Padding(12, 8, 12, 8);
 
         TitleLabel.Dock = DockStyle.Left;
         TitleLabel.AutoSize = false;
-        TitleLabel.Width = 330;
+        TitleLabel.Width = 240;
         TitleLabel.Font = new Font("Segoe UI", 11.5F, FontStyle.Bold);
         TitleLabel.ForeColor = CyberTheme.Text;
         TitleLabel.Padding = new Padding(4, 0, 12, 0);

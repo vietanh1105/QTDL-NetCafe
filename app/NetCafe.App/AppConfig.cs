@@ -163,8 +163,8 @@ namespace NetCafe.App
 
             var key = role switch
             {
-                "nv_thao" => "DB_CASHIER_PASSWORD",
                 "nv_manager" => "DB_MANAGER_PASSWORD",
+                "nv_thao" => "DB_CASHIER_PASSWORD",
                 "nv_hung" => "DB_TECHNICIAN_PASSWORD",
                 _ => "DB_ADMIN_PASSWORD"
             };
@@ -178,18 +178,20 @@ namespace NetCafe.App
 
         public static IReadOnlyList<string> GetConfiguredRoles()
         {
+            var demoRoles = new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" };
             var roles = new List<string>();
-            if (!string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password))
-            {
-                roles.Add(Username);
-            }
 
-            foreach (var role in new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" })
+            foreach (var role in demoRoles)
             {
                 if (!string.IsNullOrWhiteSpace(GetConfiguredRolePassword(role)) && !roles.Contains(role))
                 {
                     roles.Add(role);
                 }
+            }
+
+            if (roles.Count == 0 && !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password))
+            {
+                roles.Add(Username);
             }
 
             return roles;

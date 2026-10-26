@@ -1,16 +1,30 @@
-// Trách nhiệm: bảng điều khiển 5 AI PL/pgSQL, không gọi API/LLM bên ngoài.
+// Trách nhiệm: bảng điều khiển 5 module AI PL/pgSQL với giao diện phân loại ngăn nắp.
 // Liên kết: sql/07_ai_modules.sql và notification channel ai_security_alert.
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using NetCafe.Data;
 
 namespace NetCafe.App.Views;
 
 public partial class AiCenterView : AdminCardViewBase
 {
-    private readonly Button _runAllButton = new();
-    private readonly Button _runIndexButton = new();
-    private readonly Button _runDuplicateButton = new();
-    private readonly Button _runAnomalyButton = new();
-    private readonly Button _runPromotionButton = new();
-    private readonly Button _runSecurityButton = new();
+    private string _currentModule = "security";
+
+    // 5 nút chuyển đổi danh mục mô-đun AI
+    private readonly Button _securityTabButton = new();
+    private readonly Button _duplicateTabButton = new();
+    private readonly Button _anomalyTabButton = new();
+    private readonly Button _promotionTabButton = new();
+    private readonly Button _indexTabButton = new();
+
+    // Các nút thao tác ngữ cảnh
+    private readonly Button _runModuleButton = new();
     private readonly Button _reviewAlertButton = new();
     private readonly Button _mergeDuplicateButton = new();
     private readonly Button _ignoreDuplicateButton = new();
@@ -18,42 +32,135 @@ public partial class AiCenterView : AdminCardViewBase
     public AiCenterView()
     {
         InitializeComponent();
-        SetTitle(
-            "Phân tích và cảnh báo dữ liệu",
-            "Năm mô-đun PL/pgSQL chạy trong PostgreSQL; mỗi card có trạng thái, mô tả và nút xử lý riêng.");
+        Toolbar.Height = 88;
+        TitleLabel.Width = 170;
+        ActionsPanel.Padding = new Padding(2, 2, 2, 2);
+        ConfigureControls();
+        SwitchModule("security");
+    }
 
-        _runAllButton.Text = "Chạy cả 5 mô-đun";
-        _runAllButton.Width = 135;
-        CyberTheme.StyleButton(_runAllButton, PrimaryColor);
-        _runAllButton.Click += async (_, _) => await RunAllAsync();
+    private void ConfigureControls()
+    {
+        ConfigureTabButton(_securityTabButton, "🛡️ Gian lận", "security", 125);
+        ConfigureTabButton(_duplicateTabButton, "👥 Trùng lặp", "duplicate", 125);
+        ConfigureTabButton(_anomalyTabButton, "📈 Dị thường", "anomaly", 125);
+        ConfigureTabButton(_promotionTabButton, "💡 Khuyến mãi", "promotion", 125);
+        ConfigureTabButton(_indexTabButton, "⚡ Tối ưu CSDL", "index", 125);
 
-        ConfigureButton(_runIndexButton, "Tối ưu chỉ mục");
-        ConfigureButton(_runDuplicateButton, "Tìm trùng lặp");
-        ConfigureButton(_runAnomalyButton, "Phát hiện dị thường");
-        ConfigureButton(_runPromotionButton, "Gợi ý khuyến mãi");
-        ConfigureButton(_runSecurityButton, "Kiểm tra bảo mật");
-        ConfigureButton(_reviewAlertButton, "Đã xem cảnh báo");
-        ConfigureButton(_mergeDuplicateButton, "Đánh dấu đã gộp");
-        ConfigureButton(_ignoreDuplicateButton, "Đánh dấu bỏ qua");
+        ConfigureActionButton(_runModuleButton, "▶️ Quét an ninh", CyberTheme.Primary, 135);
+        ConfigureActionButton(_reviewAlertButton, "✅ Đã xử lý", CyberTheme.Success, 110);
+        ConfigureActionButton(_mergeDuplicateButton, "🔗 Đã gộp", CyberTheme.Success, 105);
+        ConfigureActionButton(_ignoreDuplicateButton, "✖️ Bỏ qua", CyberTheme.SurfaceRaised, 85);
 
-        _runIndexButton.Click += async (_, _) => await RunModuleAsync("index");
-        _runDuplicateButton.Click += async (_, _) => await RunModuleAsync("duplicate");
-        _runAnomalyButton.Click += async (_, _) => await RunModuleAsync("anomaly");
-        _runPromotionButton.Click += async (_, _) => await RunModuleAsync("promotion");
-        _runSecurityButton.Click += async (_, _) => await RunModuleAsync("security");
-        _reviewAlertButton.Click += async (_, _) => await UpdateSelectedAsync("reviewed");
-        _mergeDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("merged");
-        _ignoreDuplicateButton.Click += async (_, _) => await UpdateSelectedAsync("ignored");
+        _runModuleButton.Click += async (_, _) => await RunCurrentModuleAsync();
+        _reviewAlertButton.Click += async (_, _) => await UpdateSecurityAlertStatusAsync("reviewed");
+        _mergeDuplicateButton.Click += async (_, _) => await UpdateDuplicateStatusAsync("merged");
+        _ignoreDuplicateButton.Click += async (_, _) => await UpdateDuplicateStatusAsync("ignored");
 
-        ActionsPanel.Controls.Add(_runAllButton);
-        ActionsPanel.Controls.Add(_runIndexButton);
-        ActionsPanel.Controls.Add(_runDuplicateButton);
-        ActionsPanel.Controls.Add(_runAnomalyButton);
-        ActionsPanel.Controls.Add(_runPromotionButton);
-        ActionsPanel.Controls.Add(_runSecurityButton);
+        ActionsPanel.Controls.Add(_securityTabButton);
+        ActionsPanel.Controls.Add(_duplicateTabButton);
+        ActionsPanel.Controls.Add(_anomalyTabButton);
+        ActionsPanel.Controls.Add(_promotionTabButton);
+        ActionsPanel.Controls.Add(_indexTabButton);
+        ActionsPanel.SetFlowBreak(_indexTabButton, true);
+
+        ActionsPanel.Controls.Add(_runModuleButton);
         ActionsPanel.Controls.Add(_reviewAlertButton);
         ActionsPanel.Controls.Add(_mergeDuplicateButton);
         ActionsPanel.Controls.Add(_ignoreDuplicateButton);
+    }
+
+    private void ConfigureTabButton(Button button, string text, string module, int width)
+    {
+        button.Text = text;
+        button.Width = width;
+        button.Height = 30;
+        button.Margin = new Padding(2, 2, 2, 2);
+        button.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        button.FlatStyle = FlatStyle.Flat;
+        button.Click += (_, _) => SwitchModule(module);
+    }
+
+    private static void ConfigureActionButton(Button button, string text, Color color, int width)
+    {
+        button.Text = text;
+        button.Width = width;
+        button.Height = 30;
+        button.Margin = new Padding(2, 2, 2, 2);
+        CyberTheme.StyleButton(button, color);
+    }
+
+    private void SwitchModule(string module)
+    {
+        _currentModule = module;
+        UpdateModuleTabStyles();
+        UpdateActionControlsVisibility();
+        UpdateModuleTitle();
+        _ = RefreshAsync();
+    }
+
+    private void UpdateModuleTabStyles()
+    {
+        UpdateButtonState(_securityTabButton, _currentModule == "security");
+        UpdateButtonState(_duplicateTabButton, _currentModule == "duplicate");
+        UpdateButtonState(_anomalyTabButton, _currentModule == "anomaly");
+        UpdateButtonState(_promotionTabButton, _currentModule == "promotion");
+        UpdateButtonState(_indexTabButton, _currentModule == "index");
+    }
+
+    private static void UpdateButtonState(Button button, bool isActive)
+    {
+        button.BackColor = isActive ? CyberTheme.Primary : CyberTheme.SurfaceRaised;
+        button.ForeColor = isActive ? Color.White : CyberTheme.Text;
+        button.FlatAppearance.BorderColor = isActive ? CyberTheme.Primary : CyberTheme.Border;
+    }
+
+    private void UpdateActionControlsVisibility()
+    {
+        _runModuleButton.Text = _currentModule switch
+        {
+            "security" => "▶️ Quét an ninh",
+            "duplicate" => "▶️ Quét trùng lặp",
+            "anomaly" => "▶️ Quét dị thường",
+            "promotion" => "▶️ Quét khuyến mãi",
+            _ => "▶️ Quét hiệu năng CSDL"
+        };
+
+        _reviewAlertButton.Visible = _currentModule == "security";
+        _mergeDuplicateButton.Visible = _currentModule == "duplicate";
+        _ignoreDuplicateButton.Visible = _currentModule == "duplicate";
+    }
+
+    private void UpdateModuleTitle()
+    {
+        switch (_currentModule)
+        {
+            case "duplicate":
+                SetTitle(
+                    "Trùng lặp hội viên",
+                    "Thuật toán pg_trgm so khớp chuỗi phát hiện các tài khoản nghi vấn trùng lặp để gộp quyền lợi.");
+                break;
+            case "anomaly":
+                SetTitle(
+                    "Giao dịch dị thường",
+                    "Mô hình thống kê Z-Score phát hiện các khoản nạp tiền hoặc phiên chơi đột biến bất thường.");
+                break;
+            case "promotion":
+                SetTitle(
+                    "Gợi ý khuyến mãi",
+                    "Phân tích hành vi khách hàng RFM và khung giờ thấp điểm để đề xuất chương trình kích cầu.");
+                break;
+            case "index":
+                SetTitle(
+                    "Tối ưu tốc độ CSDL",
+                    "Tự động rà soát các bảng dữ liệu lớn bị chậm và hướng dẫn tạo chỉ mục (Index) tăng tốc.");
+                break;
+            default:
+                SetTitle(
+                    "An ninh phòng máy",
+                    "Tự động giám sát các hành vi hủy hóa đơn, sửa giờ chơi và truy cập bất thường.");
+                break;
+        }
     }
 
     public override void SetContext(AdminViewContext context)
@@ -65,25 +172,20 @@ public partial class AiCenterView : AdminCardViewBase
     private void UpdateRolePermissions(AdminViewContext context)
     {
         var canAccess = context.IsAdmin || context.IsManager;
-        _runAllButton.Enabled = canAccess;
-        _runIndexButton.Enabled = canAccess;
-        _runDuplicateButton.Enabled = canAccess;
-        _runAnomalyButton.Enabled = canAccess;
-        _runPromotionButton.Enabled = canAccess;
-        _runSecurityButton.Enabled = canAccess;
+        _runModuleButton.Enabled = canAccess;
         _reviewAlertButton.Enabled = canAccess;
         _mergeDuplicateButton.Enabled = canAccess;
         _ignoreDuplicateButton.Enabled = canAccess;
 
         if (!canAccess)
         {
-            ClearCards("🔒 Vai trò hiện tại không có quyền truy cập AI Center (Cơ chế CSDL: Schema Grant ai).");
+            ClearCards("🔒 Chỉ Chủ quán và Quản lý mới có quyền truy cập AI Center (Cơ chế CSDL: Schema Grant ai).");
         }
     }
 
     public override async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (RequiredContext.IsCashier || RequiredContext.IsTechnician)
+        if (!RequiredContext.IsAdmin && !RequiredContext.IsManager)
         {
             UpdateRolePermissions(RequiredContext);
             return;
@@ -91,26 +193,24 @@ public partial class AiCenterView : AdminCardViewBase
 
         try
         {
-            var alerts = await RequiredContext.Repository.GetAiAlertsAsync(cancellationToken);
-            var indexes = await RequiredContext.Repository.GetIndexRecommendationsAsync(cancellationToken);
-            var duplicates = await RequiredContext.Repository.GetDuplicateCandidatesAsync(cancellationToken);
-            var anomalies = await RequiredContext.Repository.GetAnomalyFlagsAsync(cancellationToken);
-            var promotions = await RequiredContext.Repository.GetPromotionSuggestionsAsync(cancellationToken);
-
-            var rows = new List<AiModuleRow>();
-            rows.AddRange(alerts.Select(item =>
-                new AiModuleRow("Cảnh báo bảo mật", item.AlertId.ToString(), item.Reason, item.Status, item.AlertId, null)));
-            rows.AddRange(indexes.Select(item =>
-                new AiModuleRow("Đề xuất chỉ mục", item.RecommendationId.ToString(), item.SuggestedSql, "Chỉ đọc", null, null)));
-            rows.AddRange(duplicates.Select(item =>
-                new AiModuleRow("Hội viên trùng lặp", item.CandidateId.ToString(), item.Reason, item.Status, null, item.CandidateId)));
-            rows.AddRange(anomalies.Select(item =>
-                new AiModuleRow("Phát hiện dị thường", item.FlagId.ToString(), $"{item.AnomalyType}: z={item.ZScore}", item.Status, null, null)));
-            rows.AddRange(promotions.Select(item =>
-                new AiModuleRow("Gợi ý khuyến mãi", item.SuggestionId.ToString(), item.Details, item.SuggestionType, null, null)));
-
-            var summary = $"5 mô-đun PostgreSQL: {alerts.Count} cảnh báo, {indexes.Count} chỉ mục, {duplicates.Count} trùng lặp, {anomalies.Count} dị thường, {promotions.Count} khuyến mãi.";
-            SetCards(rows, BuildCard, summary);
+            switch (_currentModule)
+            {
+                case "duplicate":
+                    await LoadDuplicatesAsync(cancellationToken);
+                    break;
+                case "anomaly":
+                    await LoadAnomaliesAsync(cancellationToken);
+                    break;
+                case "promotion":
+                    await LoadPromotionsAsync(cancellationToken);
+                    break;
+                case "index":
+                    await LoadIndexesAsync(cancellationToken);
+                    break;
+                default:
+                    await LoadSecurityAlertsAsync(cancellationToken);
+                    break;
+            }
         }
         catch (Exception ex)
         {
@@ -118,12 +218,174 @@ public partial class AiCenterView : AdminCardViewBase
         }
     }
 
-    private async Task RunAllAsync()
+    private async Task LoadSecurityAlertsAsync(CancellationToken cancellationToken)
+    {
+        var alerts = await RequiredContext.Repository.GetAiAlertsAsync(cancellationToken);
+        if (alerts.Count == 0)
+        {
+            ClearCards("✅ Không phát hiện cảnh báo rủi ro an ninh nào. Hệ thống an toàn!");
+            return;
+        }
+
+        SetCards(alerts, alert => new AdminCardModel(
+            $"🛡️ Cảnh báo #{alert.AlertId} • Rủi ro: {alert.RiskLevel.ToUpper()}",
+            $"Điểm rủi ro: {alert.RiskScore}/100 • Ngày: {alert.CreatedAt:dd/MM/yyyy HH:mm}",
+            CleanNoParentheses(alert.Reason),
+            alert.Status == "reviewed" ? "Đã xử lý" : "Mới phát hiện",
+            alert.Status == "reviewed" ? CyberTheme.Success : CyberTheme.Danger),
+            $"{alerts.Count} cảnh báo an ninh được ghi nhận");
+    }
+
+    private async Task LoadDuplicatesAsync(CancellationToken cancellationToken)
+    {
+        var duplicates = await RequiredContext.Repository.GetDuplicateCandidatesAsync(cancellationToken);
+        if (duplicates.Count == 0)
+        {
+            ClearCards("✅ Không phát hiện tài khoản hội viên trùng lặp nào.");
+            return;
+        }
+
+        SetCards(duplicates, item => new AdminCardModel(
+            $"👥 Nghi vấn: {item.CustomerNameA} & {item.CustomerNameB}",
+            $"Tương đồng: {(int)(item.Similarity * 100)}% • Khách #{item.CustomerIdA} & #{item.CustomerIdB}",
+            $"Lý do: {CleanNoParentheses(item.Reason)}",
+            item.Status == "merged" ? "Đã gộp" : (item.Status == "ignored" ? "Đã bỏ qua" : "Chờ xử lý"),
+            item.Status == "merged" ? CyberTheme.Success : (item.Status == "ignored" ? CyberTheme.MutedText : CyberTheme.Warning)),
+            $"{duplicates.Count} cặp hội viên nghi vấn trùng lặp");
+    }
+
+    private async Task LoadAnomaliesAsync(CancellationToken cancellationToken)
+    {
+        var anomalies = await RequiredContext.Repository.GetAnomalyFlagsAsync(cancellationToken);
+        if (anomalies.Count == 0)
+        {
+            ClearCards("✅ Toàn bộ số tiền nạp và thời lượng chơi đều ở ngưỡng thống kê bình thường.");
+            return;
+        }
+
+        SetCards(anomalies, item => new AdminCardModel(
+            $"📈 Dị thường #{item.FlagId} • Bảng: {item.SubjectTable}",
+            $"Dạng: {item.AnomalyType} • Khóa chính: #{item.SubjectPk}",
+            $"Giá trị: {item.MetricValue:N0} đ • Độ lệch chuẩn Z-Score: {item.ZScore:F2}\nLý do: Giao dịch có chênh lệch lớn so với mức trung bình",
+            item.Status == "investigated" ? "Đã xác minh" : "Cần kiểm tra",
+            CyberTheme.Warning),
+            $"{anomalies.Count} giao dịch có dấu hiệu bất thường");
+    }
+
+    private async Task LoadPromotionsAsync(CancellationToken cancellationToken)
+    {
+        var promotions = await RequiredContext.Repository.GetPromotionSuggestionsAsync(cancellationToken);
+        if (promotions.Count == 0)
+        {
+            ClearCards("ℹ️ Bấm '▶️ Quét khuyến mãi' để hệ thống phân tích và đề xuất gói ưu đãi.");
+            return;
+        }
+
+        SetCards(promotions, item => new AdminCardModel(
+            $"💡 Ưu đãi đề xuất #{item.SuggestionId}",
+            $"Mục tiêu: {CleanNoParentheses(item.Target)} • Mô hình: {FormatPromoType(item.SuggestionType)}",
+            FormatPromoDetails(item.Details),
+            "Gợi ý kinh doanh",
+            CyberTheme.Primary),
+            $"{promotions.Count} gợi ý khuyến mãi thông minh");
+    }
+
+    private async Task LoadIndexesAsync(CancellationToken cancellationToken)
+    {
+        var indexes = await RequiredContext.Repository.GetIndexRecommendationsAsync(cancellationToken);
+        if (indexes.Count == 0)
+        {
+            ClearCards("✅ Tất cả các bảng dữ liệu hiện tại đều đã được đánh chỉ mục và tối ưu hóa tốt!");
+            return;
+        }
+
+        SetCards(indexes, item => new AdminCardModel(
+            $"⚡ Tăng tốc bảng: {item.TableName}",
+            $"Cột đề xuất mục lục: {CleanNoParentheses(item.ColumnList)}",
+            $"Mục đích: {CleanNoParentheses(item.Reason)}\nLệnh SQL thực thi: {CleanNoParentheses(item.SuggestedSql)}",
+            "Đề xuất tăng tốc",
+            CyberTheme.Primary),
+            $"{indexes.Count} khuyến nghị tối ưu hóa chỉ mục CSDL");
+    }
+
+    private static string CleanNoParentheses(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        var result = System.Text.RegularExpressions.Regex.Replace(input, @"\s*\(?ID\s*\d+\)?", "",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return result.Replace("(", " ")
+                    .Replace(")", " ")
+                    .Replace("[", " ")
+                    .Replace("]", " ")
+                    .Replace("{", " ")
+                    .Replace("}", " ")
+                    .Replace("\"", "")
+                    .Replace("  ", " ")
+                    .Trim();
+    }
+
+    private static string FormatPromoDetails(string? rawDetails)
+    {
+        if (string.IsNullOrWhiteSpace(rawDetails)) return string.Empty;
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(rawDetails);
+            var root = doc.RootElement;
+            var parts = new List<string>();
+
+            if (root.TryGetProperty("recommended_action", out var action))
+            {
+                parts.Add($"Đề xuất: {action.GetString()}");
+            }
+            if (root.TryGetProperty("rationale", out var rationale))
+            {
+                parts.Add($"Lý do: {rationale.GetString()}");
+            }
+            if (root.TryGetProperty("hour", out var hour))
+            {
+                parts.Add($"Khung giờ áp dụng: {hour.GetInt32()}h00");
+            }
+            if (root.TryGetProperty("total_spent", out var spent))
+            {
+                parts.Add($"Tổng chi tiêu tích lũy: {spent.GetDecimal():N0} đ");
+            }
+            if (root.TryGetProperty("days_inactive", out var days))
+            {
+                parts.Add($"Thời gian chưa quay lại: {days} ngày");
+            }
+            if (root.TryGetProperty("current_sessions", out var curr))
+            {
+                parts.Add($"Lượt khách hiện tại: {curr}");
+            }
+
+            if (parts.Count > 0)
+            {
+                return CleanNoParentheses(string.Join("\n", parts));
+            }
+        }
+        catch
+        {
+            // fallback
+        }
+
+        return CleanNoParentheses(rawDetails);
+    }
+
+    private static string FormatPromoType(string type) => type switch
+    {
+        "rfm" or "WIN_BACK_VIP" => "Chăm sóc hội viên VIP",
+        "low_utilization" or "HAPPY_HOUR_OFFPEAK" => "Kích cầu giờ thấp điểm",
+        _ => CleanNoParentheses(type)
+    };
+
+    private async Task RunCurrentModuleAsync()
     {
         try
         {
-            await RequiredContext.Repository.RunAiModulesAsync();
+            await RequiredContext.Repository.RunAiModuleAsync(_currentModule);
             await RefreshAsync();
+            InfoLabel.Text = $"Đã chạy xong mô-đun {_currentModule} lúc {DateTime.Now:HH:mm:ss}!";
         }
         catch (Exception exception)
         {
@@ -131,38 +393,18 @@ public partial class AiCenterView : AdminCardViewBase
         }
     }
 
-    private async Task RunModuleAsync(string module)
+    private async Task UpdateSecurityAlertStatusAsync(string status)
     {
-        try
+        if (SelectedItem is not AiAlertItem alert)
         {
-            await RequiredContext.Repository.RunAiModuleAsync(module);
-            await RefreshAsync();
-        }
-        catch (Exception exception)
-        {
-            ReportError(exception);
-        }
-    }
-
-    private async Task UpdateSelectedAsync(string status)
-    {
-        if (SelectedItem is not AiModuleRow row)
-        {
+            MessageBox.Show(FindForm(), "Vui lòng bấm chọn một cảnh báo an ninh trong danh sách để cập nhật.",
+                "Chưa chọn cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         try
         {
-            if (row.AlertId is not null)
-            {
-                await RequiredContext.Repository.UpdateAiAlertStatusAsync(
-                    row.AlertId.Value, status == "reviewed" ? "reviewed" : "new");
-            }
-            else if (row.CandidateId is not null)
-            {
-                await RequiredContext.Repository.UpdateDuplicateCandidateStatusAsync(
-                    row.CandidateId.Value, status);
-            }
+            await RequiredContext.Repository.UpdateAiAlertStatusAsync(alert.AlertId, status);
             await RefreshAsync();
         }
         catch (Exception exception)
@@ -171,35 +413,23 @@ public partial class AiCenterView : AdminCardViewBase
         }
     }
 
-    private static AdminCardModel BuildCard(AiModuleRow row)
+    private async Task UpdateDuplicateStatusAsync(string status)
     {
-        var accent = row.Status.ToLowerInvariant() switch
+        if (SelectedItem is not DuplicateCandidateItem dup)
         {
-            "new" => CyberTheme.Warning,
-            "reviewed" or "merged" or "ignored" => CyberTheme.Success,
-            "chỉ đọc" => CyberTheme.Primary,
-            _ => CyberTheme.MutedText
-        };
-        return new AdminCardModel(
-            $"{row.Module} · {row.Key}",
-            "Phân tích dữ liệu PostgreSQL",
-            row.Summary,
-            row.Status,
-            accent);
-    }
+            MessageBox.Show(FindForm(), "Vui lòng bấm chọn một cặp hội viên trong danh sách để xử lý.",
+                "Chưa chọn tài khoản", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
 
-    private static void ConfigureButton(Button button, string text)
-    {
-        button.Text = text;
-        button.Width = 108;
-        CyberTheme.StyleButton(button, CyberTheme.SurfaceRaised);
+        try
+        {
+            await RequiredContext.Repository.UpdateDuplicateCandidateStatusAsync(dup.CandidateId, status);
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
     }
-
-    private sealed record AiModuleRow(
-        string Module,
-        string Key,
-        string Summary,
-        string Status,
-        int? AlertId,
-        int? CandidateId);
 }

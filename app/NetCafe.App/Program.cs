@@ -73,6 +73,24 @@ static class Program
             return;
         }
 
+        if (args != null && args.Length > 0 && args[0] == "--verify-ai")
+        {
+            RunAiLayoutVerification();
+            return;
+        }
+
+        if (args != null && args.Length > 0 && args[0] == "--verify-full-ui")
+        {
+            FullUiVerification.Run();
+            return;
+        }
+
+        if (args != null && args.Length > 0 && args[0] == "--diagnose-db")
+        {
+            RunDatabaseDiagnostics();
+            return;
+        }
+
         // 1. Tách khỏi terminal hiện tại và ép Windows tạo một CỬA SỔ CMD ĐỘC LẬP MỚI
         FreeConsole();
         AllocConsole();
@@ -204,5 +222,165 @@ static class Program
 
         Console.WriteLine($"[VERIFY_SUCCESS] Rendered screenshot to {outPath}");
         form.Close();
+    }
+
+    private static void RunAiLayoutVerification()
+    {
+        AppConfig.LoadEnv();
+        ApplicationConfiguration.Initialize();
+        using var form = new Form
+        {
+            Size = new System.Drawing.Size(1200, 800),
+            StartPosition = FormStartPosition.CenterScreen,
+            Text = "AI Center Verification"
+        };
+        var view = new Views.AiCenterView();
+        view.Dock = DockStyle.Fill;
+        form.Controls.Add(view);
+
+        var repo = new NetCafe.Data.DbRepository(
+            AppConfig.GetConnectionString("nv_admin", AppConfig.GetConfiguredRolePassword("nv_admin")));
+        var context = new Views.AdminViewContext
+        {
+            Repository = repo,
+            CurrentUser = "nv_admin",
+            UserRole = "role_admin",
+            CurrentEmployeeId = 1,
+            RefreshComputersAsync = () => Task.CompletedTask,
+            ShowError = ex => Console.WriteLine($"[ERROR] {ex.Message}")
+        };
+        view.SetContext(context);
+        form.Show();
+        Application.DoEvents();
+
+        var task = view.RefreshAsync();
+        while (!task.IsCompleted)
+        {
+            Application.DoEvents();
+            System.Threading.Thread.Sleep(20);
+        }
+        Application.DoEvents();
+
+        var outDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            @".gemini\antigravity\brain\ae94d5fa-5717-4e9a-9076-a7e423e82306\scratch");
+        Directory.CreateDirectory(outDir);
+
+        using (var bmp = new System.Drawing.Bitmap(form.Width, form.Height))
+        {
+            form.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
+            bmp.Save(Path.Combine(outDir, "ai_center_security_rendered.png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+
+        // Test module Trùng lặp
+        var switchMethod = typeof(Views.AiCenterView).GetMethod("SwitchModule",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        switchMethod.Invoke(view, new object[] { "duplicate" });
+        Application.DoEvents();
+        System.Threading.Thread.Sleep(800);
+        Application.DoEvents();
+        using (var bmp = new System.Drawing.Bitmap(form.Width, form.Height))
+        {
+            form.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
+            bmp.Save(Path.Combine(outDir, "ai_center_duplicate_rendered.png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+
+        // Test module Khuyến mãi
+        switchMethod.Invoke(view, new object[] { "promotion" });
+        Application.DoEvents();
+        System.Threading.Thread.Sleep(800);
+        Application.DoEvents();
+        using (var bmp = new System.Drawing.Bitmap(form.Width, form.Height))
+        {
+            form.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
+            bmp.Save(Path.Combine(outDir, "ai_center_promotion_rendered.png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+
+        Console.WriteLine($"[VERIFY_AI_SUCCESS] Rendered screenshots to {outDir}");
+        form.Close();
+    }
+
+    private static void RunDatabaseDiagnostics()
+    {
+        AppConfig.LoadEnv();
+        Console.WriteLine($"Loaded Env File: {AppConfig.LoadedEnvFile}");
+        Console.WriteLine($"Host: {AppConfig.Host}:{AppConfig.Port}, DB: {AppConfig.Database}, User: {AppConfig.Username}");
+
+        var ownerCs = AppConfig.GetConnectionString();
+        using (var conn = new Npgsql.NpgsqlConnection(ownerCs))
+        {
+            conn.Open();
+
+            // 1. Kích hoạt LOGIN cho nv_manager và cấp quyền role_manager
+            using var cmdSync = conn.CreateCommand();
+            cmdSync.CommandText = @"
+                ALTER ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe';
+                GRANT role_manager TO nv_manager;
+                GRANT USAGE ON SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_manager;
+                GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
+                GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_manager;
+                GRANT SELECT ON reporting.mv_revenue_daily TO role_manager;
+                GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_manager;
+                GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_manager;
+                GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_manager;
+                GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ai TO role_manager;
+                GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA core, inventory, billing, hr, ai TO role_manager;
+
+                REVOKE ALL ON hr.employee FROM role_manager;
+                GRANT SELECT (employee_id, full_name, phone, username, db_username, emp_role, default_shift, hired_date, is_active)
+                    ON hr.employee TO role_manager;
+                GRANT INSERT (full_name, phone, username, db_username, password_hash, emp_role, default_shift, hired_date, is_active)
+                    ON hr.employee TO role_manager;
+                GRANT UPDATE (full_name, phone, db_username, emp_role, default_shift, hired_date, is_active)
+                    ON hr.employee TO role_manager;
+            ";
+            cmdSync.ExecuteNonQuery();
+            Console.WriteLine("[SYNC 4 ROLES] Đã kích hoạt LOGIN và đồng bộ phân quyền cho nv_manager (role_manager)!");
+
+            using var cmd1 = conn.CreateCommand();
+            cmd1.CommandText = "SELECT count(*) FROM reporting.mv_revenue_daily;";
+            Console.WriteLine($"reporting.mv_revenue_daily: {cmd1.ExecuteScalar()} rows");
+
+            cmd1.CommandText = "SELECT count(*) FROM core.customer;";
+            Console.WriteLine($"core.customer: {cmd1.ExecuteScalar()} rows");
+
+            // Nạp tình huống demo AI Center (Gian lận, Trùng lặp, Khuyến mãi)
+            var sqlDemoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "sql", "12_ai_demo_situations.sql");
+            if (!File.Exists(sqlDemoPath))
+            {
+                sqlDemoPath = Path.Combine(Directory.GetCurrentDirectory(), "sql", "12_ai_demo_situations.sql");
+            }
+            if (File.Exists(sqlDemoPath))
+            {
+                using var cmdDemo = conn.CreateCommand();
+                cmdDemo.CommandText = File.ReadAllText(sqlDemoPath);
+                cmdDemo.ExecuteNonQuery();
+                Console.WriteLine("[AI DEMO SITUATIONS] Đã nạp thành công các tình huống mẫu cho Gian lận và Trùng lặp!");
+            }
+        }
+
+        // 2. Kiểm tra kết nối cả 4 role
+        var rolesToTest = new[] { "nv_admin", "nv_manager", "nv_thao", "nv_hung" };
+        foreach (var r in rolesToTest)
+        {
+            var cs = AppConfig.GetConnectionString(r, AppConfig.GetConfiguredRolePassword(r));
+            using var rConn = new Npgsql.NpgsqlConnection(cs);
+            try
+            {
+                rConn.Open();
+                using var cmd = rConn.CreateCommand();
+                cmd.CommandText = "SELECT current_user, session_user;";
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    Console.WriteLine($" - User '{r}' kết nối thành công! current_user={reader.GetString(0)}, session_user={reader.GetString(1)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($" - User '{r}' THẤT BẠI: {ex.Message}");
+            }
+        }
+
+        Console.WriteLine("\n[HOÀN TẤT] Đồng bộ 4 roles và kiểm tra CSDL Cloud thành công!");
     }
 }

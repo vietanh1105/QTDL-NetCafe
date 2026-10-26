@@ -57,7 +57,7 @@ public partial class OrdersView : AdminViewBase
         _toolbar.BackColor = CyberTheme.Surface;
         _toolbar.Padding = new Padding(12, 6, 12, 6);
 
-        _titleLabel.Text = "🍽️ Gọi món & Bếp";
+        _titleLabel.Text = "🍽️ Gọi món";
         _titleLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
         _titleLabel.ForeColor = CyberTheme.Text;
         _titleLabel.AutoSize = true;
@@ -248,7 +248,7 @@ public partial class OrdersView : AdminViewBase
         _cardsPanel.Controls.Clear();
         var emptyLabel = new Label
         {
-            Text = "🔒 Kỹ thuật viên không có quyền truy cập Gọi món & Bếp (Cơ chế CSDL: Table Grant inventory).",
+            Text = "🔒 Kỹ thuật viên không có quyền truy cập Gọi món (Cơ chế CSDL: Table Grant inventory).",
             ForeColor = CyberTheme.MutedText,
             Font = new Font("Segoe UI", 10F, FontStyle.Italic),
             AutoSize = true,

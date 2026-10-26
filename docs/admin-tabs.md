@@ -12,3 +12,11 @@ File này mô tả mục đích thao tác của các tab hiện có, không ch�
 - **Phân tích dữ liệu:** năm module AI chạy trong PostgreSQL, không gọi chatbot/API ngoài.
 - **Yêu cầu hỗ trợ:** nhận request từ Station qua `support_queue_changed`, xử lý theo vòng đời `new → acknowledged → resolved` hoặc `cancelled`.
 - **Thông tin hệ thống:** chẩn đoán kết nối, employee mapping, migration contract, LISTEN/NOTIFY và chạy VACUUM ANALYZE có kiểm soát.
+
+## Ma trận phân quyền 4 vai trò vận hành (RBAC)
+
+1. **Chủ quán (`nv_admin` - `role_admin`):** Toàn quyền hệ thống, xem/sửa bảng lương `salary`, chạy VACUUM/ANALYZE DBA.
+2. **Quản lý (`nv_manager` - `role_manager`):** Vận hành máy trạm, hội viên, hóa đơn, nhập kho món, báo cáo doanh thu, bảo trì, AI Center. Bị khóa cột lương nhân sự (Column-Level Security) và khóa quyền DBA Settings.
+3. **Thu ngân (`nv_thao` - `role_cashier`):** Mở/đóng máy, nạp ví, gọi món, quản lý hóa đơn ca trực (Row-Level Security).
+4. **Kỹ thuật viên (`nv_hung` - `role_technician`):** Tiếp nhận yêu cầu kỹ thuật, lập và hoàn tất phiếu bảo trì phòng máy.
+*(Hệ thống: `station_runtime` - `role_station`: Client máy trạm chạy hàm `SECURITY DEFINER`)*.

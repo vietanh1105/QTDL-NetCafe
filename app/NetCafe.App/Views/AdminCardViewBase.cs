@@ -42,6 +42,12 @@ public abstract class AdminCardViewBase : AdminDataViewBase
         Func<T, AdminCardModel> modelFactory,
         string info)
     {
+        if (InvokeRequired)
+        {
+            Invoke(() => SetCards(rows, modelFactory, info));
+            return;
+        }
+
         _selectedItem = null;
         CardsPanel.SuspendLayout();
         CardsPanel.Controls.Clear();
@@ -59,6 +65,12 @@ public abstract class AdminCardViewBase : AdminDataViewBase
 
     protected void ClearCards(string info = "")
     {
+        if (InvokeRequired)
+        {
+            Invoke(() => ClearCards(info));
+            return;
+        }
+
         _selectedItem = null;
         CardsPanel.SuspendLayout();
         CardsPanel.Controls.Clear();

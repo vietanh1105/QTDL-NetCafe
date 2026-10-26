@@ -52,7 +52,7 @@ public partial class SupportQueueView : AdminCardViewBase
         {
             SetTitle(
                 "Yêu cầu hỗ trợ",
-                "Chủ quán & Quản lý: Giám sát toàn bộ yêu cầu hỗ trợ từ máy trạm.");
+                "Chủ quán: Giám sát toàn bộ yêu cầu hỗ trợ từ máy trạm.");
         }
     }
 
@@ -64,7 +64,7 @@ public partial class SupportQueueView : AdminCardViewBase
 
     private bool CanManageRequest(ServiceRequestItem request)
     {
-        if (RequiredContext.IsAdmin || RequiredContext.IsManager)
+        if (RequiredContext.IsAdmin)
         {
             return true;
         }

@@ -21,7 +21,8 @@ public static class StationTheme
     public static void StyleButton(Button button, Color color)
     {
         button.BackColor = color;
-        button.ForeColor = Text;
+        var isLight = (color.R * 0.299 + color.G * 0.587 + color.B * 0.114) > 150;
+        button.ForeColor = isLight ? Color.FromArgb(15, 23, 42) : Text;
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
         button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(color, 0.12F);

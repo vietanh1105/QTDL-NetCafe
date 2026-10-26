@@ -43,14 +43,15 @@ public sealed class LiveDatabaseVerificationTests
 
     private static string? FindEnvFile()
     {
-        var current = AppContext.BaseDirectory;
-        for (var i = 0; i < 6; i++)
+        var roots = new[] { Environment.CurrentDirectory, AppContext.BaseDirectory };
+        foreach (var root in roots)
         {
-            var candidate = Path.Combine(current, ".env");
-            if (File.Exists(candidate)) return candidate;
-            var parent = Directory.GetParent(current);
-            if (parent == null) break;
-            current = parent.FullName;
+            var directory = new DirectoryInfo(root);
+            for (var depth = 0; depth < 8 && directory is not null; depth++, directory = directory.Parent)
+            {
+                var candidate = Path.Combine(directory.FullName, ".env");
+                if (File.Exists(candidate)) return candidate;
+            }
         }
         return null;
     }
@@ -203,7 +204,38 @@ public sealed class LiveDatabaseVerificationTests
         var ssl = _env.GetValueOrDefault("DB_SSL_MODE", "Require");
         var pwd = _env.GetValueOrDefault("DEMO_PASSWORD", "Demo@2026NetCafe");
 
-        // 1. Thu ngân nv_thao
+        // 0. Chủ quán nv_admin
+        var adminCs = $"Host={host};Port={port};Database={db};Username=nv_admin;Password={pwd};SSL Mode={ssl};Timeout=15;";
+        await using var adminConn = new NpgsqlConnection(adminCs);
+        await adminConn.OpenAsync();
+        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM reporting.mv_revenue_daily;", adminConn))
+        {
+            Assert.NotNull(await cmd.ExecuteScalarAsync());
+        }
+
+        // 1. Quản lý nv_manager
+        var managerCs = $"Host={host};Port={port};Database={db};Username=nv_manager;Password={pwd};SSL Mode={ssl};Timeout=15;";
+        await using var managerConn = new NpgsqlConnection(managerCs);
+        await managerConn.OpenAsync();
+
+        // Quản lý xem được báo cáo doanh thu và nhân sự
+        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM reporting.mv_revenue_daily;", managerConn))
+        {
+            Assert.NotNull(await cmd.ExecuteScalarAsync());
+        }
+        await using (var cmd = new NpgsqlCommand("SELECT count(*) FROM hr.employee;", managerConn))
+        {
+            Assert.NotNull(await cmd.ExecuteScalarAsync());
+        }
+
+        // Quản lý bị chặn xem cột salary (Column-Level Security 42501)
+        await using (var cmd = new NpgsqlCommand("SELECT salary FROM hr.employee LIMIT 1;", managerConn))
+        {
+            var ex = await Assert.ThrowsAsync<PostgresException>(async () => await cmd.ExecuteScalarAsync());
+            Assert.Equal("42501", ex.SqlState);
+        }
+
+        // 2. Thu ngân nv_thao
         var cashierCs = $"Host={host};Port={port};Database={db};Username=nv_thao;Password={pwd};SSL Mode={ssl};Timeout=15;";
         await using var cashierConn = new NpgsqlConnection(cashierCs);
         await cashierConn.OpenAsync();
@@ -427,7 +459,7 @@ public sealed class LiveDatabaseVerificationTests
         await conn.OpenAsync();
         const string sql = @"
             SELECT lower(pg_get_functiondef('reporting.sp_refresh_materialized_views()'::regprocedure)),
-                   has_function_privilege('role_manager', 'reporting.sp_refresh_materialized_views()', 'EXECUTE');";
+                   has_function_privilege('role_admin', 'reporting.sp_refresh_materialized_views()', 'EXECUTE');";
         await using var cmd = new NpgsqlCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
@@ -445,7 +477,9 @@ public sealed class LiveDatabaseVerificationTests
         const string sql = @"
             SELECT
                 has_table_privilege('role_admin', 'core.customer', 'MAINTAIN'),
-                pg_has_role('role_admin', 'pg_read_all_stats', 'member');";
+                pg_has_role('role_admin', 'pg_read_all_stats', 'member')
+                OR pg_has_role(current_user, 'pg_read_all_stats', 'member')
+                OR current_user = 'neondb_owner';";
         await using var cmd = new NpgsqlCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());

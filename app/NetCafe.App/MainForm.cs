@@ -37,14 +37,15 @@ public partial class MainForm : Form
     public MainForm()
     {
         AppConfig.LoadEnv();
-        _currentUser = AppConfig.Username;
+        var configuredRoles = AppConfig.GetConfiguredRoles();
+        _currentUser = configuredRoles.Count > 0 ? configuredRoles[0] : AppConfig.Username;
         _currentEmployeeId = AppConfig.AdminEmployeeId;
-        _repository = new DbRepository(AppConfig.GetConnectionString());
+        _repository = new DbRepository(AppConfig.GetConnectionString(_currentUser, AppConfig.GetConfiguredRolePassword(_currentUser)));
         _roleRepositoryCache[_currentUser] = _repository;
         _employeeIdCache["nv_admin"] = AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1;
-        _employeeIdCache["nv_thao"] = 2;
-        _employeeIdCache["nv_hung"] = 3;
-        _employeeIdCache["nv_manager"] = 4;
+        _employeeIdCache["nv_manager"] = 2;
+        _employeeIdCache["nv_thao"] = 3;
+        _employeeIdCache["nv_hung"] = 6;
         InitializeComponent();
         InitializeShell();
         Shown += async (_, _) => await StartAsync();
@@ -94,19 +95,21 @@ public partial class MainForm : Form
 
     private void BuildViews()
     {
-        AddNavigationSeparator("VẬN HÀNH");
-        AddView("Computers", "Máy trạm", new ComputersView());
-        AddView("Customers", "Hội viên", new CustomersView());
-        AddView("Orders", "Gọi món", new OrdersView());
-        AddView("Invoices", "Hóa đơn", new InvoicesView());
-        AddNavigationSeparator("BÁO CÁO VÀ NHÂN SỰ");
-        AddView("Reports", "Báo cáo", new ReportsView());
-        AddView("Employees", "Nhân viên", new EmployeesView());
-        AddView("Maintenance", "Bảo trì", new MaintenanceView());
-        AddNavigationSeparator("HỖ TRỢ VÀ HỆ THỐNG");
-        AddView("AiCenter", "Phân tích dữ liệu", new AiCenterView());
-        AddView("SupportQueue", "Yêu cầu hỗ trợ", new SupportQueueView());
-        AddView("Settings", "Thông tin hệ thống", new SettingsView());
+        AddNavigationSeparator("VẬN HÀNH PHÒNG MÁY");
+        AddView("Computers", "🖥️  Máy trạm", new ComputersView());
+        AddView("Customers", "👥  Hội viên", new CustomersView());
+        AddView("Orders", "🍽️  Gọi món", new OrdersView());
+        AddView("Invoices", "🧾  Hóa đơn", new InvoicesView());
+
+        AddNavigationSeparator("BÁO CÁO & NHÂN SỰ");
+        AddView("Reports", "📊  Báo cáo doanh thu", new ReportsView());
+        AddView("Employees", "👔  Nhân viên", new EmployeesView());
+        AddView("Maintenance", "🔧  Bảo trì thiết bị", new MaintenanceView());
+
+        AddNavigationSeparator("HỆ THỐNG & AI");
+        AddView("AiCenter", "🧠  Phân tích dữ liệu", new AiCenterView());
+        AddView("SupportQueue", "🔔  Yêu cầu hỗ trợ", new SupportQueueView());
+        AddView("Settings", "⚙️  Thông tin hệ thống", new SettingsView());
         ApplyContext();
         SwitchView("Computers");
     }
@@ -126,12 +129,13 @@ public partial class MainForm : Form
         var button = new Button
         {
             Text = label,
-            Width = 209,
-            Height = 38,
-            Margin = new Padding(4),
+            Width = 220,
+            Height = 40,
+            Margin = new Padding(4, 2, 4, 2),
             FlatStyle = FlatStyle.Flat,
-            BackColor = CyberTheme.Surface,
+            BackColor = Color.FromArgb(28, 31, 42),
             ForeColor = CyberTheme.Text,
+            Font = new Font("Segoe UI", 9.5F),
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(12, 0, 0, 0)
         };
@@ -146,14 +150,14 @@ public partial class MainForm : Form
         {
             if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                button.BackColor = CyberTheme.SurfaceRaised;
+                button.BackColor = CyberTheme.Surface;
             }
         };
         button.MouseLeave += (_, _) =>
         {
             if (!string.Equals(_activeKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                button.BackColor = CyberTheme.Surface;
+                button.BackColor = Color.FromArgb(28, 31, 42);
             }
         };
         _navigationPanel.Controls.Add(button);
@@ -164,12 +168,14 @@ public partial class MainForm : Form
         _navigationPanel.Controls.Add(new Label
         {
             Text = title,
-            Width = 209,
-            Height = 26,
-            Margin = new Padding(4, 8, 4, 0),
+            Width = 220,
+            Height = 28,
+            Margin = new Padding(4, 10, 4, 2),
             ForeColor = CyberTheme.Primary,
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleLeft
+            Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(8, 0, 0, 0),
+            UseMnemonic = false
         });
     }
 
@@ -191,13 +197,14 @@ public partial class MainForm : Form
         foreach (var item in _navigationButtons)
         {
             var selected = string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase);
-            item.Value.BackColor = selected ? CyberTheme.SurfaceRaised : CyberTheme.Surface;
+            item.Value.BackColor = selected ? CyberTheme.SurfaceRaised : Color.FromArgb(28, 31, 42);
             item.Value.ForeColor = selected ? CyberTheme.Primary : CyberTheme.Text;
+            item.Value.Font = new Font("Segoe UI", 9.5F, selected ? FontStyle.Bold : FontStyle.Regular);
         }
         UpdateNavigationStates(ResolveRole(_currentUser));
         _activeView = view;
         var displayTitle = _viewLabels.TryGetValue(key, out var label) ? label : key;
-        _activeViewLabel.Text = $"Đang mở: {displayTitle}";
+        _activeViewLabel.Text = $"Hệ thống  ›  {displayTitle}";
     }
 
     private async Task StartAsync()
@@ -440,9 +447,9 @@ public partial class MainForm : Form
                 empId = user switch
                 {
                     "nv_admin" => AppConfig.AdminEmployeeId > 0 ? AppConfig.AdminEmployeeId : 1,
-                    "nv_thao" => 2,
-                    "nv_hung" => 3,
-                    "nv_manager" => 4,
+                    "nv_manager" => 2,
+                    "nv_thao" => 3,
+                    "nv_hung" => 6,
                     _ => 0
                 };
             }
@@ -532,11 +539,11 @@ public partial class MainForm : Form
     {
         if (!string.IsNullOrWhiteSpace(notice))
         {
-            _dbStatusLabel.Text = $"{notice} | Bộ lắng nghe CSDL: {_listenerStatus}";
+            _dbStatusLabel.Text = $"{notice} | Đồng bộ: {_listenerStatus}";
             return;
         }
 
-        var status = $"{_runtimeSummary} | Nhân viên: {_currentEmployeeId} | Bộ lắng nghe CSDL: {_listenerStatus}";
+        var status = $"● CSDL Cloud: {AppConfig.Database} | Người dùng: {_currentUser} | Đồng bộ: {_listenerStatus}";
         if (!_databaseContractReady && !string.IsNullOrWhiteSpace(_runtimeContractStatus))
         {
             status += $" | {_runtimeContractStatus}";
@@ -570,7 +577,11 @@ public partial class MainForm : Form
 
     public static bool IsTabForbidden(string key, string role)
     {
-        if (role is "role_admin" or "role_manager") return false;
+        if (role == "role_admin") return false;
+        if (role == "role_manager")
+        {
+            return key is "Settings";
+        }
         if (role == "role_cashier")
         {
             return key is "Reports" or "Maintenance" or "AiCenter" or "Settings";
@@ -607,12 +618,12 @@ public partial class MainForm : Form
         var role = ResolveRole(user);
         var label = role switch
         {
-            "role_manager" => "Vai trò demo: Quản lý",
-            "role_cashier" => "Vai trò demo: Thu ngân",
-            "role_technician" => "Vai trò demo: Kỹ thuật viên",
-            _ => "Vai trò demo: Siêu quản trị"
+            "role_manager" => "👔 Quản lý (nv_manager)",
+            "role_cashier" => "💵 Thu ngân (nv_thao)",
+            "role_technician" => "🔧 Kỹ thuật viên (nv_hung)",
+            _ => "👑 Chủ quán (nv_admin)"
         };
-        return new RoleOption(user, $"{label} ({role})");
+        return new RoleOption(user, $"{label} [{role}]");
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

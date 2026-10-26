@@ -43,7 +43,7 @@ BEGIN
         CREATE ROLE role_report_readonly NOLOGIN;
     END IF;
 
-    -- User đăng nhập demo
+    -- User đăng nhập demo: Mô hình 4 vai trò chính (nv_admin, nv_manager, nv_thao, nv_hung)
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_admin') THEN
         CREATE ROLE nv_admin WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_admin;
     ELSE
@@ -52,7 +52,7 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_manager') THEN
         CREATE ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_manager;
     ELSE
-        ALTER ROLE nv_manager WITH PASSWORD 'Demo@2026NetCafe';
+        ALTER ROLE nv_manager WITH LOGIN PASSWORD 'Demo@2026NetCafe';
     END IF;
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nv_thao') THEN
         CREATE ROLE nv_thao WITH LOGIN PASSWORD 'Demo@2026NetCafe' IN ROLE role_cashier;
