@@ -244,7 +244,28 @@ def clean_and_load():
             f.write(f"   - {reason:30}: {count} dòng\n")
         f.write("\n============================================================\n")
 
-    print(f"[+] Hoàn tất! Báo cáo thống kê đã lưu tại: {report_file}")
+    # 5. Xuất file CSV dữ liệu đã làm sạch cố định (Excel xem được tiếng Việt chuẩn)
+    import csv
+    clean_csv_file = os.path.join("evidence", "cleaned_customers.csv")
+    with open(clean_csv_file, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["full_name", "phone", "email", "username", "balance", "loyalty_points", "membership_tier"])
+        for r in clean_records:
+            writer.writerow([r[0], r[1], r[2], r[3], r[5], r[6], r[7]])
+
+    # 6. Xuất file CSV dữ liệu bị cách ly (rejected)
+    rejected_csv_file = os.path.join("evidence", "rejected_customers.csv")
+    with open(rejected_csv_file, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["stt", "error_reason", "raw_name", "raw_phone", "raw_balance", "raw_email"])
+        for idx, r in enumerate(rejected_records, 1):
+            raw = json.loads(r[1])
+            writer.writerow([idx, r[2], raw.get("name"), raw.get("phone"), raw.get("balance"), raw.get("email")])
+
+    print(f"[+] Hoàn tất tiến trình ETL!")
+    print(f"    - Báo cáo thống kê   : {report_file}")
+    print(f"    - File dữ liệu SẠCH  : {clean_csv_file} ({len(clean_records)} dòng)")
+    print(f"    - File dữ liệu BỊ LOẠI: {rejected_csv_file} ({len(rejected_records)} dòng)\n")
     with open(report_file, "r", encoding="utf-8") as f:
         print(f.read())
 

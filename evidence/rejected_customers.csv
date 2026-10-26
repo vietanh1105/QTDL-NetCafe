@@ -1,0 +1,27 @@
+﻿stt,error_reason,raw_name,raw_phone,raw_balance,raw_email
+1,NEGATIVE_BALANCE,Nguyễn Xuân Hải,0855667651,-50000,nguynxun45@gmail.com
+2,PHONE_FORMAT_INVALID,Phạm Thị Nam,12345,200000,phmthnam54@gmail.com
+3,NEGATIVE_BALANCE,Bùi Đức Việt,0863100814,-50000,bicvit92@gmail.com
+4,NEGATIVE_BALANCE,Võ Xuân Việt,0724972279,-50000,vxunvit47@gmail.com
+5,NEGATIVE_BALANCE,Lê Minh Anh,0984346088,-50000,lminhanh39@gmail.com
+6,NEGATIVE_BALANCE,Hoàng Quốc Khánh,0569302158,-50000,hongquck80@gmail.com
+7,PHONE_FORMAT_INVALID,Hoàng Ngọc Bình,12345,20000,hongngcb80@gmail.com
+8,PHONE_FORMAT_INVALID,Dương Thị Thảo,12345,100000,dngththo28@gmail.com
+9,PHONE_FORMAT_INVALID,Võ Tuấn Khánh,12345,500000,vtunkhnh46@gmail.com
+10,PHONE_FORMAT_INVALID,Phan Tuấn Quân,12345,500000,phantunq22@gmail.com
+11,PHONE_FORMAT_INVALID,Phan Thị Quân,12345,500000,phanthqu37@gmail.com
+12,PHONE_FORMAT_INVALID,Phạm Quốc Anh,12345,20000,phmqucan55@gmail.com
+13,NEGATIVE_BALANCE,Võ Minh Giang,0819010480,-50000,vminhgia21@gmail.com
+14,PHONE_FORMAT_INVALID,Võ Thanh Bình,12345,50000,vthanhbn19@gmail.com
+15,NEGATIVE_BALANCE,Bùi Quốc Vinh,0394676162,-50000,biqucvin92@gmail.com
+16,PHONE_FORMAT_INVALID,Bùi Thành Giang,12345,500000,bithnhgi92@gmail.com
+17,NEGATIVE_BALANCE,Đỗ Tuấn Bình,0792523968,-50000,tunbnh65@gmail.com
+18,PHONE_FORMAT_INVALID,Phạm Minh Huy,12345,100000,phmminhh44@gmail.com
+19,PHONE_FORMAT_INVALID,Võ Văn Tuấn,12345,500000,vvntun90@gmail.com
+20,NEGATIVE_BALANCE,Lý Quốc Sơn,0310887495,-50000,lqucsn78@gmail.com
+21,NEGATIVE_BALANCE,Lê Thanh Dũng,0935093324,-50000,lthanhdn56@gmail.com
+22,PHONE_FORMAT_INVALID,Đỗ Quang Khánh,12345,200000,quangkhn72@gmail.com
+23,NEGATIVE_BALANCE,Phan Thành Phong,0879323646,-50000,phanthnh57@gmail.com
+24,PHONE_FORMAT_INVALID,Hoàng Đình Tùng,12345,100000,hongnhtn52@gmail.com
+25,NEGATIVE_BALANCE,Trần Xuân Việt,0998837400,-50000,trnxunvi48@gmail.com
+26,NEGATIVE_BALANCE,Vũ Văn Hùng,0958486337,-50000,vvnhng59@gmail.com
