@@ -107,7 +107,7 @@ GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, 
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT pg_read_all_stats TO role_admin, role_manager;
+-- GRANT pg_read_all_stats bo qua tren Cloud Database
 
 -- AI chỉ dành cho admin/manager.
 GRANT EXECUTE ON FUNCTION ai.fn_recommend_indexes() TO role_admin, role_manager;

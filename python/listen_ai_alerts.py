@@ -107,3 +107,4 @@ def start_listening(channel="ai_security_alert"):
 
 if __name__ == "__main__":
     start_listening("ai_security_alert")
+

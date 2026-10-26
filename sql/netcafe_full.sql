@@ -210,6 +210,8 @@ CREATE TABLE core.gaming_session (
     hourly_rate_applied NUMERIC(12,0) NOT NULL,
     play_amount NUMERIC(12,0) NULL,
     game_info JSONB NOT NULL DEFAULT '{}'::jsonb,
+    last_heartbeat_at TIMESTAMPTZ NULL,
+    close_reason VARCHAR(40) NULL,
 
     CONSTRAINT ck_session_status CHECK (status IN ('active', 'finished', 'cancelled')),
     CONSTRAINT ck_session_hourly_rate CHECK (hourly_rate_applied >= 0),
@@ -233,6 +235,24 @@ ALTER TABLE core.gaming_session
         ) WITH &&
     )
     WHERE (status IN ('active', 'finished'));
+
+CREATE TABLE IF NOT EXISTS core.service_request (
+    service_request_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    session_id BIGINT NULL REFERENCES core.gaming_session(session_id) ON DELETE RESTRICT,
+    customer_id INT NULL REFERENCES core.customer(customer_id) ON DELETE RESTRICT,
+    computer_id INT NOT NULL REFERENCES core.computer(computer_id) ON DELETE RESTRICT,
+    request_type VARCHAR(30) NOT NULL DEFAULT 'general',
+    message TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'new',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMPTZ NULL,
+    resolved_at TIMESTAMPTZ NULL,
+    handled_by INT NULL REFERENCES hr.employee(employee_id) ON DELETE RESTRICT,
+    CONSTRAINT ck_service_request_type CHECK (request_type IN ('general', 'technical', 'food', 'payment')),
+    CONSTRAINT ck_service_request_status CHECK (status IN ('new', 'acknowledged', 'resolved', 'cancelled')),
+    CONSTRAINT ck_service_request_message CHECK (length(trim(message)) BETWEEN 1 AND 1000)
+);
+COMMENT ON TABLE core.service_request IS 'Queue hỗ trợ từ NetCafe.Client; station chỉ ghi qua SECURITY DEFINER function.';
 
 -- ----------------------------------------------------------------------------
 -- 5. SCHEMA INVENTORY (Quản lý F&B, Tồn kho & Đơn gọi món)
@@ -1240,7 +1260,7 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT pg_read_all_stats TO role_admin, role_manager;
+-- GRANT pg_read_all_stats bo qua tren Cloud Database
 
 -- Manager chỉ đọc nhân sự công khai; thay đổi tài khoản chỉ do admin thực hiện.
 REVOKE ALL ON hr.employee FROM role_manager;
@@ -3715,7 +3735,7 @@ GRANT EXECUTE ON FUNCTION hr.sp_update_employee(INT, VARCHAR, VARCHAR, VARCHAR, 
 GRANT EXECUTE ON FUNCTION hr.sp_set_employee_active(INT, BOOLEAN) TO role_admin;
 GRANT EXECUTE ON FUNCTION hr.sp_reset_employee_password(INT, TEXT) TO role_admin;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT pg_read_all_stats TO role_admin, role_manager;
+-- GRANT pg_read_all_stats bo qua tren Cloud Database
 
 -- AI chỉ dành cho admin/manager.
 GRANT EXECUTE ON FUNCTION ai.fn_recommend_indexes() TO role_admin, role_manager;

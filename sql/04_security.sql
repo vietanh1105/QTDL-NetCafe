@@ -68,7 +68,7 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ai TO role_admin, role_manager;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, audit, ai TO role_admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA core, inventory, billing, hr, reporting, ai TO role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT pg_read_all_stats TO role_admin, role_manager;
+-- GRANT pg_read_all_stats bo qua tren Cloud Database
 
 -- Manager chỉ đọc nhân sự công khai; thay đổi tài khoản chỉ do admin thực hiện.
 REVOKE ALL ON hr.employee FROM role_manager;
