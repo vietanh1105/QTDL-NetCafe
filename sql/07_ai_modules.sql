@@ -496,7 +496,7 @@ BEGIN
             ROUND(o.global_avg, 1) AS benchmark_avg
         FROM hourly_stat h
         CROSS JOIN overall o
-        WHERE h.avg_sessions < COALESCE(o.global_avg * 0.7, 10)
+        WHERE h.avg_sessions <= o.global_avg
         ORDER BY h.avg_sessions ASC
         LIMIT 3
     LOOP
@@ -538,7 +538,7 @@ BEGIN
             ROUND(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_played_at, NOW() - INTERVAL '5 days'))) / 86400.0) AS days_inactive
         FROM reporting.mv_top_customers
         WHERE total_spent >= 50000 
-          AND (last_played_at IS NULL OR last_played_at < (NOW() - INTERVAL '2 days'))
+          AND (last_played_at IS NULL OR last_played_at < (NOW() - INTERVAL '1 day'))
         ORDER BY total_spent DESC
         LIMIT 5
     LOOP
