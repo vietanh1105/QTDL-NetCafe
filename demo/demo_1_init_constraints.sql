@@ -1,64 +1,97 @@
 -- ============================================================================
--- BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU
--- KỊCH BẢN DEMO 1: KHỞI TẠO CSDL VÀ CHỨNG MINH RÀNG BUỘC TOÀN VẸN (CONSTRAINTS)
--- Hướng dẫn: Mở trên pgAdmin / DBeaver, bôi đen từng khối lệnh và bấm F5 để trình chiếu
+-- BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU (QTDL)
+-- KỊCH BẢN DEMO 1: KHỞI TẠO CSDL - PYTHON ETL LÀM SẠCH - THỬ NGHIỆM RỦI RO LỖI ĐỎ
 -- ============================================================================
 
-\c netcafe_db;
+-- ============================================================================
+-- PHẦN 1: KHỞI TẠO TOÀN BỘ CSDL VÀ CHÈN DỮ LIỆU MỒI
+-- (Sử dụng 1 file duy nhất: sql/netcafe_full.sql nạp qua Neon SQL Editor / psql)
+-- ============================================================================
 
--- ----------------------------------------------------------------------------
--- PHẦN 1.1: TỔNG QUAN KIẾN TRÚC SCHEMAS VÀ BẢNG
--- ----------------------------------------------------------------------------
--- Giảng viên thấy hệ thống phân rã thành 8 schemas nghiệp vụ độc lập:
+-- Kiểm tra 8 Schemas đã khởi tạo thành công:
 SELECT table_schema, count(table_name) AS total_tables
 FROM information_schema.tables
 WHERE table_schema IN ('core', 'inventory', 'billing', 'hr', 'audit', 'ai', 'reporting', 'staging')
 GROUP BY table_schema
 ORDER BY table_schema;
 
--- Kiểm tra 4 extensions mở rộng đã kích hoạt:
+-- Kiểm tra 3 Extensions mở rộng (Bảo mật, Trigram AI, Tiếng Việt):
 SELECT extname, extversion 
 FROM pg_extension 
 WHERE extname IN ('pgcrypto', 'pg_trgm', 'unaccent');
 
 
+-- ============================================================================
+-- PHẦN 2: DEMO PIPELINE PYTHON ETL (SINH DỮ LIỆU BẨN & CHUẨN HÓA DỮ LIỆU)
+-- Bước 1 (Terminal): Chạy "python python/generate_dirty_data.py"
+-- Bước 2 (Terminal): Chạy "python python/clean_data.py"
+-- Bước 3 (SQL Editor): Chạy các câu query dưới đây để chứng minh với Giảng viên:
+-- ============================================================================
+
+-- 2.1. Xem dữ liệu bẩn ban đầu trong bảng Staging (chứa SĐT +84, số âm, khoảng trắng, ...):
+SELECT raw_id, raw_full_name, raw_phone, raw_balance, raw_tier, source_batch
+FROM staging.stg_customers
+ORDER BY raw_id
+LIMIT 10;
+
+-- 2.2. Xem các dòng bẩn không thể cứu bị Python cách ly vào bảng Rejected:
+SELECT rejected_id, source_table, error_reason, raw_record, rejected_at
+FROM staging.rejected_rows
+ORDER BY rejected_id DESC
+LIMIT 10;
+
+-- 2.3. Xem dữ liệu sạch đã được chuẩn hóa và nạp thành công vào bảng chính core.customer:
+SELECT customer_id, full_name, phone, email, username, balance, membership_tier
+FROM core.customer
+ORDER BY customer_id DESC
+LIMIT 10;
+
+
+-- ============================================================================
+-- PHẦN 3: THỬ NGHIỆM RỦI RO (BẮT BUỘC - XUẤT HIỆN THÔNG BÁO LỖI MÀU ĐỎ CỦA POSTGRESQL)
+-- Lưu ý: Chạy từng câu lệnh TRẦN TRỤI dưới đây trên Neon Query Tool / DBeaver
+-- để PostgreSQL trả về thông báo lỗi MÀU ĐỎ trực tiếp trên màn hình!
+-- ============================================================================
+
 -- ----------------------------------------------------------------------------
--- PHẦN 1.2: CHỨNG MINH RÀNG BUỘC TOÀN VẸN VÀ BẢO ĐẢM CHẤT LƯỢNG DỮ LIỆU
+-- [TEST RỦI RO 1]: CỐ TÌNH INSERT SAI ĐỊNH DẠNG SỐ ĐIỆN THOẠI
+-- Mong đợi: PostgreSQL Engine văng lỗi ĐỎ vi phạm check constraint "ck_customer_phone"
 -- ----------------------------------------------------------------------------
+INSERT INTO core.customer (full_name, phone, username, password_hash)
+VALUES ('Trần Văn Sai SĐT', '12345', 'user_bad_phone_demo', '$2a$06$fakehashforrejectiontest00000000000000000000000000000');
 
--- [DEMO C1]: RÀNG BUỘC CHECK SỐ TIỀN KHÔNG ÂM (CK_INVOICE_TOTAL_AMOUNT)
--- Thử cố tình tạo hóa đơn tổng tiền âm:
-DO $$
-BEGIN
-    INSERT INTO billing.invoice (
-        session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status
-    ) VALUES (99999, 1, 3, 20000, 10000, 0, 50000, -20000, 'unpaid');
-    RAISE EXCEPTION 'LỖI: Chấp nhận tiền âm!';
-EXCEPTION WHEN check_violation THEN
-    RAISE NOTICE '>>> THÀNH CÔNG: CSDL chặn hóa đơn có số tiền âm (check_violation)!';
-END $$;
+/*
+THÔNG BÁO LỖI ĐỎ POSTGRESQL TRẢ VỀ:
+ERROR: new row for relation "customer" violates check constraint "ck_customer_phone"
+DETAIL: Failing row contains (..., Trần Văn Sai SĐT, 12345, ..., user_bad_phone_demo, ...).
+*/
 
 
--- [DEMO C2]: RÀNG BUỘC BẤT BIẾN CÔNG THỨC HÓA ĐƠN (CK_INVOICE_FORMULA)
--- total_amount PHẢI = play_amount + service_amount + surcharge - discount_amount
-DO $$
-BEGIN
-    INSERT INTO billing.invoice (
-        session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status
-    ) VALUES (99999, 1, 3, 20000, 10000, 0, 5000, 50000, 'unpaid'); -- 20k + 10k - 5k = 25k, nhưng nhập 50k
-    RAISE EXCEPTION 'LỖI: Chấp nhận công thức sai lệch!';
-EXCEPTION WHEN check_violation THEN
-    RAISE NOTICE '>>> THÀNH CÔNG: CSDL chặn hóa đơn sai lệch công thức toán học bất biến!';
-END $$;
+-- ----------------------------------------------------------------------------
+-- [TEST RỦI RO 2]: CỐ TÌNH CẬP NHẬT GIÁ TRỊ ÂM (TIỀN SỐ DƯ ÂM)
+-- Mong đợi: PostgreSQL Engine văng lỗi ĐỎ vi phạm check constraint "ck_customer_balance"
+-- ----------------------------------------------------------------------------
+UPDATE core.customer
+SET balance = -50000
+WHERE customer_id = 1;
+
+/*
+THÔNG BÁO LỖI ĐỎ POSTGRESQL TRẢ VỀ:
+ERROR: new row for relation "customer" violates check constraint "ck_customer_balance"
+DETAIL: Failing row contains (1, ..., balance = -50000, ...).
+*/
 
 
--- [DEMO C3]: RÀNG BUỘC CHECK THỜI LƯỢNG PHIÊN CHƠI (CK_SESSION_TIME_ORDER)
--- Giờ kết thúc phiên end_time phải lớn hơn giờ bắt đầu start_time:
-DO $$
-BEGIN
-    INSERT INTO core.gaming_session (customer_id, computer_id, opened_by, start_time, end_time, status)
-    VALUES (1, 1, 3, NOW(), NOW() - INTERVAL '1 hour', 'finished');
-    RAISE EXCEPTION 'LỖI: Cho phép giờ kết thúc trước giờ bắt đầu!';
-EXCEPTION WHEN check_violation THEN
-    RAISE NOTICE '>>> THÀNH CÔNG: CSDL chặn phiên chơi có end_time <= start_time!';
-END $$;
+-- ----------------------------------------------------------------------------
+-- [TEST RỦI RO 3]: CỐ TÌNH XÓA DỮ LIỆU CHA ĐANG BỊ RÀNG BUỘC FK RESTRICT
+-- Phòng máy số 1 (room_id = 1) hiện đang có nhiều máy trạm (computer) trực thuộc.
+-- Mong đợi: PostgreSQL Engine chặn đứng thao tác xóa và văng lỗi ĐỎ ON DELETE RESTRICT!
+-- ----------------------------------------------------------------------------
+DELETE FROM core.room
+WHERE room_id = 1;
+
+/*
+THÔNG BÁO LỖI ĐỎ POSTGRESQL TRẢ VỀ:
+ERROR: update or delete on table "room" violates foreign key constraint "fk_computer_room" on table "computer"
+DETAIL: Key (room_id)=(1) is still referenced from table "computer".
+*/

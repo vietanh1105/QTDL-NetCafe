@@ -6,7 +6,7 @@
 # Mục đích: Làm sạch và chuẩn hóa dữ liệu từ staging.stg_customers
 #           - Chuẩn hóa SĐT về dạng 0xxxxxxxxx, họ tên Title Case, email lowercase
 #           - Đẩy bản ghi không cứu được vào staging.rejected_rows kèm lý do
-#           - Nạp bản ghi hợp lệ vào core.customer bằng COPY
+#           - Nạp bản ghi hợp lệ vào core.customer
 #           - Xuất báo cáo thống kê trước/sau vào evidence/clean_data_stats.txt
 # ============================================================================
 
@@ -14,8 +14,6 @@ import os
 import sys
 import re
 import json
-from dotenv import load_dotenv
-import psycopg
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -23,21 +21,48 @@ if sys.stdout.encoding != 'utf-8':
     except Exception:
         pass
 
-load_dotenv()
+def load_env_file():
+    env_vars = {}
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    env_vars[k.strip()] = v.strip().strip("'").strip('"')
+    return env_vars
 
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "netcafe_qa")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+env = load_env_file()
+DB_HOST = env.get("DB_HOST", os.getenv("DB_HOST", "127.0.0.1"))
+DB_PORT = env.get("DB_PORT", os.getenv("DB_PORT", "5432"))
+DB_NAME = env.get("DB_NAME", os.getenv("DB_NAME", "netcafe_db"))
+DB_USER = env.get("DB_USER", os.getenv("DB_USER", "postgres"))
+DB_PASSWORD = env.get("DB_PASSWORD", os.getenv("DB_PASSWORD", ""))
+DB_SSL_MODE = env.get("DB_SSL_MODE", os.getenv("DB_SSL_MODE", "prefer"))
 
-CONN_STRING = f"host={DB_HOST} port={DB_PORT} dbname={DB_NAME} user={DB_USER} password={DB_PASSWORD}"
+def get_db_connection():
+    try:
+        import psycopg2
+        return psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            sslmode=DB_SSL_MODE.lower() if DB_SSL_MODE else "prefer"
+        )
+    except ImportError:
+        import psycopg
+        ssl_str = f"?sslmode={DB_SSL_MODE.lower()}" if DB_SSL_MODE else ""
+        conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}{ssl_str}"
+        return psycopg.connect(conn_str)
 
 PHONE_REGEX = re.compile(r"^0[35789][0-9]{8}$")
 EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 def clean_and_load():
-    print(f"[*] Bắt đầu tiến trình làm sạch dữ liệu từ staging...")
+    print(f"[*] Bắt đầu tiến trình làm sạch dữ liệu từ staging trên {DB_HOST}...")
 
     stats = {
         "total_processed": 0,
@@ -51,8 +76,11 @@ def clean_and_load():
     clean_records = []
     rejected_records = []
     seen_phones = set()
+    seen_emails = set()
+    seen_usernames = set()
 
-    with psycopg.connect(CONN_STRING) as conn:
+    conn = get_db_connection()
+    try:
         with conn.cursor() as cur:
             # 1. Đọc dữ liệu từ staging
             cur.execute("""
@@ -65,9 +93,7 @@ def clean_and_load():
             raw_rows = cur.fetchall()
             stats["total_processed"] = len(raw_rows)
 
-            # Lấy danh sách SĐT, Email, Username đã tồn tại trong core.customer để tránh trùng
-            seen_emails = set()
-            seen_usernames = set()
+            # Lấy danh sách SĐT, Email, Username đã tồn tại trong core.customer để tránh vi phạm Unique
             cur.execute("SELECT phone FROM core.customer;")
             for p in cur.fetchall():
                 seen_phones.add(p[0])
@@ -78,8 +104,8 @@ def clean_and_load():
             for un in cur.fetchall():
                 seen_usernames.add(un[0])
 
-            # Lấy mật khẩu hash mặc định cho các khách mới
-            cur.execute("SELECT crypt(gen_random_uuid()::text, gen_salt('bf'));")
+            # Mật khẩu hash mặc định (mã hóa bcrypt giả lập hoặc chuỗi hash chuẩn)
+            cur.execute("SELECT crypt('Pass@123456', gen_salt('bf'));")
             default_pwd_hash = cur.fetchone()[0]
 
             for row in raw_rows:
@@ -89,7 +115,7 @@ def clean_and_load():
                     "email": raw_email, "username": raw_username, "balance": raw_balance
                 }
 
-                # Chuẩn hóa họ tên
+                # Chuẩn hóa họ tên: cắt khoảng trắng dư thừa, đưa về Title Case
                 name = " ".join(raw_name.split()).title() if raw_name else ""
                 if name != raw_name:
                     stats["normalized_name_count"] += 1
@@ -120,7 +146,7 @@ def clean_and_load():
                     stats["rejected_by_reason"]["DUPLICATE_PHONE"] = stats["rejected_by_reason"].get("DUPLICATE_PHONE", 0) + 1
                     continue
 
-                # Kiểm tra số dư
+                # Kiểm tra số dư không âm
                 try:
                     balance = float(raw_balance)
                     if balance < 0:
@@ -141,7 +167,7 @@ def clean_and_load():
                 if email and not EMAIL_REGEX.match(email):
                     email = None
                 if email and email in seen_emails:
-                    email = None  # Cứu khách bằng cách bỏ email trùng
+                    email = None
                 elif email:
                     seen_emails.add(email)
 
@@ -152,7 +178,7 @@ def clean_and_load():
                 seen_usernames.add(username)
 
                 tier = raw_tier if raw_tier in ['regular', 'silver', 'gold', 'vip'] else 'regular'
-                points = int(raw_points) if raw_points and raw_points.isdigit() else 0
+                points = int(raw_points) if raw_points and str(raw_points).isdigit() else 0
 
                 seen_phones.add(phone)
                 clean_records.append((
@@ -162,21 +188,42 @@ def clean_and_load():
             stats["clean_loaded"] = len(clean_records)
             stats["rejected_total"] = len(rejected_records)
 
-            # 2. Ghi nhận các dòng bị từ chối vào staging.rejected_rows
-            if rejected_records:
-                print(f"[*] Ghi nhận {len(rejected_records)} bản ghi không cứu được vào staging.rejected_rows...")
-                with cur.copy("COPY staging.rejected_rows (source_table, raw_record, error_reason) FROM STDIN") as copy:
-                    for rej in rejected_records:
-                        copy.write_row(rej)
+            # Xóa các dòng rejected cũ của batch này
+            cur.execute("DELETE FROM staging.rejected_rows WHERE source_table = 'core.customer';")
 
-            # 3. Nạp các bản ghi sạch vào core.customer bằng COPY
+            # 2. Ghi nhận các bản ghi bị từ chối vào staging.rejected_rows
+            if rejected_records:
+                print(f"[*] Đang ghi nhận {len(rejected_records)} bản ghi không cứu được vào staging.rejected_rows...")
+                try:
+                    from psycopg2.extras import execute_values
+                    query = "INSERT INTO staging.rejected_rows (source_table, raw_record, error_reason) VALUES %s;"
+                    execute_values(cur, query, rejected_records)
+                except ImportError:
+                    for rej in rejected_records:
+                        cur.execute("INSERT INTO staging.rejected_rows (source_table, raw_record, error_reason) VALUES (%s, %s, %s);", rej)
+
+            # 3. Nạp các bản ghi sạch vào core.customer
             if clean_records:
-                print(f"[*] Nạp {len(clean_records)} bản ghi sạch vào core.customer bằng COPY...")
-                with cur.copy("COPY core.customer (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier, is_active) FROM STDIN") as copy:
+                print(f"[*] Đang nạp {len(clean_records)} bản ghi sạch vào core.customer...")
+                try:
+                    from psycopg2.extras import execute_values
+                    query = """
+                        INSERT INTO core.customer 
+                        (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier, is_active)
+                        VALUES %s;
+                    """
+                    execute_values(cur, query, clean_records)
+                except ImportError:
                     for cln in clean_records:
-                        copy.write_row(cln)
+                        cur.execute("""
+                            INSERT INTO core.customer 
+                            (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier, is_active)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        """, cln)
 
             conn.commit()
+    finally:
+        conn.close()
 
     # 4. Xuất báo cáo thống kê
     os.makedirs("evidence", exist_ok=True)

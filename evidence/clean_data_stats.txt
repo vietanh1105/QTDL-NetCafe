@@ -3,17 +3,17 @@ BÁO CÁO THỐNG KÊ LÀM SẠCH VÀ CHUẨN HÓA DỮ LIỆU (ETL CLEANING)
 ============================================================
 
 1. Tổng số dòng dữ liệu thô xử lý:           500 dòng
-2. Số dòng chuẩn hóa và nạp thành công:      466 dòng
-3. Số dòng không thể cứu (Đưa vào reject):    34 dòng
-   - Tỷ lệ dữ liệu bẩn / lỗi loại trừ:        6.80%
+2. Số dòng chuẩn hóa và nạp thành công:      0 dòng
+3. Số dòng không thể cứu (Đưa vào reject):    500 dòng
+   - Tỷ lệ dữ liệu bẩn / lỗi loại trừ:        100.00%
 
 4. Thống kê thao tác chuẩn hóa thành công:
-   - Số điện thoại chuẩn hóa (+84/dấu chấm/cách): 8 trường hợp
-   - Họ tên cắt khoảng trắng thừa / Title Case:   52 trường hợp
+   - Số điện thoại chuẩn hóa (+84/dấu chấm/cách): 5 trường hợp
+   - Họ tên cắt khoảng trắng thừa / Title Case:   11 trường hợp
 
 5. Chi tiết các lý do từ chối (staging.rejected_rows):
-   - NEGATIVE_BALANCE              : 14 dòng
-   - PHONE_FORMAT_INVALID          : 8 dòng
-   - DUPLICATE_PHONE               : 12 dòng
+   - DUPLICATE_PHONE               : 480 dòng
+   - NEGATIVE_BALANCE              : 10 dòng
+   - PHONE_FORMAT_INVALID          : 10 dòng
 
 ============================================================

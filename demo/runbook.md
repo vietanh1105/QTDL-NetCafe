@@ -1,72 +1,192 @@
-# KỊCH BẢN BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU
-## ĐỀ TÀI: XÂY DỰNG VÀ TỐI ƯU HÓA CƠ SỞ DỮ LIỆU CHO HỆ THỐNG QUẢN LÝ PHÒNG GAME/NET (NETCAFE MANAGEMENT SYSTEM)
+# KỊCH BẢN TỔNG THỂ BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU
+## ĐỀ TÀI: QUẢN LÝ PHÒNG GAME/NET (NETCAFE MANAGEMENT SYSTEM)
+### Hướng dẫn thao tác trực tiếp trên DBeaver / pgAdmin và Terminal kết nối PostgreSQL
 
 ---
 
-## 1. CHUẨN BỊ TRƯỚC BUỔI BẢO VỆ (CHECKLIST 5 PHÚT)
-
-1. **Khởi động PostgreSQL 17/18**: Đảm bảo dịch vụ đang chạy trên cổng `5432`.
-2. **Kiểm tra CSDL**: QA dùng `scripts/run-qa.ps1`; database chính dùng `scripts/migrate-main.ps1` sau khi có backup. Không chạy full SQL/reset/seed lên `netcafe_db`.
-3. **Bố trí 2 cửa sổ song song trên màn hình chiếu (Dual-Window Layout)**:
-   - **Nửa màn hình TRÁI (50%)**: Mở Admin (`NetCafe.App.exe`) và Station (`NetCafe.Client.exe`) ở hai cửa sổ riêng.
-   - **Nửa màn hình PHẢI (50%)**: Mở **pgAdmin 4** hoặc **DBeaver**, kết nối đúng database đang hiển thị trong Settings.
+## 1. BỐ TRÍ MÀN HÌNH (DUAL-WINDOW SETUP)
+Trước khi thầy gọi lên trình bày, bố trí 2 cửa sổ trên màn hình máy chiếu:
+- **Cửa sổ TRÁI (60%)**: DBeaver / pgAdmin (kết nối database `netcafe_db` trên Neon Cloud).
+- **Cửa sổ PHẢI (40%)**: PowerShell / Windows Terminal tại thư mục gốc dự án.
 
 ---
 
-## 2. KỊCH BẢN TRÌNH DIỄN THEO DÒNG THỜI GIAN (15 PHÚT)
+## 2. TIẾN TRÌNH 4 BƯỚC DEMO THEO ĐÚNG YÊU CẦU GIẢNG VIÊN
 
-| Thời gian | Nội dung | Thao tác trên màn hình | Điểm nhấn giải thích trước Hội đồng |
-|---|---|---|---|
-| **00:00 - 03:00** (3 phút) | **Giới thiệu Tổng quan & Kiến trúc CSDL** | Mở sơ đồ ERD (`docs/erd_viewer.html`) và giới thiệu 8 schemas | - 1 instance, 8 schemas chuyên biệt (`core`, `inventory`, `billing`, `hr`, `audit`, `ai`, `reporting`, `staging`).<br>- 16 bảng nghiệp vụ đạt chuẩn 3NF + 6 bảng mở rộng.<br>- Database tạo từ `template0 ENCODING 'UTF8'` không phụ thuộc OS locale. |
-| **03:00 - 07:00** (4 phút) | **Demo Song song: Thao tác Desktop -> Bản ghi CSDL** | Thao tác trên Desktop Client (Trái), đồng thời F5 query trên DBeaver (Phải) | - Mở phiên máy PC001 -> Thấy trigger tự động đổi trạng thái máy sang `in_use`.<br>- Gọi món F&B -> Thấy trigger trừ tồn kho ngay lập tức.<br>- Thanh toán phiên -> Hóa đơn tự sinh, thanh toán cập nhật, máy về `available`.<br>- Thanh SQL Strip phía dưới app hiển thị câu lệnh và thời gian thực thi nội bộ CSDL. |
-| **07:00 - 09:30** (2.5 phút) | **Demo Tính toàn vẹn & Phân quyền bảo mật** | Chạy `demo/demo_1_init_constraints.sql` và `demo/demo_2_security_rls.sql` | - Thử tạo hóa đơn âm tiền -> Bị chặn bởi CHECK constraint.<br>- Thử sai công thức hóa đơn và thời lượng phiên -> Bị chặn tại CSDL.<br>- Chuyển vai trò thu ngân `nv_thao` -> RLS chỉ hiển thị đúng hóa đơn của Thảo.<br>- Thử truy vấn cột `salary` -> PostgreSQL trả về lỗi `permission denied` (Column-level security). |
-| **09:30 - 11:30** (2 phút) | **Demo Tối ưu hiệu năng & DBA Operations** | Chạy `demo/demo_3_performance.sql` | - Giải thích `EXPLAIN (ANALYZE, BUFFERS)`: GIN Trigram cho họ tên có ký tự đại diện `%Thành%`, GIN `jsonb_path_ops` cho phần cứng GPU, Partial Index cho phiên `active`.<br>- Chạy `audit.fn_create_monthly_partitions(3)` để thấy cơ chế tự động sinh bảng phân vùng hàng tháng. |
-| **11:30 - 13:30** (2 phút) | **Điểm sáng: 5 Module In-Database AI** | Chạy `demo/demo_4_highlights.sql` | - **Module 1**: Sửa lương hoặc nạp tiền lớn -> Bắn cảnh báo NOTIFY tức thì qua trigger.<br>- **Module 2**: Quét catalog `pg_stat_user_tables` gợi ý index.<br>- **Module 3**: Dùng `pg_trgm` phát hiện khách trùng tên/SĐT.<br>- **Module 4**: Tính Z-score phát hiện phiên chơi 36 tiếng và tiền nạp 15 triệu.<br>- **Module 5**: Khai phá Materialized Views đề xuất Happy Hour và Voucher giữ chân khách VIP. |
-| **13:30 - 15:00** (1.5 phút) | **Hỏi đáp phản biện & Kết luận** | Trả lời câu hỏi của Giảng viên | Xem Bộ câu hỏi phản biện bên dưới. |
-
----
-
-## 3. BỘ CÂU HỎI PHẢN BIỆN THƯỜNG GẶP VÀ CÂU TRẢ LỜI "VÌ SAO"
-
-### Câu 1: Vì sao lại dùng `TEMPLATE template0` và `LC_COLLATE = 'C'` khi tạo Database?
-> **Trả lời:** "Dạ thưa Thầy/Cô, việc dùng `template0` và bảng mã UTF-8 với `LC_COLLATE = 'C'` giúp CSDL hoàn toàn trung lập với hệ điều hành của máy chủ cài đặt (Windows hay Linux). Khi chấm bài trên một máy tính độc lập, hệ thống không bị lỗi xung đột locale tiếng Việt của Windows, đồng thời việc sắp xếp và tìm kiếm không dấu đã được giải quyết bằng extension `unaccent` và `pg_trgm`."
-
-### Câu 2: Vì sao kiểm tra công thức hóa đơn ở tầng CSDL?
-> **Trả lời:** "Dạ thưa Thầy/Cô, CHECK constraint bảo đảm mọi đường ghi dữ liệu đều tuân thủ công thức tiền giờ + tiền F&B + phụ phí - giảm giá = tổng tiền. Quy tắc nằm trong PostgreSQL nên không phụ thuộc riêng vào giao diện Admin hay Station."
-
-### Câu 3: Vì sao số tiền dùng `NUMERIC(12,0)` mà không dùng `BIGINT` hay `FLOAT/DOUBLE`?
-> **Trả lời:** "Dạ thưa Thầy/Cô, kiểu `FLOAT/DOUBLE` sử dụng dấu phẩy động chuẩn IEEE 754 có sai số làm tròn nhị phân, tuyệt đối không được dùng trong tài chính kế toán. Còn `NUMERIC(12,0)` trong PostgreSQL là kiểu fixed-point số học chính xác tuyệt đối, thang đo 12 chữ số đủ biểu diễn số tiền tới hàng trăm tỷ đồng Việt Nam (vốn không có phần thập phân xu/hào), vừa chính xác vừa tiết kiệm không gian lưu trữ."
-
-### Câu 4: Vì sao hàm hỗ trợ RLS `fn_get_current_employee_id()` lại phải đặt `SECURITY DEFINER` và `SET search_path = hr, pg_temp`?
-> **Trả lời:** "Dạ thưa Thầy/Cô, hàm cần `SECURITY DEFINER` để chạy dưới quyền của chủ sở hữu hàm (postgres) nhằm tra cứu ID nhân viên trong bảng `hr.employee` ngay cả khi nhân viên đang đăng nhập không có quyền xem toàn bảng. Việc cố định `SET search_path = hr, pg_temp` là tiêu chuẩn an ninh bắt buộc của PostgreSQL để ngăn chặn kỹ thuật tấn công chèn mã độc (search_path hijacking)."
-
-### Câu 5: Vì sao chọn BRIN Index cho bảng `audit.audit_log` thay vì B-Tree?
-> **Trả lời:** "Dạ thưa Thầy/Cô, bảng `audit_log` là bảng ghi nhật ký thời gian tăng dần liên tục (append-only). Các block dữ liệu trên đĩa vật lý được sắp xếp hoàn toàn theo thứ tự thời gian. BRIN (Block Range Index) chỉ lưu tóm tắt min/max của từng cụm trang đĩa, dung lượng chỉ chiếm dưới 1% so với B-Tree nhưng cho tốc độ quét theo khoảng ngày tháng tương đương, giúp tiết kiệm bộ nhớ RAM đệm và dung lượng đĩa cực kỳ lớn."
-
-### Câu 6: Thuật toán AI trong đề tài này có gọi API bên ngoài (OpenAI/ChatGPT) không?
-> **Trả lời:** "Dạ thưa Thầy/Cô, đề tài tuân thủ nghiêm ngặt nguyên tắc In-Database Intelligence: 100% thuật toán chạy nội bộ bằng toán học, thống kê và hàm PL/pgSQL có sẵn của PostgreSQL 17 (Z-score với `stddev_samp`, khoảng cách chuỗi Trigram với `similarity`, thống kê cửa sổ `NTILE`, Moving Average trên Materialized Views). Hệ thống hoàn toàn không gọi API bên ngoài và có thể chạy độc lập không cần kết nối Internet."
-
-## 4. KỊCH BẢN QA STATION VÀ SUPPORT
-
-1. Chạy `scripts/reset-qa.ps1`; xác nhận marker và chỉ có database `netcafe_qa` được reset.
-2. Chạy `tests/station_customer.sql`; kiểm tra cột heartbeat, function, role station, notification channel và service request.
-3. Mở `NetCafe.Client` tại PC001, đăng nhập customer có balance dương; kiểm tra session active và máy chuyển `in_use`.
-4. Chờ heartbeat theo cấu hình 30 giây; projected play/service chỉ hiển thị, chưa tạo payment.
-5. Gọi món trong hạn mức; thử vượt ví để chứng minh database từ chối đơn.
-6. Gửi support request và xử lý `new → acknowledged → resolved` trong Support queue Admin.
-7. Logout station; kiểm tra invoice/payment, session `finished`, close reason `station_logout`, máy `available`.
-8. Dừng station không logout, đợi hơn 90 giây rồi mở Computers; watcher reconcile với close reason `stale_timeout`.
-9. Mở AiCenter, chạy đủ 5 module; index SQL readonly, duplicate không tự merge.
-
-## 5. Lệnh kiểm tra nhanh
-
-```powershell
-$env:DB_NAME = "netcafe_qa"
-$env:DB_PASSWORD = "<cấp ngoài source>"
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-qa.ps1
-dotnet run --project .\app\NetCafe.App
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-station.ps1 -ComputerCode PC001
-# Hoặc dùng wrapper: .\scripts\run-station.cmd -ComputerCode PC001
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. FAIL-SAFE DEMO (Khởi tạo CSDL + Python Data Cleaning + Lỗi ĐỎ rủi ro)     │
+│ 2. ROLE-PLAYING DEMO (SET ROLE nv_thao + RLS Invoice + Cấm cột Lương + AI)  │
+│ 3. PERFORMANCE DEMO (EXPLAIN ANALYZE Seq Scan -> Index Scan + AI Recommender)│
+│ 4. INTEGRATION & AI DEMO (NoSQL JSONB ->> + Python ETL + LISTEN/NOTIFY AI)   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Nếu Developer PowerShell không có `pwsh`, dùng `powershell` hoặc `run-station.cmd`. QA station hiện chạy thêm ba script `verify_qa_station_*.sql`; không dùng database production hoặc evidence cũ để kết luận live demo.
+---
+
+### PHẦN 1: DEMO KHỞI TẠO VÀ RÀNG BUỘC DỮ LIỆU (FAIL-SAFE DEMO)
+📁 **File SQL:** `demo/demo_1_init_constraints.sql`  
+🐍 **File Python:** `python/generate_dirty_data.py` & `python/clean_data.py`
+
+#### 1.1. Chứng minh Khởi tạo toàn bộ Database, Schemas, Tables & Mock Data
+- **Thuyết minh:** *"Dạ thưa Thầy, toàn bộ CSDL đã được đóng gói trong 1 script khởi tạo duy nhất `sql/netcafe_full.sql`. Hệ thống được phân rã thành 8 Schemas độc lập đạt chuẩn 3NF."*
+- **Thao tác DBeaver:** Chạy kiểm tra 8 schemas:
+  ```sql
+  SELECT table_schema, count(table_name) AS total_tables
+  FROM information_schema.tables
+  WHERE table_schema IN ('core', 'inventory', 'billing', 'hr', 'audit', 'ai', 'reporting', 'staging')
+  GROUP BY table_schema;
+  ```
+
+#### 1.2. Sinh dữ liệu giả lập chưa chuẩn bằng Python & Chuẩn hóa dữ liệu
+- **Thao tác Terminal:**
+  ```powershell
+  # Bước 1: Sinh 500 dòng dữ liệu bẩn (~15% lỗi: +84, chấm, khoảng trắng, số âm)
+  python python/generate_dirty_data.py
+  ```
+- **Thao tác DBeaver:** Xem dữ liệu bẩn trong bảng staging:
+  ```sql
+  SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch 
+  FROM staging.stg_customers LIMIT 10;
+  ```
+- **Thao tác Terminal:**
+  ```powershell
+  # Bước 2: Chạy Python làm sạch và nạp lại vào bảng chính
+  python python/clean_data.py
+  ```
+  *(Terminal hiển thị báo cáo: Xử lý 500 dòng -> nạp 476 dòng sạch vào `core.customer`, cách ly 24 dòng lỗi nặng vào `staging.rejected_rows`).*
+- **Thao tác DBeaver:** Chứng minh bảng cách ly:
+  ```sql
+  SELECT rejected_id, source_table, error_reason, raw_record 
+  FROM staging.rejected_rows LIMIT 10;
+  ```
+
+#### 1.3. Thử nghiệm rủi ro (Bắt buộc) — Xuất hiện thông báo LỖI ĐỎ của PostgreSQL
+- **Thao tác DBeaver:** Chạy lần lượt 3 câu lệnh trần trụi:
+  1. **Vi phạm SĐT:**
+     ```sql
+     INSERT INTO core.customer (full_name, phone, username, password_hash)
+     VALUES ('Trần Văn Lỗi', '12345', 'user_bad_phone_demo', 'hash');
+     ```
+     🔴 *PostgreSQL bắn lỗi đỏ:* `ERROR: check constraint "ck_customer_phone"`
+  2. **Vi phạm Số âm:**
+     ```sql
+     UPDATE core.customer SET balance = -50000 WHERE customer_id = 1;
+     ```
+     🔴 *PostgreSQL bắn lỗi đỏ:* `ERROR: check constraint "ck_customer_balance"`
+  3. **Vi phạm Xóa cha bị RESTRICT:**
+     ```sql
+     DELETE FROM core.room WHERE room_id = 1;
+     ```
+     🔴 *PostgreSQL bắn lỗi đỏ:* `ERROR: foreign key constraint "fk_computer_room" (RESTRICT)`
+- **Thuyết minh:** *"Ràng buộc được thực thi trực tiếp tại Storage Engine của PostgreSQL nên ngăn chặn 100% việc nhập sai dữ liệu ngay từ tầng vật lý."*
+
+---
+
+### PHẦN 2: DEMO BẢO MẬT VÀ RLS (ROLE-PLAYING DEMO)
+📁 **File SQL:** `demo/demo_2_security_rls.sql`
+
+#### 2.1. Đóng vai nhân viên cấp thấp (SET ROLE) & Kiểm tra RLS
+- **Thao tác DBeaver:**
+  ```sql
+  SET ROLE nv_thao; -- Thu ngân Thảo (employee_id = 3)
+  
+  -- RLS tự động lọc chỉ trả về hóa đơn do Thảo lập:
+  SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+  FROM billing.invoice;
+  ```
+  *(Toàn bộ các dòng trả về đều có `cashier_id = 3`, tuyệt đối không thấy hóa đơn của thu ngân khác).*
+
+#### 2.2. Kiểm tra Column-Level Privileges (Chặn cột nhạy cảm)
+- **Thao tác DBeaver:**
+  ```sql
+  -- Xem danh sách nhân viên công khai (HỢP LỆ):
+  SELECT employee_id, full_name, username, emp_role FROM hr.employee;
+  
+  -- Cố tình truy vấn cột lương (salary):
+  SELECT employee_id, full_name, salary FROM hr.employee;
+  ```
+  🔴 *PostgreSQL bắn lỗi đỏ:* `ERROR: permission denied for column "salary" of relation "employee"` (Mã lỗi 42501).
+
+#### 2.3. Thử nghiệm Module AI đã tích hợp
+- **Thao tác DBeaver:**
+  ```sql
+  RESET ROLE;
+  -- Module AI 3: Phát hiện tài khoản khách hàng gian lận tạo nhiều nick hưởng khuyến mãi
+  SELECT candidate_id, customer_name_a, customer_name_b, similarity, reason 
+  FROM ai.fn_detect_duplicates(0.65) LIMIT 5;
+  ```
+
+---
+
+### PHẦN 3: DEMO TỐI ƯU HÓA HIỆU NĂNG (PERFORMANCE DEMO)
+📁 **File SQL:** `demo/demo_3_performance.sql`
+
+#### 3.1. Truy vấn tìm kiếm phức tạp trước khi có Index (Seq Scan)
+- **Thao tác DBeaver:**
+  ```sql
+  DROP INDEX IF EXISTS core.idx_customer_fullname_trgm;
+  
+  EXPLAIN (ANALYZE, BUFFERS)
+  SELECT customer_id, full_name, phone FROM core.customer 
+  WHERE full_name ILIKE '%Thành%';
+  ```
+  *(Chỉ cho thầy dòng: `Seq Scan on customer` và thời gian thực thi).*
+
+#### 3.2. Tạo Index và đo lại hiệu năng (Index Scan)
+- **Thao tác DBeaver:**
+  ```sql
+  CREATE INDEX idx_customer_fullname_trgm 
+  ON core.customer USING gin (full_name gin_trgm_ops);
+  
+  EXPLAIN (ANALYZE, BUFFERS)
+  SELECT customer_id, full_name, phone FROM core.customer 
+  WHERE full_name ILIKE '%Thành%';
+  ```
+  *(Chỉ cho thầy dòng: `Bitmap Index Scan on idx_customer_fullname_trgm` - Tốc độ tăng tốc vượt bậc).*
+
+#### 3.3. Thử nghiệm Module AI tích hợp
+- **Thao tác DBeaver:**
+  ```sql
+  -- Module AI 2: In-Database AI tự động phân tích Catalog và khuyến nghị tạo Index
+  SELECT * FROM ai.fn_recommend_indexes();
+  ```
+
+---
+
+### PHẦN 4: DEMO ĐIỂM NHẤN TÍCH HỢP DỮ LIỆU HOẶC AI (INTEGRATION/AI DEMO)
+📁 **File SQL:** `demo/demo_4_highlights.sql`  
+🐍 **File Python:** `python/listen_ai_alerts.py`
+
+#### 4.1. Bóc tách dữ liệu bán cấu trúc NoSQL từ cột JSONB (`->>`)
+- **Thao tác DBeaver:**
+  ```sql
+  SELECT 
+      computer_code, 
+      computer_name,
+      specs ->> 'cpu' AS cpu_model,
+      specs ->> 'gpu' AS graphics_card,
+      specs ->> 'ram' AS memory_size
+  FROM core.computer
+  WHERE specs ->> 'gpu' ILIKE '%RTX%';
+  ```
+
+#### 4.2. (ĐIỂM CỘNG XUẤT SẮC): Luồng Python lắng nghe LISTEN/NOTIFY với Trigger Cảnh báo AI
+- **Bước 1 (Terminal):** Khởi động luồng lắng nghe thời gian thực:
+  ```powershell
+  python python/listen_ai_alerts.py
+  ```
+  *(Terminal thông báo: `[+] ĐÃ KÍCH HOẠT LẮNG NGHE KÊNH: 'ai_security_alert'`)*
+- **Bước 2 (DBeaver):** Chạy câu lệnh giả lập nạp số tiền lớn bất thường:
+  ```sql
+  INSERT INTO billing.payment (kind, customer_id, method, amount, employee_id, reference)
+  VALUES ('topup', 1, 'cash', 10000000, 3, 'Demo nạp tiền lớn kích hoạt Trigger AI');
+  ```
+- **Bước 3 (Quan sát Terminal):** Cửa sổ Python nổ ra cảnh báo thời gian thực ngay lập tức:
+  ```
+  [🚨 CẢNH BÁO AN NINH PHÁT HIỆN LÚC ...]
+  - Kênh (Channel)     : ai_security_alert
+  - Mức độ rủi ro      : [HIGH] (Score: 70/100)
+  - Nguyên nhân AI     : Thanh toán/nạp tiền lớn bất thường: 10,000,000 VNĐ
+  ```
+- **Thuyết minh:** *"Dạ thưa Thầy, đây là kiến trúc Real-Time Push Notification trực tiếp từ PostgreSQL Engine qua socket mạng không cần Polling định kỳ, giúp tối ưu băng thông và cảnh báo gian lận ngay tức thì."*

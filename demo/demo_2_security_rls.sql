@@ -1,78 +1,69 @@
 -- ============================================================================
--- BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU
--- KỊCH BẢN DEMO 2: AN NINH PHÂN QUYỀN RBAC, COLUMN-LEVEL & ROW-LEVEL SECURITY (RLS)
--- Hướng dẫn: Trình diễn việc bảo vệ dữ liệu nhạy cảm và cách ly dữ liệu giữa các nhân viên
+-- BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU (QTDL)
+-- PHẦN 2: DEMO BẢO MẬT VÀ RLS (ROLE-PLAYING DEMO)
+-- Hướng dẫn: Đăng nhập bằng tài khoản Quản trị, bôi đen từng lệnh để chạy trên DBeaver / pgAdmin
 -- ============================================================================
 
-\c netcafe_db;
-
 -- ----------------------------------------------------------------------------
--- PHẦN 2.1: COLUMN-LEVEL SECURITY (BẢO VỆ CỘT LƯƠNG VÀ MẬT KHẨU)
+-- [BƯỚC 2.1]: ĐÓNG VAI NHÂN VIÊN THU NGÂN CẤP THẤP BẰNG LỆNH SET ROLE
 -- ----------------------------------------------------------------------------
--- Khi thu ngân 'nv_thao' đăng nhập:
+-- Đóng vai nhân viên thu ngân Thảo (employee_id = 3):
 SET ROLE nv_thao;
 
--- Thu ngân xem được danh sách nhân viên công khai:
-SELECT employee_id, full_name, username, emp_role, default_shift 
-FROM hr.employee;
+-- Kiểm tra vai trò hiện tại đang đóng:
+SELECT current_user, session_user;
 
--- Cố tình truy vấn cột lương (salary) -> Bị CSDL chặn ngay lập tức (Lỗi 42501):
--- SELECT employee_id, full_name, salary FROM hr.employee;
-DO $$
-BEGIN
-    PERFORM salary FROM hr.employee;
-EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE '>>> BẢO VỆ CỘT THÀNH CÔNG: Thu ngân nv_thao bị chặn truy vấn cột salary (permission denied)!';
-END $$;
 
+-- ----------------------------------------------------------------------------
+-- [BƯỚC 2.2]: CHỨNG MINH TÍNH NĂNG ROW-LEVEL SECURITY (RLS) HOẠT ĐỘNG
+-- Nhân viên chỉ nhìn thấy dòng hóa đơn của chính mình lập (cashier_id = 3)
+-- ----------------------------------------------------------------------------
+-- Thu ngân Thảo thực hiện SELECT * trên bảng chính billing.invoice:
+SELECT invoice_id, customer_id, cashier_id, total_amount, status, created_at
+FROM billing.invoice;
+
+-- Chứng minh toàn bộ các dòng nhìn thấy ĐỀU CÓ cashier_id = 3:
+SELECT count(*) AS total_invoices_seen, bool_and(cashier_id = 3) AS strictly_owned_by_thao 
+FROM billing.invoice;
+
+-- Đổi vai sang Quản lý (Manager) để đối chiếu: Quản lý nhìn thấy TOÀN BỘ hóa đơn:
 RESET ROLE;
-
--- ----------------------------------------------------------------------------
--- PHẦN 2.2: ROW-LEVEL SECURITY (RLS) TRÊN HÓA ĐƠN VÀ SỔ QUỸ
--- ----------------------------------------------------------------------------
-
--- [GÓC NHÌN QUẢN LÝ / ADMIN (nv_manager)]:
 SET ROLE nv_manager;
--- Quản lý thấy toàn bộ hóa đơn của tất cả thu ngân:
-SELECT cashier_id, count(*) AS total_invoices 
-FROM billing.invoice 
+SELECT cashier_id, count(*) AS total_invoices_by_cashier
+FROM billing.invoice
 GROUP BY cashier_id;
 RESET ROLE;
 
--- [GÓC NHÌN THU NGÂN 1: nv_thao (Employee ID = 3)]:
+
+-- ----------------------------------------------------------------------------
+-- [BƯỚC 2.3]: CHỨNG MINH COLUMN-LEVEL PRIVILEGES (BẢO VỆ CỘT NHẠY CẢM)
+-- Thu ngân chỉ được xem thông tin công khai, CỘT LƯƠNG (salary) BỊ CHẶN TUYỆT ĐỐI!
+-- ----------------------------------------------------------------------------
 SET ROLE nv_thao;
--- RLS tự động lọc chỉ trả về những hóa đơn do chính nv_thao lập:
-SELECT count(*) AS invoices_seen_by_thao, bool_and(cashier_id = 3) AS strictly_owned_by_thao 
-FROM billing.invoice;
+
+-- Thu ngân xem thông tin nhân sự công khai (HỢP LỆ):
+SELECT employee_id, full_name, username, emp_role, default_shift 
+FROM hr.employee;
+
+-- CỐ TÌNH TRUY VẬN CỘT NHẠY CẢM "salary" (LƯƠNG NHÂN VIÊN):
+-- Mong đợi: PostgreSQL Engine chặn đứng và văng lỗi ĐỎ:
+SELECT employee_id, full_name, salary 
+FROM hr.employee;
+
+/*
+THÔNG BÁO LỖI ĐỎ POSTGRESQL TRẢ VỀ:
+ERROR: permission denied for column "salary" of relation "employee"
+Code: 42501 (insufficient_privilege)
+*/
+
 RESET ROLE;
 
--- [GÓC NHÌN THU NGÂN 2: nv_nam (Employee ID = 4)]:
-SET ROLE nv_nam;
--- RLS tự động chuyển ngữ cảnh: chỉ thấy hóa đơn của nv_nam:
-SELECT count(*) AS invoices_seen_by_nam, bool_and(cashier_id = 4) AS strictly_owned_by_nam 
-FROM billing.invoice;
-RESET ROLE;
 
 -- ----------------------------------------------------------------------------
--- PHẦN 2.3: ROW-LEVEL SECURITY (RLS) CHO KỸ THUẬT VIÊN (hr.maintenance)
+-- [BƯỚC 2.4]: THỬ NGHIỆM MODULE AI TÍCH HỢP TRONG PHẦN BẢO MẬT
+-- (Module AI 3: Thuật toán so khớp chuỗi mờ pg_trgm + unaccent phát hiện tài khoản trùng lặp)
 -- ----------------------------------------------------------------------------
-
--- [GÓC NHÌN KỸ THUẬT VIÊN: nv_hung (Employee ID = 6)]:
-SET ROLE nv_hung;
--- Chỉ nhìn thấy đúng phiếu bảo trì được giao cho mình sửa chữa:
-SELECT maintenance_id, computer_id, technician_id, issue_description, status 
-FROM hr.maintenance;
-RESET ROLE;
-
--- ----------------------------------------------------------------------------
--- PHẦN 2.4: ĐẶC QUYỀN TỐI THIỂU (LEAST PRIVILEGE) GIỮA CÁC SCHEMA
--- ----------------------------------------------------------------------------
--- Nhân viên phục vụ 'nv_tuan' chỉ phụ trách F&B, không được phép sờ vào schema billing:
-SET ROLE nv_tuan;
-DO $$
-BEGIN
-    PERFORM count(*) FROM billing.invoice;
-EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE '>>> NGUYÊN TẮC ĐẶC QUYỀN TỐI THIỂU HOẠT ĐỘNG: nv_tuan bị chặn hoàn toàn khỏi schema billing!';
-END $$;
-RESET ROLE;
+-- Hệ thống tự động so sánh độ tương đồng họ tên & SĐT để chống gian lận tạo nhiều nick nhận khuyến mãi:
+SELECT candidate_id, customer_name_a, customer_name_b, similarity, reason 
+FROM ai.fn_detect_duplicates(0.65)
+LIMIT 5;
