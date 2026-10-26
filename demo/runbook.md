@@ -273,3 +273,20 @@ Trước khi thầy gọi nhóm lên, chuẩn bị sẵn 2 cửa sổ song song:
 
 ### Câu 4: Vì sao chọn GIN Trigram Index cho họ tên thay vì B-Tree thông thường?
 > **Trả lời:** *"Dạ thưa Thầy, chỉ mục B-Tree chỉ có tác dụng khi tìm kiếm chính xác hoặc tiền tố (`'Nguyễn%'`). Khi người dùng tìm kiếm chuỗi con có ký tự đại diện ở đầu như `'%Thành%'`, B-Tree bị vô hiệu hóa hoàn toàn và PostgreSQL buộc phải quét tuần tự (Seq Scan). GIN Trigram tách chuỗi thành các bộ 3 ký tự (3-grams), cho phép Index Scan tăng tốc hàng chục lần ngay cả khi tìm kiếm mờ hoặc tìm ở giữa chuỗi."*
+
+---
+
+## 3. BỘ CÂU HỎI PHẢN BIỆN "VÌ SAO" DÀNH CHO GIẢNG VIÊN VÀ CÂU TRẢ LỜI ĂN ĐIỂM 10
+
+### Câu 1: Vì sao lại chia thành 8 Schemas độc lập mà không gom chung vào schema `public`?
+> **Trả lời:** *"Dạ thưa Thầy, việc phân chia 8 schemas nghiệp vụ chuyên biệt (`core`, `inventory`, `billing`, `hr`, `audit`, `ai`, `reporting`, `staging`) giúp phân quyền đặc quyền tối thiểu (Least Privilege). Nhân viên thu ngân chỉ được SELECT trên `billing` và `core`, hoàn toàn bị cô lập khỏi `hr` và `audit`. Đồng thời việc này giúp quản trị vòng đời dữ liệu (backup, partition, maintenance) trên từng schema riêng biệt mà không ảnh hưởng tới toàn bộ hệ thống."*
+
+### Câu 2: Vì sao lại dùng `NUMERIC(12,0)` cho số tiền thay vì `BIGINT` hay `FLOAT`?
+> **Trả lời:** *"Dạ thưa Thầy, `FLOAT/DOUBLE` có sai số làm tròn dấu phẩy động chuẩn IEEE 754 nên tuyệt đối cấm kỵ trong tài chính kế toán. `NUMERIC(12,0)` trong PostgreSQL là số học dấu chấm tĩnh (Fixed-Point) chính xác tuyệt đối từng đơn vị đồng, thang đo 12 chữ số đủ biểu diễn số tiền tới hàng trăm tỷ VNĐ mà không tốn dung lượng thừa."*
+
+### Câu 3: Thuật toán AI trong đề tài này có gọi API bên ngoài (như OpenAI / ChatGPT) không?
+> **Trả lời:** *"Dạ thưa Thầy, đề tài tuân thủ 100% nguyên tắc **In-Database Intelligence**: Toàn bộ 5 module AI chạy nội bộ bằng toán học, thống kê và hàm PL/pgSQL có sẵn của PostgreSQL (Z-score phát hiện ngoại lai, khoảng cách Trigram so khớp chuỗi, phân tích thống kê `pg_stat_user_tables`). Hệ thống không gọi API bên ngoài, bảo mật dữ liệu tuyệt đối và hoạt động độc lập không cần Internet."*
+
+### Câu 4: Vì sao chọn GIN Trigram Index cho họ tên thay vì B-Tree thông thường?
+> **Trả lời:** *"Dạ thưa Thầy, chỉ mục B-Tree chỉ có tác dụng khi tìm kiếm chính xác hoặc tiền tố (`'Nguyễn%'`). Khi người dùng tìm kiếm chuỗi con có ký tự đại diện ở đầu như `'%Thành%'`, B-Tree bị vô hiệu hóa hoàn toàn và PostgreSQL buộc phải quét tuần tự (Seq Scan). GIN Trigram tách chuỗi thành các bộ 3 ký tự (3-grams), cho phép Index Scan tăng tốc hàng chục lần ngay cả khi tìm kiếm mờ hoặc tìm ở giữa chuỗi."*
+

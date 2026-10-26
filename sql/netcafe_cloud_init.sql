@@ -1672,7 +1672,35 @@ VALUES
     (1, 2, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
--- 10. LÀM MỚI MATERIALIZED VIEWS
+-- 10. PHIÊN CHƠI VÀ HÓA ĐƠN MẪU (PHỤC VỤ DEMO RLS VÀ BÁO CÁO DOANH THU)
+INSERT INTO core.gaming_session (customer_id, computer_id, opened_by, start_time, end_time, status, hourly_rate_applied, play_amount, game_info)
+VALUES 
+    (1, 1, 3, NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour', 'finished', 8000, 16000, '{"game":"League of Legends"}'::jsonb),
+    (2, 2, 3, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 8000, 16000, '{"game":"Valorant"}'::jsonb),
+    (3, 3, 3, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 8000, 16000, '{"game":"CS2"}'::jsonb),
+    (4, 9, 4, NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour', 'finished', 12000, 24000, '{"game":"Dota 2"}'::jsonb),
+    (5, 10, 4, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 12000, 24000, '{"game":"PUBG"}'::jsonb),
+    (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb);
+
+INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status, issued_at, paid_at)
+VALUES 
+    (1, 1, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (2, 2, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
+    (3, 3, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
+    (4, 4, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (5, 5, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
+    (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours');
+
+INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference)
+VALUES 
+    ('invoice', 1, 1, 'cash', 16000, 3, NOW() - INTERVAL '1 hour', 'HD-001'),
+    ('invoice', 2, 2, 'cash', 16000, 3, NOW() - INTERVAL '2 hours', 'HD-002'),
+    ('invoice', 3, 3, 'cash', 16000, 3, NOW() - INTERVAL '3 hours', 'HD-003'),
+    ('invoice', 4, 4, 'cash', 24000, 4, NOW() - INTERVAL '1 hour', 'HD-004'),
+    ('invoice', 5, 5, 'cash', 24000, 4, NOW() - INTERVAL '2 hours', 'HD-005'),
+    ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006');
+
+-- 11. LÀM MỚI MATERIALIZED VIEWS
 REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
 REFRESH MATERIALIZED VIEW reporting.mv_monthly_revenue;
 REFRESH MATERIALIZED VIEW reporting.mv_top_customers;

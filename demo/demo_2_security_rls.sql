@@ -19,7 +19,7 @@ SELECT current_user, session_user;
 -- Nhân viên chỉ nhìn thấy dòng hóa đơn của chính mình lập (cashier_id = 3)
 -- ----------------------------------------------------------------------------
 -- Thu ngân Thảo thực hiện SELECT * trên bảng chính billing.invoice:
-SELECT invoice_id, customer_id, cashier_id, total_amount, status, created_at
+SELECT invoice_id, customer_id, cashier_id, total_amount, status, issued_at
 FROM billing.invoice;
 
 -- Chứng minh toàn bộ các dòng nhìn thấy ĐỀU CÓ cashier_id = 3:
