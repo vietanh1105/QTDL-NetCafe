@@ -2067,24 +2067,25 @@ BEGIN
            OR (similarity(unaccent(lower(c1.full_name)), unaccent(lower(c2.full_name))) >= 0.85)
            OR (right(c1.phone, 7) = right(c2.phone, 7))
     LOOP
-        -- Chèn hoặc cập nhật bảng ai.duplicate_candidate
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.duplicate_candidate 
-            WHERE ai.duplicate_candidate.customer_id_a = r.id_a AND ai.duplicate_candidate.customer_id_b = r.id_b
-        ) THEN
+        SELECT ai.duplicate_candidate.cand_id INTO v_cand_id
+        FROM ai.duplicate_candidate 
+        WHERE ai.duplicate_candidate.customer_id_a = r.id_a AND ai.duplicate_candidate.customer_id_b = r.id_b
+        LIMIT 1;
+
+        IF v_cand_id IS NULL THEN
             INSERT INTO ai.duplicate_candidate (customer_id_a, customer_id_b, similarity, reason, status)
             VALUES (r.id_a, r.id_b, r.sim_score, r.match_reason, 'pending')
             RETURNING cand_id INTO v_cand_id;
-
-            candidate_id := v_cand_id;
-            customer_id_a := r.id_a;
-            customer_name_a := r.name_a;
-            customer_id_b := r.id_b;
-            customer_name_b := r.name_b;
-            similarity := r.sim_score;
-            reason := r.match_reason;
-            RETURN NEXT;
         END IF;
+
+        candidate_id := v_cand_id;
+        customer_id_a := r.id_a;
+        customer_name_a := r.name_a;
+        customer_id_b := r.id_b;
+        customer_name_b := r.name_b;
+        similarity := r.sim_score;
+        reason := r.match_reason;
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -2135,11 +2136,13 @@ BEGIN
         LOOP
             v_z := ROUND((ABS(r.duration_mins - v_avg_dur) / v_std_dur)::numeric, 2);
             IF v_z >= p_z_threshold THEN
-                IF NOT EXISTS (
-                    SELECT 1 FROM ai.anomaly_flag 
-                    WHERE ai.anomaly_flag.subject_table = 'core.gaming_session' 
-                      AND ai.anomaly_flag.subject_pk = r.session_id::text
-                ) THEN
+                SELECT ai.anomaly_flag.flag_id INTO v_flag_id
+                FROM ai.anomaly_flag 
+                WHERE ai.anomaly_flag.subject_table = 'core.gaming_session' 
+                  AND ai.anomaly_flag.subject_pk = r.session_id::text
+                LIMIT 1;
+
+                IF v_flag_id IS NULL THEN
                     INSERT INTO ai.anomaly_flag (anomaly_type, subject_table, subject_pk, metric_value, threshold_info, status)
                     VALUES (
                         'SESSION_DURATION_OUTLIER',
@@ -2150,16 +2153,16 @@ BEGIN
                         'open'
                     )
                     RETURNING ai.anomaly_flag.flag_id INTO v_flag_id;
-
-                    flag_id := v_flag_id;
-                    anomaly_type := 'SESSION_DURATION_OUTLIER';
-                    subject_table := 'core.gaming_session';
-                    subject_pk := r.session_id::text;
-                    metric_value := r.duration_mins;
-                    z_score := v_z;
-                    detail_info := jsonb_build_object('mean', ROUND(v_avg_dur, 2), 'stddev', ROUND(v_std_dur, 2), 'z_score', v_z);
-                    RETURN NEXT;
                 END IF;
+
+                flag_id := v_flag_id;
+                anomaly_type := 'SESSION_DURATION_OUTLIER';
+                subject_table := 'core.gaming_session';
+                subject_pk := r.session_id::text;
+                metric_value := r.duration_mins;
+                z_score := v_z;
+                detail_info := jsonb_build_object('mean', ROUND(v_avg_dur, 2), 'stddev', ROUND(v_std_dur, 2), 'z_score', v_z);
+                RETURN NEXT;
             END IF;
         END LOOP;
     END IF;
@@ -2178,11 +2181,13 @@ BEGIN
         LOOP
             v_z := ROUND((ABS(r.amount - v_avg_pay) / v_std_pay)::numeric, 2);
             IF v_z >= p_z_threshold THEN
-                IF NOT EXISTS (
-                    SELECT 1 FROM ai.anomaly_flag 
-                    WHERE ai.anomaly_flag.subject_table = 'billing.payment' 
-                      AND ai.anomaly_flag.subject_pk = r.payment_id::text
-                ) THEN
+                SELECT ai.anomaly_flag.flag_id INTO v_flag_id
+                FROM ai.anomaly_flag 
+                WHERE ai.anomaly_flag.subject_table = 'billing.payment' 
+                  AND ai.anomaly_flag.subject_pk = r.payment_id::text
+                LIMIT 1;
+
+                IF v_flag_id IS NULL THEN
                     INSERT INTO ai.anomaly_flag (anomaly_type, subject_table, subject_pk, metric_value, threshold_info, status)
                     VALUES (
                         'PAYMENT_AMOUNT_OUTLIER',
@@ -2193,16 +2198,16 @@ BEGIN
                         'open'
                     )
                     RETURNING ai.anomaly_flag.flag_id INTO v_flag_id;
-
-                    flag_id := v_flag_id;
-                    anomaly_type := 'PAYMENT_AMOUNT_OUTLIER';
-                    subject_table := 'billing.payment';
-                    subject_pk := r.payment_id::text;
-                    metric_value := r.amount;
-                    z_score := v_z;
-                    detail_info := jsonb_build_object('mean', ROUND(v_avg_pay, 2), 'stddev', ROUND(v_std_pay, 2), 'z_score', v_z);
-                    RETURN NEXT;
                 END IF;
+
+                flag_id := v_flag_id;
+                anomaly_type := 'PAYMENT_AMOUNT_OUTLIER';
+                subject_table := 'billing.payment';
+                subject_pk := r.payment_id::text;
+                metric_value := r.amount;
+                z_score := v_z;
+                detail_info := jsonb_build_object('mean', ROUND(v_avg_pay, 2), 'stddev', ROUND(v_std_pay, 2), 'z_score', v_z);
+                RETURN NEXT;
             END IF;
         END LOOP;
     END IF;
