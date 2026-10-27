@@ -1,53 +1,54 @@
 -- ============================================================================
 -- BUỔI BẢO VỆ TIỂU LUẬN MÔN QUẢN TRỊ CƠ SỞ DỮ LIỆU (QTDL)
 -- PHẦN 3: DEMO TỐI ƯU HÓA HIỆU NĂNG (PERFORMANCE DEMO)
--- Hướng dẫn: Mở trên DBeaver / pgAdmin, chạy từng bước để so sánh trước và sau khi có Index
+-- Bài toán: Tìm kiếm hóa đơn có số tiền lớn (total_amount = 630.000 VNĐ)
+-- Hướng dẫn: Mở trên Neon SQL Editor / DBeaver, chạy từng bước để so sánh
 -- ============================================================================
 
--- Đảm bảo thoát khỏi vai trò nhân viên cấp thấp (tránh lỗi 42501 permission denied):
+-- Đảm bảo thoát khỏi vai trò nhân viên cấp thấp, về lại vai trò Admin/DBA:
 RESET ROLE;
 
 -- ----------------------------------------------------------------------------
--- [BƯỚC 3.1]: CHẠY TRUY VẤN TÌM KIẾM PHỨC TẠP TRƯỚC KHI CÓ INDEX (SEQ SCAN)
--- Truy vấn tìm kiếm mờ ký tự đại diện ở đầu: '%Thành%'
+-- [BƯỚC 3.1]: CHẠY TRUY VẤN TÌM KIẾM TRƯỚC KHI CÓ INDEX (SEQ SCAN)
+-- Truy vấn tìm hóa đơn có giá trị lớn: total_amount = 630.000 VNĐ
 -- ----------------------------------------------------------------------------
--- Tạm thời xóa index GIN Trigram (nếu có) để giả lập trạng thái bảng nguyên bản:
-DROP INDEX IF EXISTS core.idx_customer_fullname_trgm;
+-- Tạm thời xóa index (nếu có) để đưa bảng về trạng thái nguyên bản chưa tối ưu:
+DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
 
 -- Chạy EXPLAIN (ANALYZE, BUFFERS) trước khi có index:
 EXPLAIN (ANALYZE, BUFFERS)
-SELECT customer_id, full_name, phone, membership_tier 
-FROM core.customer 
-WHERE full_name ILIKE '%Thành%';
+SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+FROM billing.invoice 
+WHERE total_amount = 630000;
 
 /*
 KẾT QUẢ KHI CHƯA CÓ INDEX:
-- Thuật toán quét: "Seq Scan on customer" (Quét tuần tự toàn bộ từng block dữ liệu)
-- Buffers: Phải đọc nhiều shared hit blocks
-- Thời gian thực thi: Cao
+- Thuật toán quét: "Seq Scan on invoice" (Quét tuần tự toàn bộ từng hóa đơn)
+- Đời thường: Giống như phải lật giở từng tờ hóa đơn từ đầu đến cuối xấp để tìm
 */
 
 
 -- ----------------------------------------------------------------------------
--- [BƯỚC 3.2]: TẠO CHỈ MỤC TỐI ƯU VÀ CHẠY LẠI TRUY VẤN (INDEX SCAN / BITMAP SCAN)
--- B-Tree thông thường bất lực với chuỗi bắt đầu bằng '%'.
--- Giải pháp tối ưu: Sử dụng GIN Index kết hợp toán tử gin_trgm_ops (pg_trgm)
+-- [BƯỚC 3.2]: TẠO CHỈ MỤC B-TREE VÀ CHẠY LẠI TRUY VẤN (INDEX SCAN)
+-- B-Tree Index tự động sắp xếp số tiền theo thứ tự để tra cứu trúng đích O(logN)
 -- ----------------------------------------------------------------------------
--- Thực thi tạo chỉ mục chuyên dụng:
-CREATE INDEX idx_customer_fullname_trgm 
-ON core.customer USING gin (full_name gin_trgm_ops);
+-- Thực thi tạo chỉ mục B-Tree trên cột total_amount:
+CREATE INDEX idx_invoice_total_amount ON billing.invoice (total_amount);
 
--- Chạy lại câu truy vấn chính xác như trên để đối chiếu:
+-- Bật ép dùng Index và chạy lại câu truy vấn:
+SET enable_seqscan = off;
+
 EXPLAIN (ANALYZE, BUFFERS)
-SELECT customer_id, full_name, phone, membership_tier 
-FROM core.customer 
-WHERE full_name ILIKE '%Thành%';
+SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+FROM billing.invoice 
+WHERE total_amount = 630000;
+
+SET enable_seqscan = on;
 
 /*
 KẾT QUẢ SAU KHI CÓ INDEX:
-- Thuật toán quét: "Bitmap Index Scan on idx_customer_fullname_trgm"
-- Thuật toán đọc: "Bitmap Heap Scan on customer"
-- Tốc độ: Tối ưu hóa vượt bậc, chỉ đọc đúng các con trỏ dòng khớp Trigram!
+- Thuật toán quét: "Index Scan using idx_invoice_total_amount on invoice"
+- Tốc độ: Nhảy thẳng đến địa chỉ dòng hóa đơn cần tìm, bỏ qua hoàn toàn các hóa đơn khác!
 */
 
 
@@ -56,15 +57,6 @@ KẾT QUẢ SAU KHI CÓ INDEX:
 -- (Module AI 2: In-Database AI tự động phân tích Catalog và khuyến nghị chỉ mục)
 -- ----------------------------------------------------------------------------
 -- Hệ thống tự động quét pg_stat_user_tables và tìm các khóa ngoại / bảng quét Seq Scan cao:
-SELECT * FROM ai.fn_recommend_indexes();
-
-
--- ----------------------------------------------------------------------------
--- [BƯỚC 3.4 - MỞ RỘNG]: CHỈ MỤC CÓ ĐIỀU KIỆN (PARTIAL INDEX) CHO THỜI GIAN THỰC
--- Bảng gaming_session có hàng trăm ngàn dòng lịch sử, nhưng chỉ vài chục phiên đang chơi.
--- Partial Index (WHERE status = 'active') có kích thước siêu nhỏ, truy cập tức thì:
--- ----------------------------------------------------------------------------
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT session_id, customer_id, computer_id, start_time 
-FROM core.gaming_session 
-WHERE status = 'active';
+SELECT recommendation_id, table_name, column_list, reason, suggested_sql 
+FROM ai.fn_recommend_indexes() 
+LIMIT 3;

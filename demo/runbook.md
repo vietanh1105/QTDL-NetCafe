@@ -187,35 +187,42 @@ Trước khi thầy gọi nhóm lên, chuẩn bị sẵn 2 cửa sổ song song:
 ### PHẦN 3: DEMO TỐI ƯU HÓA HIỆU NĂNG (PERFORMANCE DEMO)
 📁 **File SQL:** `demo/demo_3_performance.sql`
 
-#### 3.1. Truy vấn tìm kiếm phức tạp trước khi có Index (Seq Scan)
-* **Thao tác DBeaver:**
+#### 3.1. Truy vấn tìm kiếm hóa đơn theo số tiền trước khi có Index (Seq Scan)
+* **Thao tác DBeaver / Neon:**
   ```sql
-  -- Xóa index để giả lập trạng thái nguyên bản:
-  DROP INDEX IF EXISTS core.idx_customer_fullname_trgm;
+  RESET ROLE;
 
-  -- Chạy EXPLAIN (ANALYZE, BUFFERS) tìm kiếm mờ ký tự đại diện ở đầu: '%Thành%'
+  -- Xóa index để giả lập trạng thái nguyên bản chưa tối ưu:
+  DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
+
+  -- Chạy EXPLAIN (ANALYZE, BUFFERS) tìm kiếm hóa đơn lớn: 630.000 VNĐ
   EXPLAIN (ANALYZE, BUFFERS)
-  SELECT customer_id, full_name, phone FROM core.customer 
-  WHERE full_name ILIKE '%Thành%';
+  SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+  FROM billing.invoice 
+  WHERE total_amount = 630000;
   ```
-  👉 **Chỉ chuột vào dòng:** **`Seq Scan on customer`** (Quét tuần tự toàn bộ từng block dữ liệu trên đĩa).
+  👉 **Chỉ chuột vào dòng:** **`Seq Scan on invoice`** (Quét tuần tự toàn bộ xấp hóa đơn từ đầu đến cuối).
 
-#### 3.2. Tạo Index chuyên dụng và chứng minh tăng tốc (Index Scan)
-* **Thao tác DBeaver:**
+#### 3.2. Tạo B-Tree Index và chứng minh tăng tốc (Index Scan)
+* **Thao tác DBeaver / Neon:**
   ```sql
-  -- B-Tree thông thường bất lực với '%'. Ta tạo chỉ mục chuyên dụng GIN Trigram:
-  CREATE INDEX idx_customer_fullname_trgm 
-  ON core.customer USING gin (full_name gin_trgm_ops);
+  -- Tạo chỉ mục B-Tree trên cột số tiền hóa đơn:
+  CREATE INDEX idx_invoice_total_amount ON billing.invoice (total_amount);
 
-  -- Chạy lại câu truy vấn chính xác như trên:
+  -- Bật ép dùng Index và chạy lại:
+  SET enable_seqscan = off;
+
   EXPLAIN (ANALYZE, BUFFERS)
-  SELECT customer_id, full_name, phone FROM core.customer 
-  WHERE full_name ILIKE '%Thành%';
+  SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+  FROM billing.invoice 
+  WHERE total_amount = 630000;
+
+  SET enable_seqscan = on;
   ```
-  👉 **Chỉ chuột vào dòng:** **`Bitmap Index Scan on idx_customer_fullname_trgm`** (Tốc độ tăng tốc vượt bậc, chỉ đọc đúng các con trỏ dòng khớp Trigram).
+  👉 **Chỉ chuột vào dòng:** **`Index Scan using idx_invoice_total_amount on invoice`** (Hệ thống nhảy thẳng đến địa chỉ hóa đơn 630.000đ mà không cần duyệt các hóa đơn khác).
 
 #### 3.3. Thử nghiệm Module AI tích hợp trong phần Hiệu năng
-* **Thao tác DBeaver:**
+* **Thao tác DBeaver / Neon:**
   ```sql
   -- Module AI 2: In-Database AI tự động phân tích Catalog pg_stat_user_tables và khuyến nghị Index
   SELECT * FROM ai.fn_recommend_indexes();
