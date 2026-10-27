@@ -4,6 +4,9 @@
 -- Hướng dẫn: Mở trên DBeaver / pgAdmin, chạy từng bước để so sánh trước và sau khi có Index
 -- ============================================================================
 
+-- Đảm bảo thoát khỏi vai trò nhân viên cấp thấp (tránh lỗi 42501 permission denied):
+RESET ROLE;
+
 -- ----------------------------------------------------------------------------
 -- [BƯỚC 3.1]: CHẠY TRUY VẤN TÌM KIẾM PHỨC TẠP TRƯỚC KHI CÓ INDEX (SEQ SCAN)
 -- Truy vấn tìm kiếm mờ ký tự đại diện ở đầu: '%Thành%'
