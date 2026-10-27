@@ -26,12 +26,24 @@ FROM billing.invoice;
 SELECT count(*) AS total_invoices_seen, bool_and(cashier_id = 3) AS strictly_owned_by_thao 
 FROM billing.invoice;
 
--- Đổi vai sang Quản lý (Manager) để đối chiếu: Quản lý nhìn thấy TOÀN BỘ hóa đơn:
+-- Đổi vai sang Quản lý (Manager) để đối chiếu: Quản lý nhìn thấy TOÀN BỘ hóa đơn cùng thông tin nhân viên:
 RESET ROLE;
 SET ROLE nv_manager;
-SELECT cashier_id, count(*) AS total_invoices_by_cashier
-FROM billing.invoice
-GROUP BY cashier_id;
+
+SELECT 
+    i.cashier_id,
+    e.full_name AS ten_nhan_vien,
+    e.username AS tai_khoan,
+    e.phone AS so_dien_thoai,
+    e.emp_role AS vai_tro,
+    e.default_shift AS ca_lam_viec,
+    count(i.invoice_id) AS so_luong_hoa_don,
+    sum(i.total_amount) AS tong_doanh_thu_thu_duoc
+FROM billing.invoice i
+JOIN hr.employee e ON i.cashier_id = e.employee_id
+GROUP BY i.cashier_id, e.full_name, e.username, e.phone, e.emp_role, e.default_shift
+ORDER BY i.cashier_id;
+
 RESET ROLE;
 
 
