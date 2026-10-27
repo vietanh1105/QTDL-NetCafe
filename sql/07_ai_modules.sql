@@ -621,6 +621,64 @@ $$;
 
 COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh báo do audit trigger chấm điểm và ghi vào ai.ai_alert';
 
+
+
+-- ----------------------------------------------------------------------------
+-- HÀM KÍCH HOẠT ÁP DỤNG KHUYẾN MÃI DO AI ĐỀ XUẤT VÀO BẢNG BILLING.PROMOTION
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ai.fn_apply_promotions()
+RETURNS TABLE(
+    applied_code VARCHAR(50),
+    applied_name VARCHAR(100),
+    discount_val NUMERIC,
+    status_msg TEXT
+) AS $$
+BEGIN
+    -- 1. Áp dụng Happy Hour khung 16h
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('HAPPY_AI_16H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- 2. Áp dụng Happy Hour khung 0h
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('HAPPY_AI_0H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 0h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- 3. Áp dụng Voucher giữ chân VIP Bùi Minh Quân (ID 8)
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('VIP_WINBACK_8', 'Voucher AI: Tặng 30.000 VNĐ Níu Chân Khách VIP #8', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', '{"target_customer_id": 8, "auto_created_by_ai": true}'::jsonb, TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- Trả về danh sách vừa kích hoạt
+    RETURN QUERY
+    SELECT code, promotion_name, value, 'Đã kích hoạt thành công vào hệ thống khuyến mãi'::TEXT
+    FROM billing.promotion
+    WHERE code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_WINBACK_8');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
+
+-- ----------------------------------------------------------------------------
+-- HÀM HOÀN TÁC CÁC CHƯƠNG TRÌNH KHUYẾN MÃI DO AI TỰ ĐỘNG SINH
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ai.fn_rollback_promotions()
+RETURNS TABLE(
+    removed_code VARCHAR(50),
+    status_msg TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH deleted AS (
+        DELETE FROM billing.promotion
+        WHERE conditions->>'auto_created_by_ai' = 'true'
+        RETURNING code
+    )
+    SELECT code, 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
+    FROM deleted;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
+
 REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
 REVOKE ALL ON FUNCTION ai.fn_auto_optimize_indexes() FROM PUBLIC;
 REVOKE ALL ON FUNCTION ai.fn_detect_duplicates(REAL) FROM PUBLIC;

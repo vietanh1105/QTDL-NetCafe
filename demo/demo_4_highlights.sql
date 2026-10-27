@@ -77,10 +77,10 @@ FROM ai.fn_detect_anomalies(1.5);
 
 
 -- ----------------------------------------------------------------------------
--- [ĐIỂM NHẤN 4.5 - MỞ RỘNG]: GỢI Ý CHƯƠNG TRÌNH KHUYẾN MÃI THÔNG MINH
+-- [ĐIỂM NHẤN 4.5 - MỞ RỘNG]: GỢI Ý & TỰ ĐỘNG KÍCH HOẠT CHƯƠNG TRÌNH KHUYẾN MÃI
 -- (Module AI 5: Khai phá dữ liệu giờ thấp điểm và phân nhóm RFM chống rời bỏ khách VIP)
 -- ----------------------------------------------------------------------------
--- Hệ thống tự động phân tích hành vi khách hàng và lịch sử giờ chơi để đề xuất khuyến mãi:
+-- 1. Xem 3 đề xuất thông minh do AI phân tích:
 SELECT 
     sug_id,
     suggestion_type,
@@ -88,3 +88,9 @@ SELECT
     details->>'recommended_action' AS recommended_action,
     details->>'rationale' AS rationale
 FROM ai.promotion_suggestion;
+
+-- 2. THỰC THI ÁP DỤNG: Tự động kích hoạt 3 khuyến mãi trên vào bảng billing.promotion:
+SELECT * FROM ai.fn_apply_promotions();
+
+-- 3. HOÀN TÁC (ROLLBACK): Hủy các khuyến mãi vừa kích hoạt, trả về trạng thái ban đầu:
+SELECT * FROM ai.fn_rollback_promotions();
