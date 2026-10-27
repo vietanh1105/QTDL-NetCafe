@@ -81,6 +81,10 @@ FROM ai.fn_detect_anomalies(1.5);
 -- Diễn ra: Khai phá Materialized Views: phát hiện khung giờ vắng khách (Happy Hour)
 --          và phân tích RFM để phát hiện khách VIP có nguy cơ rời bỏ phòng máy (Win-Back VIP).
 -- ============================================================================
+-- 5.1. Chạy hàm AI phân tích và đề xuất:
+SELECT * FROM ai.fn_suggest_promotions();
+
+-- 5.2. Xem danh sách các đề xuất AI:
 SELECT 
     sug_id,
     suggestion_type,
@@ -88,4 +92,15 @@ SELECT
     details->>'recommended_action' AS hanh_dong_de_xuat,
     details->>'rationale' AS ly_do_ai_phan_tich
 FROM ai.promotion_suggestion;
+
+-- 5.3. Tự động áp dụng khuyến mãi vào hệ thống & bắn tin nhắn SMS về điện thoại (LISTEN/NOTIFY):
+SELECT * FROM ai.fn_apply_promotions();
+
+-- 5.4. Kiểm tra các mã khuyến mãi vừa được AI tự động đưa vào bảng khuyến mãi chính thức:
+SELECT code, promotion_name, promo_type, value, valid_from, valid_to, is_active
+FROM billing.promotion
+WHERE conditions->>'auto_created_by_ai' = 'true';
+
+-- 5.5. Hoàn tác (Rollback) các khuyến mãi vừa áp dụng để đưa dữ liệu về nguyên bản:
+SELECT * FROM ai.fn_rollback_promotions();
 

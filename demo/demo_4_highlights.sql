@@ -79,7 +79,13 @@ FROM ai.fn_detect_anomalies(1.5);
 -- ----------------------------------------------------------------------------
 -- [ĐIỂM NHẤN 4.5 - MỞ RỘNG]: GỢI Ý & TỰ ĐỘNG KÍCH HOẠT CHƯƠNG TRÌNH KHUYẾN MÃI
 -- (Module AI 5: Khai phá dữ liệu giờ thấp điểm và phân nhóm RFM chống rời bỏ khách VIP)
+-- KÈM BẮN TIN NHẮN SMS THỜI GIAN THỰC VỀ ĐIỆN THOẠI (0327469105 - Nguyễn Việt Anh)
 -- ----------------------------------------------------------------------------
+-- Hướng dẫn kích hoạt Demo SMS về máy thật:
+--   Bước A (Terminal): python python/sms_gateway_listener.py
+--   Bước B (Điện thoại): Mở link https://ntfy.sh/netcafe_vietanh (hoặc app ntfy)
+--   Bước C (DBeaver): Chạy lệnh 2 bên dưới -> Tin nhắn VIP voucher lập tức nổ trên điện thoại!
+
 -- 1. Xem 3 đề xuất thông minh do AI phân tích:
 SELECT 
     sug_id,
@@ -89,8 +95,13 @@ SELECT
     details->>'rationale' AS rationale
 FROM ai.promotion_suggestion;
 
--- 2. THỰC THI ÁP DỤNG: Tự động kích hoạt 3 khuyến mãi trên vào bảng billing.promotion:
+-- 2. THỰC THI ÁP DỤNG: Tự động kích hoạt 3 khuyến mãi & BẮN TIN NHẮN SMS VỀ ĐIỆN THOẠI:
 SELECT * FROM ai.fn_apply_promotions();
 
--- 3. HOÀN TÁC (ROLLBACK): Hủy các khuyến mãi vừa kích hoạt, trả về trạng thái ban đầu:
+-- 3. KIỂM TRA BẢNG PROMOTION CHÍNH THỨC:
+SELECT code, promotion_name, promo_type, value, valid_from, valid_to, is_active
+FROM billing.promotion
+WHERE conditions->>'auto_created_by_ai' = 'true';
+
+-- 4. HOÀN TÁC (ROLLBACK): Hủy các khuyến mãi vừa kích hoạt, trả về trạng thái ban đầu:
 SELECT * FROM ai.fn_rollback_promotions();

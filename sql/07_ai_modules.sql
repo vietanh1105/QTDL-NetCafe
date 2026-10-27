@@ -628,12 +628,17 @@ COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh b
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ai.fn_apply_promotions()
 RETURNS TABLE(
-    applied_code VARCHAR(50),
-    applied_name VARCHAR(100),
+    applied_code VARCHAR,
+    applied_name VARCHAR,
+    target_info VARCHAR,
     discount_val NUMERIC,
     status_msg TEXT
 ) AS $$
+DECLARE
+    v_va_id INT;
 BEGIN
+    SELECT customer_id INTO v_va_id FROM core.customer WHERE phone = '0327469105' LIMIT 1;
+
     -- 1. Áp dụng Happy Hour khung 16h
     INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
     VALUES ('HAPPY_AI_16H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
@@ -644,16 +649,33 @@ BEGIN
     VALUES ('HAPPY_AI_0H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 0h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
     ON CONFLICT (code) DO NOTHING;
 
-    -- 3. Áp dụng Voucher giữ chân VIP Bùi Minh Quân (ID 8)
+    -- 3. Áp dụng Voucher giữ chân đích danh Nguyễn Việt Anh (SĐT: 0327469105)
     INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
-    VALUES ('VIP_WINBACK_8', 'Voucher AI: Tặng 30.000 VNĐ Níu Chân Khách VIP #8', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', '{"target_customer_id": 8, "auto_created_by_ai": true}'::jsonb, TRUE)
+    VALUES ('VIP_VIETANH_30K', 'Voucher VIP AI: Tặng 30.000 VNĐ cho Nguyễn Việt Anh (0327469105)', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', jsonb_build_object('target_phone', '0327469105', 'target_customer_id', v_va_id, 'auto_created_by_ai', true), TRUE)
     ON CONFLICT (code) DO NOTHING;
+
+    -- PHÁT TÍN HIỆU NOTIFY CHO PYTHON GATEWAY ĐỂ BẮN THÔNG BÁO VỀ ĐIỆN THOẠI THẬT
+    PERFORM pg_notify(
+        'ai_sms_dispatch',
+        json_build_object(
+            'customer_name', 'Nguyễn Việt Anh',
+            'phone', '0327469105',
+            'code', 'VIP_VIETANH_30K',
+            'discount', '30,000 VNĐ',
+            'message', '[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Lâu rồi không thấy bạn ghé quán. Tặng bạn mã VIP30K (giảm 30.000đ + 1 lon nước ngọt). Hẹn gặp bạn tại phòng máy!'
+        )::text
+    );
 
     -- Trả về danh sách vừa kích hoạt
     RETURN QUERY
-    SELECT code, promotion_name, value, 'Đã kích hoạt thành công vào hệ thống khuyến mãi'::TEXT
-    FROM billing.promotion
-    WHERE code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_WINBACK_8');
+    SELECT 
+        p.code, 
+        p.promotion_name, 
+        COALESCE(p.conditions->>'target_phone', 'Toàn quán')::VARCHAR(100) AS target_info,
+        p.value, 
+        'Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật'::TEXT
+    FROM billing.promotion p
+    WHERE p.code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_VIETANH_30K');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
@@ -691,3 +713,5 @@ GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_mana
 GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_apply_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_rollback_promotions() TO role_admin, role_manager;

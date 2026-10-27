@@ -130,7 +130,8 @@ VALUES
     ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt(gen_random_uuid()::text, gen_salt('bf')), 300000, 2800, 'vip'),
     ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt(gen_random_uuid()::text, gen_salt('bf')), 60000, 80, 'regular'),
     ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver'),
-    ('Tran Van Binh', '0912345679', 'binh.duplicate@gmail.com', 'binh_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 10, 'regular');
+    ('Tran Van Binh', '0912345679', 'binh.duplicate@gmail.com', 'binh_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 10, 'regular'),
+    ('Nguyễn Việt Anh', '0327469105', 'vietanh.nguyen@gmail.com', 'vietanh_vip', crypt('Pass@123', gen_salt('bf')), 500000, 3500, 'vip');
 
 -- 9. LỊCH SỬ BẢO TRÌ MẪU (CHO DEMO RLS VÀ MODULE BẢO TRÌ)
 INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
@@ -148,7 +149,8 @@ VALUES
     (5, 10, 4, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 12000, 24000, '{"game":"PUBG"}'::jsonb),
     (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb),
     (3, 16, 3, NOW() - INTERVAL '5 days' - INTERVAL '4 hours', NOW() - INTERVAL '5 days', 'finished', 18000, 72000, '{"game":"Cyberpunk 2077"}'::jsonb),
-    (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb);
+    (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb),
+    (31, 18, 3, NOW() - INTERVAL '4 days' - INTERVAL '5 hours', NOW() - INTERVAL '4 days', 'finished', 18000, 720000, '{"game":"CS2 Tournament"}'::jsonb);
 
 INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status, issued_at, paid_at)
 VALUES 
@@ -159,7 +161,8 @@ VALUES
     (5, 5, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
     (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
     (7, 3, 3, 72000, 0, 0, 0, 72000, 'paid', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
-    (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour');
+    (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (9, 31, 3, 720000, 0, 0, 0, 720000, 'paid', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days');
 
 INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference)
 VALUES 
@@ -171,7 +174,9 @@ VALUES
     ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006'),
     ('invoice', 7, 3, 'cash', 72000, 3, NOW() - INTERVAL '5 days', 'HD-007'),
     ('invoice', 8, 8, 'bank_transfer', 630000, 3, NOW() - INTERVAL '1 hour', 'HD-008'),
-    ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001');
+    ('invoice', 9, 31, 'bank_transfer', 720000, 3, NOW() - INTERVAL '4 days', 'HD-009'),
+    ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001'),
+    ('topup', NULL, 31, 'bank_transfer', 1000000, 1, NOW() - INTERVAL '5 days', 'DEP-002');
 
 -- 11. LÀM MỚI MATERIALIZED VIEWS
 REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;

@@ -271,6 +271,25 @@ Trước khi thầy gọi nhóm lên, chuẩn bị sẵn 2 cửa sổ song song:
   ```
 * **Nói với thầy:** *"Hệ thống sử dụng kiến trúc Real-Time Push Notification trực tiếp từ PostgreSQL Engine qua socket mạng `LISTEN/NOTIFY`. Khi có hành vi bất thường, Trigger nội bộ của CSDL tự động tính điểm rủi ro và bắn cảnh báo ra ứng dụng ngay lập tức mà không cần client phải tốn tài nguyên Polling định kỳ."*
 
+#### 4.3. (ĐIỂM NHẤN ĐẶC BIỆT): AI Tự Động Kích Hoạt Voucher & Bắn Tin Nhắn SMS Về Điện Thoại Thật
+* **Chuẩn bị trên điện thoại:** Mở trình duyệt gõ `https://ntfy.sh/netcafe_vietanh` (hoặc tải app `ntfy` đăng ký kênh `netcafe_vietanh`).
+* **Bước 1 (Terminal):** Bật gateway lắng nghe tin nhắn SMS:
+  ```powershell
+  python python/sms_gateway_listener.py
+  ```
+* **Bước 2 (DBeaver / Neon):** Chạy hàm kích hoạt ưu đãi AI:
+  ```sql
+  -- Tự động kích hoạt khuyến mãi và bắn tin SMS:
+  SELECT * FROM ai.fn_apply_promotions();
+  ```
+* **Bước 3 (Quan sát):**
+  - Cửa sổ Terminal Python hiển thị thông tin gửi tin nhắn cho khách hàng VIP **Nguyễn Việt Anh** (`0327469105`).
+  - **Điện thoại của bạn lập tức rung lên và nhận thông báo voucher 30.000 VNĐ**!
+* **Bước 4 (DBeaver):** Hoàn tác sạch sẽ dữ liệu sau khi demo:
+  ```sql
+  SELECT * FROM ai.fn_rollback_promotions();
+  ```
+
 ---
 
 ## 3. BỘ CÂU HỎI PHẢN BIỆN "VÌ SAO" DÀNH CHO GIẢNG VIÊN VÀ CÂU TRẢ LỜI ĂN ĐIỂM 10
@@ -287,19 +306,6 @@ Trước khi thầy gọi nhóm lên, chuẩn bị sẵn 2 cửa sổ song song:
 ### Câu 4: Vì sao chọn GIN Trigram Index cho họ tên thay vì B-Tree thông thường?
 > **Trả lời:** *"Dạ thưa Thầy, chỉ mục B-Tree chỉ có tác dụng khi tìm kiếm chính xác hoặc tiền tố (`'Nguyễn%'`). Khi người dùng tìm kiếm chuỗi con có ký tự đại diện ở đầu như `'%Thành%'`, B-Tree bị vô hiệu hóa hoàn toàn và PostgreSQL buộc phải quét tuần tự (Seq Scan). GIN Trigram tách chuỗi thành các bộ 3 ký tự (3-grams), cho phép Index Scan tăng tốc hàng chục lần ngay cả khi tìm kiếm mờ hoặc tìm ở giữa chuỗi."*
 
----
-
-## 3. BỘ CÂU HỎI PHẢN BIỆN "VÌ SAO" DÀNH CHO GIẢNG VIÊN VÀ CÂU TRẢ LỜI ĂN ĐIỂM 10
-
-### Câu 1: Vì sao lại chia thành 8 Schemas độc lập mà không gom chung vào schema `public`?
-> **Trả lời:** *"Dạ thưa Thầy, việc phân chia 8 schemas nghiệp vụ chuyên biệt (`core`, `inventory`, `billing`, `hr`, `audit`, `ai`, `reporting`, `staging`) giúp phân quyền đặc quyền tối thiểu (Least Privilege). Nhân viên thu ngân chỉ được SELECT trên `billing` và `core`, hoàn toàn bị cô lập khỏi `hr` và `audit`. Đồng thời việc này giúp quản trị vòng đời dữ liệu (backup, partition, maintenance) trên từng schema riêng biệt mà không ảnh hưởng tới toàn bộ hệ thống."*
-
-### Câu 2: Vì sao lại dùng `NUMERIC(12,0)` cho số tiền thay vì `BIGINT` hay `FLOAT`?
-> **Trả lời:** *"Dạ thưa Thầy, `FLOAT/DOUBLE` có sai số làm tròn dấu phẩy động chuẩn IEEE 754 nên tuyệt đối cấm kỵ trong tài chính kế toán. `NUMERIC(12,0)` trong PostgreSQL là số học dấu chấm tĩnh (Fixed-Point) chính xác tuyệt đối từng đơn vị đồng, thang đo 12 chữ số đủ biểu diễn số tiền tới hàng trăm tỷ VNĐ mà không tốn dung lượng thừa."*
-
-### Câu 3: Thuật toán AI trong đề tài này có gọi API bên ngoài (như OpenAI / ChatGPT) không?
-> **Trả lời:** *"Dạ thưa Thầy, đề tài tuân thủ 100% nguyên tắc **In-Database Intelligence**: Toàn bộ 5 module AI chạy nội bộ bằng toán học, thống kê và hàm PL/pgSQL có sẵn của PostgreSQL (Z-score phát hiện ngoại lai, khoảng cách Trigram so khớp chuỗi, phân tích thống kê `pg_stat_user_tables`). Hệ thống không gọi API bên ngoài, bảo mật dữ liệu tuyệt đối và hoạt động độc lập không cần Internet."*
-
-### Câu 4: Vì sao chọn GIN Trigram Index cho họ tên thay vì B-Tree thông thường?
-> **Trả lời:** *"Dạ thưa Thầy, chỉ mục B-Tree chỉ có tác dụng khi tìm kiếm chính xác hoặc tiền tố (`'Nguyễn%'`). Khi người dùng tìm kiếm chuỗi con có ký tự đại diện ở đầu như `'%Thành%'`, B-Tree bị vô hiệu hóa hoàn toàn và PostgreSQL buộc phải quét tuần tự (Seq Scan). GIN Trigram tách chuỗi thành các bộ 3 ký tự (3-grams), cho phép Index Scan tăng tốc hàng chục lần ngay cả khi tìm kiếm mờ hoặc tìm ở giữa chuỗi."*
+### Câu 5: B-Tree Index trên `billing.invoice(total_amount)` giúp tối ưu như thế nào?
+> **Trả lời:** *"Dạ thưa Thầy, cấu trúc B-Tree lưu trữ các khóa theo thứ tự phân cấp cây cân bằng độ sâu O(log N). Khi tìm hóa đơn có số tiền lớn như `total_amount = 630000`, CSDL không phải duyệt qua hàng trăm nghìn dòng hóa đơn (Seq Scan) mà nhảy thẳng đến nốt lá chứa giá trị tương ứng qua Index Scan, giảm số lượng đọc khối nhớ I/O (Buffers hit) về mức tối thiểu."*
 

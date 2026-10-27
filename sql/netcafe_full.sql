@@ -1701,7 +1701,8 @@ VALUES
     ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt(gen_random_uuid()::text, gen_salt('bf')), 300000, 2800, 'vip'),
     ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt(gen_random_uuid()::text, gen_salt('bf')), 60000, 80, 'regular'),
     ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver'),
-    ('Tran Van Binh', '0912345679', 'binh.duplicate@gmail.com', 'binh_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 10, 'regular');
+    ('Tran Van Binh', '0912345679', 'binh.duplicate@gmail.com', 'binh_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 10, 'regular'),
+    ('Nguyễn Việt Anh', '0327469105', 'vietanh.nguyen@gmail.com', 'vietanh_vip', crypt('Pass@123', gen_salt('bf')), 500000, 3500, 'vip');
 
 -- 9. LỊCH SỬ BẢO TRÌ MẪU (CHO DEMO RLS VÀ MODULE BẢO TRÌ)
 INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
@@ -1719,7 +1720,8 @@ VALUES
     (5, 10, 4, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 12000, 24000, '{"game":"PUBG"}'::jsonb),
     (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb),
     (3, 16, 3, NOW() - INTERVAL '5 days' - INTERVAL '4 hours', NOW() - INTERVAL '5 days', 'finished', 18000, 72000, '{"game":"Cyberpunk 2077"}'::jsonb),
-    (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb);
+    (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb),
+    (31, 18, 3, NOW() - INTERVAL '4 days' - INTERVAL '5 hours', NOW() - INTERVAL '4 days', 'finished', 18000, 720000, '{"game":"CS2 Tournament"}'::jsonb);
 
 INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status, issued_at, paid_at)
 VALUES 
@@ -1730,7 +1732,8 @@ VALUES
     (5, 5, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
     (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
     (7, 3, 3, 72000, 0, 0, 0, 72000, 'paid', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
-    (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour');
+    (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (9, 31, 3, 720000, 0, 0, 0, 720000, 'paid', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days');
 
 INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference)
 VALUES 
@@ -1742,7 +1745,9 @@ VALUES
     ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006'),
     ('invoice', 7, 3, 'cash', 72000, 3, NOW() - INTERVAL '5 days', 'HD-007'),
     ('invoice', 8, 8, 'bank_transfer', 630000, 3, NOW() - INTERVAL '1 hour', 'HD-008'),
-    ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001');
+    ('invoice', 9, 31, 'bank_transfer', 720000, 3, NOW() - INTERVAL '4 days', 'HD-009'),
+    ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001'),
+    ('topup', NULL, 31, 'bank_transfer', 1000000, 1, NOW() - INTERVAL '5 days', 'DEP-002');
 
 -- 11. LÀM MỚI MATERIALIZED VIEWS
 REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
@@ -2386,12 +2391,17 @@ COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh b
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ai.fn_apply_promotions()
 RETURNS TABLE(
-    applied_code VARCHAR(50),
-    applied_name VARCHAR(100),
+    applied_code VARCHAR,
+    applied_name VARCHAR,
+    target_info VARCHAR,
     discount_val NUMERIC,
     status_msg TEXT
 ) AS $$
+DECLARE
+    v_va_id INT;
 BEGIN
+    SELECT customer_id INTO v_va_id FROM core.customer WHERE phone = '0327469105' LIMIT 1;
+
     -- 1. Áp dụng Happy Hour khung 16h
     INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
     VALUES ('HAPPY_AI_16H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
@@ -2402,16 +2412,33 @@ BEGIN
     VALUES ('HAPPY_AI_0H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 0h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
     ON CONFLICT (code) DO NOTHING;
 
-    -- 3. Áp dụng Voucher giữ chân VIP Bùi Minh Quân (ID 8)
+    -- 3. Áp dụng Voucher giữ chân đích danh Nguyễn Việt Anh (SĐT: 0327469105)
     INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
-    VALUES ('VIP_WINBACK_8', 'Voucher AI: Tặng 30.000 VNĐ Níu Chân Khách VIP #8', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', '{"target_customer_id": 8, "auto_created_by_ai": true}'::jsonb, TRUE)
+    VALUES ('VIP_VIETANH_30K', 'Voucher VIP AI: Tặng 30.000 VNĐ cho Nguyễn Việt Anh (0327469105)', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', jsonb_build_object('target_phone', '0327469105', 'target_customer_id', v_va_id, 'auto_created_by_ai', true), TRUE)
     ON CONFLICT (code) DO NOTHING;
+
+    -- PHÁT TÍN HIỆU NOTIFY CHO PYTHON GATEWAY ĐỂ BẮN THÔNG BÁO VỀ ĐIỆN THOẠI THẬT
+    PERFORM pg_notify(
+        'ai_sms_dispatch',
+        json_build_object(
+            'customer_name', 'Nguyễn Việt Anh',
+            'phone', '0327469105',
+            'code', 'VIP_VIETANH_30K',
+            'discount', '30,000 VNĐ',
+            'message', '[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Lâu rồi không thấy bạn ghé quán. Tặng bạn mã VIP30K (giảm 30.000đ + 1 lon nước ngọt). Hẹn gặp bạn tại phòng máy!'
+        )::text
+    );
 
     -- Trả về danh sách vừa kích hoạt
     RETURN QUERY
-    SELECT code, promotion_name, value, 'Đã kích hoạt thành công vào hệ thống khuyến mãi'::TEXT
-    FROM billing.promotion
-    WHERE code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_WINBACK_8');
+    SELECT 
+        p.code, 
+        p.promotion_name, 
+        COALESCE(p.conditions->>'target_phone', 'Toàn quán')::VARCHAR(100) AS target_info,
+        p.value, 
+        'Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật'::TEXT
+    FROM billing.promotion p
+    WHERE p.code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_VIETANH_30K');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
@@ -2449,6 +2476,8 @@ GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_mana
 GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_apply_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_rollback_promotions() TO role_admin, role_manager;
 
 
 
