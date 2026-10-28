@@ -60,3 +60,6 @@ KẾT QUẢ SAU KHI CÓ INDEX:
 SELECT recommendation_id, table_name, column_list, reason, suggested_sql 
 FROM ai.fn_recommend_indexes() 
 LIMIT 3;
+
+-- (Tùy chọn) Xem toàn bộ danh sách khuyến nghị đã lưu trong bảng snapshot:
+-- SELECT rec_id, table_name, column_list, reason, suggested_sql FROM ai.index_recommendation ORDER BY rec_id;
