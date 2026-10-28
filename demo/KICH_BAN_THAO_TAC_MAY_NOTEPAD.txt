@@ -1,0 +1,213 @@
+================================================================================
+          KỊCH BẢN THAO TÁC MÁY (DÀNH CHO BẠN BẤM LỆNH KHI BẢO VỆ)
+   Dự án: Quản trị Cơ sở Dữ liệu Phòng Game Net (PostgreSQL 17)
+   Database: netcafe_db | User: neondb_owner
+================================================================================
+
+CHUẨN BỊ TRƯỚC KHI LÊN NÓI (Mở sẵn 2 cửa sổ trên màn hình):
+  1. Cửa sổ bên TRÁI: DBeaver / pgAdmin / Neon SQL Editor (đang kết nối 'netcafe_db')
+  2. Cửa sổ bên PHẢI: PowerShell (mở sẵn tại thư mục dự án QTDL-NetCafe)
+  3. Điện thoại: Mở trình duyệt web gõ sẵn link: https://ntfy.sh/netcafe_vietanh
+
+
+################################################################################
+PHẦN 1: KHỞI TẠO, ETL & RÀNG BUỘC TOÀN VẸN (FAIL-SAFE DEMO)
+################################################################################
+
+--- [BƯỚC 1.1: Chạy ETL Python làm sạch dữ liệu bẩn] ---
+👉 Thao tác trên cửa sổ TERMINAL (PowerShell):
+
+python python/generate_dirty_data.py
+python python/clean_data.py
+
+
+--- [BƯỚC 1.2: Xem dữ liệu bẩn bị cách ly] ---
+👉 Copy dán vào cửa sổ SQL EDITOR rồi bấm Chạy:
+
+SELECT rejected_id, source_table, error_reason, raw_record, rejected_at 
+FROM staging.rejected_rows 
+ORDER BY rejected_id DESC 
+LIMIT 5;
+
+
+--- [BƯỚC 1.3: Demo Ràng buộc CHECK - Nạp tiền âm bị chặn] ---
+👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ -> Đúng kịch bản!):
+
+INSERT INTO billing.payment (kind, customer_id, method, amount, employee_id, reference)
+VALUES ('topup', 1, 'cash', -50000, 3, 'Demo nap tien am');
+
+
+--- [BƯỚC 1.4: Demo Ràng buộc CHECK - Email sai định dạng bị chặn] ---
+👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ -> Đúng kịch bản!):
+
+INSERT INTO core.customer (full_name, phone, email, username, password_hash)
+VALUES ('Khach Hang Test', '0988777666', 'email_sai_dinh_dang', 'user_test', 'hash_pass');
+
+
+
+################################################################################
+PHẦN 2: BẢO MẬT PHÂN QUYỀN & RLS / CLS (ROLE-PLAYING DEMO)
+################################################################################
+
+--- [BƯỚC 2.1: Đóng vai Nhân viên Thu ngân Thảo] ---
+👉 Copy dán vào SQL EDITOR:
+
+SET ROLE nv_thao;
+SELECT CURRENT_USER, SESSION_USER;
+
+
+--- [BƯỚC 2.2: Demo RLS - Thảo chỉ thấy hóa đơn do chính mình tạo (cashier_id = 3)] ---
+👉 Copy dán vào SQL EDITOR:
+
+SELECT invoice_id, customer_id, cashier_id, play_amount, total_amount, status 
+FROM billing.invoice;
+
+
+--- [BƯỚC 2.3: Demo CLS - Thu ngân bị cấm xem cột Lương (salary)] ---
+👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ permission denied -> Đúng kịch bản!):
+
+SELECT employee_id, full_name, salary 
+FROM hr.employee;
+
+
+--- [BƯỚC 2.4: Thu ngân xem qua View công khai không có cột lương] ---
+👉 Copy dán vào SQL EDITOR:
+
+SELECT * FROM hr.vw_employee_public;
+
+
+--- [BƯỚC 2.5: TRẢ QUYỀN VỀ QUẢN TRỊ (BẮT BUỘC PHẢI CHẠY LỆNH NÀY!)] ---
+👉 Copy dán vào SQL EDITOR:
+
+RESET ROLE;
+SELECT CURRENT_USER;
+
+
+
+################################################################################
+PHẦN 3: TỐI ƯU HÓA HIỆU NĂNG VÀ MODULE AI 2 (PERFORMANCE DEMO)
+################################################################################
+
+--- [BƯỚC 3.1: Đảm bảo quyền Owner & Xóa index cũ để đo trước khi tối ưu] ---
+👉 Copy dán vào SQL EDITOR:
+
+RESET ROLE;
+DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
+
+
+--- [BƯỚC 3.2: Đo khi CHƯA có Index -> Kết quả: Seq Scan (Quét toàn bảng)] ---
+👉 Copy dán vào SQL EDITOR (Chỉ chuột vào dòng 'Seq Scan on invoice'):
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+FROM billing.invoice 
+WHERE total_amount = 630000;
+
+
+--- [BƯỚC 3.3: Tạo B-Tree Index và đo lại -> Kết quả: Index Scan (Nhảy thẳng)] ---
+👉 Copy dán vào SQL EDITOR (Chỉ chuột vào dòng 'Index Scan using idx_invoice_total_amount'):
+
+CREATE INDEX idx_invoice_total_amount ON billing.invoice (total_amount);
+
+SET enable_seqscan = off;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT invoice_id, customer_id, cashier_id, total_amount, status 
+FROM billing.invoice 
+WHERE total_amount = 630000;
+
+SET enable_seqscan = on;
+
+
+--- [BƯỚC 3.4: Module AI 2 - AI tự động quét Catalog và khuyến nghị Index] ---
+👉 Copy dán vào SQL EDITOR:
+
+SELECT recommendation_id, table_name, column_list, reason, suggested_sql 
+FROM ai.fn_recommend_indexes() 
+LIMIT 3;
+
+
+
+################################################################################
+PHẦN 4: ĐIỂM NHẤN TÍCH HỢP & 3 MODULE AI THỜI GIAN THỰC (AI HIGHLIGHTS)
+################################################################################
+
+--- [BƯỚC 4.1: Bóc tách dữ liệu bán cấu trúc NoSQL từ cột JSONB (->> và @>)] ---
+👉 Copy dán vào SQL EDITOR:
+
+SELECT 
+    computer_code, 
+    computer_name,
+    specs ->> 'cpu'     AS cpu_model,
+    specs ->> 'gpu'     AS graphics_card,
+    specs ->> 'ram'     AS memory_size
+FROM core.computer
+WHERE specs @> '{"gpu": "RTX 4070"}'::jsonb;
+
+
+--- [BƯỚC 4.2: AI Cảnh báo rủi ro An ninh thời gian thực (LISTEN / NOTIFY)] ---
+👉 Bước A (Cửa sổ TERMINAL bên Phải): Chạy lệnh lắng nghe tín hiệu:
+python python/listen_ai_alerts.py
+
+👉 Bước B (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh nạp tiền lớn bất thường (10 triệu):
+INSERT INTO billing.payment (kind, customer_id, method, amount, employee_id, reference)
+VALUES ('topup', 1, 'cash', 10000000, 3, 'Demo trigger canh bao AI');
+
+👉 Bước C: Nhìn sang cửa sổ Terminal -> Nổ CẢNH BÁO ĐỎ thời gian thực!
+(Sau đó bấm tổ hợp phím Ctrl + C trên Terminal để dừng tiến trình).
+
+
+--- [BƯỚC 4.3: Module AI 4 - Thuật toán thống kê Z-Score phát hiện ngoại lai] ---
+👉 Copy dán vào SQL EDITOR:
+
+SELECT 
+    flag_id, 
+    anomaly_type, 
+    subject_table, 
+    metric_value, 
+    z_score, 
+    detail_info->>'mean' AS mean_val, 
+    detail_info->>'stddev' AS stddev_val
+FROM ai.fn_detect_anomalies(1.5);
+
+
+--- [BƯỚC 4.4: ĐIỂM NHẤN ĐẶC BIỆT - AI TỰ GỬI SMS VỀ ĐIỆN THOẠI THẬT CỦA BẠN] ---
+👉 Bước A (Trên điện thoại): Đảm bảo đang mở link https://ntfy.sh/netcafe_vietanh
+
+👉 Bước B (Cửa sổ TERMINAL): Chạy tiến trình bắn SMS Gateway:
+python python/sms_gateway_listener.py
+
+👉 Bước C (Cửa sổ SQL EDITOR): Xem 3 đề xuất của AI:
+SELECT 
+    sug_id,
+    suggestion_type,
+    target,
+    details->>'recommended_action' AS de_xuat_ai,
+    details->>'rationale' AS ly_do_ai
+FROM ai.promotion_suggestion;
+
+👉 Bước D (Cửa sổ SQL EDITOR): KÍCH HOẠT VOUCHER & BẮN TIN NHẮN VỀ ĐIỆN THOẠI:
+SELECT * FROM ai.fn_apply_promotions();
+(👉 QUAN SÁT: Điện thoại của bạn rung lên và nhận ngay tin nhắn Voucher 30.000đ!)
+
+👉 Bước E (Cửa sổ SQL EDITOR): Kiểm tra bảng khuyến mãi chính thức đã được AI thêm vào:
+SELECT code, promotion_name, value, valid_from, valid_to 
+FROM billing.promotion 
+WHERE conditions->>'auto_created_by_ai' = 'true';
+
+👉 Bước F (Cửa sổ SQL EDITOR): Hoàn tác xóa sạch khuyến mãi vừa tạo:
+SELECT * FROM ai.fn_rollback_promotions();
+
+(Bấm Ctrl + C trên Terminal để dừng listener).
+
+
+
+################################################################################
+PHẦN DỰ PHÒNG: NẾU THẦY BẢO CHẠY TOÀN BỘ AI KIỂM TRA MỘT LƯỢT
+################################################################################
+👉 Chạy đúng 1 lệnh duy nhất trên Terminal:
+
+python python/test_all_ai_modules.py
+
+(Hệ thống tự động chạy và in kết quả đầy đủ cả 5 Module AI trong 2 giây!)
+================================================================================
