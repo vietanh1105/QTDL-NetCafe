@@ -184,7 +184,6 @@ BEGIN
           AND (idx_scan IS NULL OR idx_scan < seq_scan)
     LOOP
         v_tbl := r.full_table;
-        -- Chỉ sinh SQL khi cột đích thật sự tồn tại trong catalog.
         SELECT a.attname
         INTO v_col
         FROM pg_attribute a
@@ -211,19 +210,23 @@ BEGIN
                            v_tbl, r.seq_scan, COALESCE(r.idx_scan, 0));
         v_sql := format('CREATE INDEX idx_%s_auto_opt ON %s (%I);', r.relname, v_tbl, v_col);
 
-        -- Ghi vào bảng khuyến nghị nếu chưa tồn tại
-        IF NOT EXISTS (SELECT 1 FROM ai.index_recommendation WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql) THEN
+        SELECT rec_id INTO v_rec_id 
+        FROM ai.index_recommendation 
+        WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql 
+        LIMIT 1;
+
+        IF v_rec_id IS NULL THEN
             INSERT INTO ai.index_recommendation (table_name, column_list, reason, suggested_sql)
             VALUES (v_tbl, v_col, v_reason, v_sql)
             RETURNING rec_id INTO v_rec_id;
-
-            recommendation_id := v_rec_id;
-            table_name := v_tbl;
-            column_list := v_col;
-            reason := v_reason;
-            suggested_sql := v_sql;
-            RETURN NEXT;
         END IF;
+
+        recommendation_id := v_rec_id;
+        table_name := v_tbl;
+        column_list := v_col;
+        reason := v_reason;
+        suggested_sql := v_sql;
+        RETURN NEXT;
     END LOOP;
 
     -- 2. Kiểm tra Foreign Keys thiếu index (ngăn ngừa table lock và chậm JOIN)
@@ -249,18 +252,23 @@ BEGIN
         v_reason := format('Cột khóa ngoại %s.%s chưa có B-Tree index hỗ trợ truy vấn JOIN và chống lock.', v_tbl, v_col);
         v_sql := format('CREATE INDEX idx_%s_%s_fk ON %s (%s);', r.relname, v_col, v_tbl, v_col);
 
-        IF NOT EXISTS (SELECT 1 FROM ai.index_recommendation WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql) THEN
+        SELECT rec_id INTO v_rec_id 
+        FROM ai.index_recommendation 
+        WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql 
+        LIMIT 1;
+
+        IF v_rec_id IS NULL THEN
             INSERT INTO ai.index_recommendation (table_name, column_list, reason, suggested_sql)
             VALUES (v_tbl, v_col, v_reason, v_sql)
             RETURNING rec_id INTO v_rec_id;
-
-            recommendation_id := v_rec_id;
-            table_name := v_tbl;
-            column_list := v_col;
-            reason := v_reason;
-            suggested_sql := v_sql;
-            RETURN NEXT;
         END IF;
+
+        recommendation_id := v_rec_id;
+        table_name := v_tbl;
+        column_list := v_col;
+        reason := v_reason;
+        suggested_sql := v_sql;
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -478,11 +486,10 @@ DECLARE
     r RECORD;
     v_sug_id INT;
 BEGIN
-    -- Làm mới Materialized Views để có số liệu phân tích mới nhất
     REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
     REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
 
-    -- 1. Đề xuất Happy Hour cho các khung giờ thấp điểm (lượng phiên dưới mức trung bình)
+    -- 1. Đề xuất Happy Hour cho các khung giờ thấp điểm
     FOR r IN
         WITH hourly_stat AS (
             SELECT 
@@ -505,11 +512,13 @@ BEGIN
         ORDER BY h.avg_sessions ASC
         LIMIT 3
     LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.promotion_suggestion 
-            WHERE ai.promotion_suggestion.suggestion_type = 'HAPPY_HOUR_OFFPEAK'
-              AND ai.promotion_suggestion.target = format('Khung giờ %sh:00', r.hour_of_day)
-        ) THEN
+        SELECT sug_id INTO v_sug_id
+        FROM ai.promotion_suggestion
+        WHERE ai.promotion_suggestion.suggestion_type = 'HAPPY_HOUR_OFFPEAK'
+          AND ai.promotion_suggestion.target = format('Khung giờ %sh:00', r.hour_of_day)
+        LIMIT 1;
+
+        IF v_sug_id IS NULL THEN
             INSERT INTO ai.promotion_suggestion (suggestion_type, target, details)
             VALUES (
                 'HAPPY_HOUR_OFFPEAK',
@@ -523,16 +532,16 @@ BEGIN
                 )
             )
             RETURNING sug_id INTO v_sug_id;
-
-            suggestion_id := v_sug_id;
-            suggestion_type := 'HAPPY_HOUR_OFFPEAK';
-            target := format('Khung giờ %sh:00', r.hour_of_day);
-            details := jsonb_build_object('hour', r.hour_of_day, 'sessions', r.session_vol);
-            RETURN NEXT;
         END IF;
+
+        suggestion_id := v_sug_id;
+        suggestion_type := 'HAPPY_HOUR_OFFPEAK';
+        target := format('Khung giờ %sh:00', r.hour_of_day);
+        details := jsonb_build_object('hour', r.hour_of_day, 'sessions', r.session_vol);
+        RETURN NEXT;
     END LOOP;
 
-    -- 2. Đề xuất Win-Back Voucher cho khách hàng VIP có nguy cơ rời bỏ (At-Risk High-Value)
+    -- 2. Đề xuất Win-Back Voucher cho khách hàng VIP
     FOR r IN
         SELECT 
             customer_id,
@@ -547,11 +556,13 @@ BEGIN
         ORDER BY total_spent DESC
         LIMIT 5
     LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.promotion_suggestion 
-            WHERE ai.promotion_suggestion.suggestion_type = 'WIN_BACK_VIP'
-              AND ai.promotion_suggestion.target = format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id)
-        ) THEN
+        SELECT sug_id INTO v_sug_id
+        FROM ai.promotion_suggestion
+        WHERE ai.promotion_suggestion.suggestion_type = 'WIN_BACK_VIP'
+          AND ai.promotion_suggestion.target = format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id)
+        LIMIT 1;
+
+        IF v_sug_id IS NULL THEN
             INSERT INTO ai.promotion_suggestion (suggestion_type, target, details)
             VALUES (
                 'WIN_BACK_VIP',
@@ -565,13 +576,13 @@ BEGIN
                 )
             )
             RETURNING sug_id INTO v_sug_id;
-
-            suggestion_id := v_sug_id;
-            suggestion_type := 'WIN_BACK_VIP';
-            target := format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id);
-            details := jsonb_build_object('customer_id', r.customer_id, 'spent', r.total_spent, 'days_inactive', r.days_inactive);
-            RETURN NEXT;
         END IF;
+
+        suggestion_id := v_sug_id;
+        suggestion_type := 'WIN_BACK_VIP';
+        target := format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id);
+        details := jsonb_build_object('customer_id', r.customer_id, 'spent', r.total_spent, 'days_inactive', r.days_inactive);
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
