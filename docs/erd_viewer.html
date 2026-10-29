@@ -3,42 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sơ đồ ERD - NetCafe DB</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <title>ERD Viewer - Hệ thống Quản trị NetCafe (PostgreSQL 17)</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
     <style>
-        body {
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 20px;
-            background-color: #f8fafc;
-            color: #1e293b;
         }
-        h1 {
-            color: #0f172a;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 12px;
-        }
-        .container {
-            background: white;
-            border-radius: 8px;
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
             padding: 24px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            overflow-x: auto;
         }
-        .legend {
-            margin-top: 20px;
-            padding: 16px;
-            background: #f1f5f9;
-            border-radius: 6px;
+
+        .header {
+            background: var(--card-bg);
+            padding: 20px 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            color: #1e293b;
+            font-weight: 700;
+        }
+
+        .header p {
             font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .btn-download {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-download:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        /* Tabs bar */
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            padding-bottom: 4px;
+        }
+
+        .tab-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+
+        /* Canvas box */
+        .diagram-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            min-height: 550px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow: auto;
+        }
+
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .mermaid svg {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        .instructions {
+            margin-top: 16px;
+            padding: 14px 20px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            font-size: 13.5px;
+            color: #1e40af;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
-    <h1>Sơ đồ Thực thể Quan hệ (ERD) - Hệ thống NetCafe (21 Bảng)</h1>
-    <p><em>Môn học: Quản trị Cơ sở Dữ liệu | PostgreSQL 17</em></p>
-    <div class="container">
-        <pre class="mermaid">
-erDiagram
+
+    <div class="header">
+        <div>
+            <h1>Sơ đồ Thực thể Quan hệ (ERD) - NetCafe Management System</h1>
+            <p>Hệ thống Quản trị CSDL PostgreSQL 17 | Thiết kế chuẩn hóa 3NF chia 8 Schemas</p>
+        </div>
+        <button class="btn-download" onclick="downloadCurrentDiagram()">
+            📷 Tải ảnh PNG để chèn vào Báo cáo
+        </button>
+    </div>
+
+    <!-- Tabs chia theo từng Schema -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('full', this)">🌐 Toàn bộ CSDL (Tổng quan)</button>
+        <button class="tab-btn" onclick="switchTab('core', this)">🖥️ Phân hệ Lõi & Máy trạm (core)</button>
+        <button class="tab-btn" onclick="switchTab('billing', this)">💳 Phân hệ Tài chính & Khuyến mãi (billing)</button>
+        <button class="tab-btn" onclick="switchTab('inventory', this)">🍔 Phân hệ Kho F&B (inventory)</button>
+        <button class="tab-btn" onclick="switchTab('hr', this)">👥 Phân hệ Nhân sự & Bảo trì (hr)</button>
+        <button class="tab-btn" onclick="switchTab('ai', this)">🤖 Phân hệ In-Database AI & Audit (ai)</button>
+    </div>
+
+    <div class="diagram-container" id="diagramWrapper">
+        <div id="mermaidTarget" class="mermaid"></div>
+    </div>
+
+    <div class="instructions">
+        💡 <strong>Mẹo chèn vào Word báo cáo:</strong> Bấm vào từng tab phân hệ ở trên (Core, Billing, Inventory, HR, AI), sau đó bấm nút <strong>"📷 Tải ảnh PNG"</strong>. Từng ảnh phân hệ sẽ rất sắc nét, chữ to rõ ràng, không bị rối như khi gộp tất cả bảng vào một hình!
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            er: {
+                useMaxWidth: false,
+                diagramPadding: 20
+            }
+        });
+
+        const diagrams = {
+            // 1. TOÀN BỘ CSDL
+            full: `erDiagram
     ROOM ||--o{ COMPUTER : "contains"
     COMPUTER_TYPE ||--o{ COMPUTER : "categorizes"
     CUSTOMER ||--o{ GAMING_SESSION : "plays"
@@ -51,7 +201,7 @@ erDiagram
     FOOD_ORDER ||--|{ FOOD_ORDER_DETAIL : "has_items"
     PRODUCT ||--o{ FOOD_ORDER_DETAIL : "ordered_in"
 
-    GAMING_SESSION ||--|| INVOICE : "generates (1-1)"
+    GAMING_SESSION ||--|| INVOICE : "generates"
     CUSTOMER ||--o{ INVOICE : "billed_to"
     EMPLOYEE ||--o{ INVOICE : "collected_by"
     INVOICE ||--o{ INVOICE_PROMOTION : "applies"
@@ -63,50 +213,146 @@ erDiagram
     COMPUTER ||--o{ MAINTENANCE : "maintained"
     EMPLOYEE ||--o{ MAINTENANCE : "performed_by"
 
-    AUDIT_LOG ||--o{ AI_ALERT : "triggers_alert"
-    CUSTOMER ||--o{ DUPLICATE_CANDIDATE : "customer_a"
-    CUSTOMER ||--o{ DUPLICATE_CANDIDATE : "customer_b"
+    CUSTOMER ||--o{ DUPLICATE_CANDIDATE : "candidate_a"
 
     ROOM {
         int room_id PK
-        varchar room_name UK
-        text description
+        varchar room_name "UK"
     }
-
     COMPUTER_TYPE {
         int type_id PK
-        varchar type_name UK
+        varchar type_name "UK"
         numeric hourly_rate
     }
-
     COMPUTER {
         int computer_id PK
-        varchar computer_code UK
+        varchar computer_code "UK"
+        int room_id FK
+        int type_id FK
+        jsonb specs
+        varchar status
+    }
+    CUSTOMER {
+        int customer_id PK
+        varchar full_name
+        varchar phone "UK"
+        numeric balance
+        varchar membership_tier
+    }
+    GAMING_SESSION {
+        bigint session_id PK
+        int customer_id FK
+        int computer_id FK
+        timestamptz start_time
+        timestamptz end_time
+        numeric play_amount
+    }
+    PRODUCT_CATEGORY {
+        int category_id PK
+        varchar category_name "UK"
+    }
+    PRODUCT {
+        int product_id PK
+        varchar sku "UK"
+        varchar product_name
+        numeric unit_price
+        int stock_qty
+    }
+    FOOD_ORDER {
+        bigint order_id PK
+        bigint session_id FK
+        timestamptz ordered_at
+        varchar status
+    }
+    FOOD_ORDER_DETAIL {
+        bigint order_id PK, FK
+        int product_id PK, FK
+        int quantity
+        numeric unit_price
+    }
+    INVOICE {
+        bigint invoice_id PK
+        bigint session_id FK "UK"
+        int customer_id FK
+        numeric total_amount
+        varchar status
+    }
+    PAYMENT {
+        bigint payment_id PK
+        bigint invoice_id FK
+        numeric amount
+        varchar method
+    }
+    PROMOTION {
+        int promotion_id PK
+        varchar code "UK"
+        numeric value
+    }
+    INVOICE_PROMOTION {
+        bigint invoice_id PK, FK
+        int promotion_id PK, FK
+        numeric discount_amount
+    }
+    EMPLOYEE {
+        int employee_id PK
+        varchar full_name
+        varchar emp_role
+        numeric salary
+    }
+    MAINTENANCE {
+        int maintenance_id PK
+        int computer_id FK
+        int technician_id FK
+        numeric cost
+        varchar status
+    }
+    DUPLICATE_CANDIDATE {
+        int cand_id PK
+        int customer_id_a FK
+        int customer_id_b FK
+        numeric similarity
+    }`,
+
+            // 2. CORE SCHEMA
+            core: `erDiagram
+    ROOM ||--o{ COMPUTER : "contains"
+    COMPUTER_TYPE ||--o{ COMPUTER : "categorizes"
+    CUSTOMER ||--o{ GAMING_SESSION : "plays"
+    COMPUTER ||--o{ GAMING_SESSION : "hosts"
+
+    ROOM {
+        int room_id PK
+        varchar room_name "UK"
+        text description
+    }
+    COMPUTER_TYPE {
+        int type_id PK
+        varchar type_name "UK"
+        numeric hourly_rate
+    }
+    COMPUTER {
+        int computer_id PK
+        varchar computer_code "UK"
         varchar computer_name
         int room_id FK
         int type_id FK
         jsonb specs
-        inet ip_address UK
-        macaddr mac_address UK
+        inet ip_address "UK"
+        macaddr mac_address "UK"
         varchar status
-        date purchased_at
         timestamptz created_at
     }
-
     CUSTOMER {
         int customer_id PK
         varchar full_name
-        varchar phone UK
-        varchar email UK
-        varchar username UK
-        varchar password_hash
+        varchar phone "UK"
+        varchar email "UK"
+        varchar username "UK"
         numeric balance
         int loyalty_points
         varchar membership_tier
         boolean is_active
-        timestamptz created_at
     }
-
     GAMING_SESSION {
         bigint session_id PK
         int customer_id FK
@@ -118,54 +364,17 @@ erDiagram
         numeric hourly_rate_applied
         numeric play_amount
         jsonb game_info
-    }
+    }`,
 
-    PRODUCT_CATEGORY {
-        int category_id PK
-        varchar category_name UK
-    }
-
-    PRODUCT {
-        int product_id PK
-        varchar sku UK
-        varchar product_name
-        int category_id FK
-        numeric unit_price
-        int stock_qty
-        jsonb attributes
-        boolean is_active
-    }
-
-    FOOD_ORDER {
-        bigint order_id PK
-        bigint session_id FK
-        int employee_id FK
-        timestamptz ordered_at
-        varchar status
-    }
-
-    FOOD_ORDER_DETAIL {
-        bigint order_id PK_FK
-        int product_id PK_FK
-        int quantity
-        numeric unit_price
-    }
-
-    PROMOTION {
-        int promotion_id PK
-        varchar code UK
-        varchar promotion_name
-        varchar promo_type
-        numeric value
-        timestamptz valid_from
-        timestamptz valid_to
-        jsonb conditions
-        boolean is_active
-    }
+            // 3. BILLING SCHEMA
+            billing: `erDiagram
+    INVOICE ||--o{ INVOICE_PROMOTION : "applies"
+    PROMOTION ||--o{ INVOICE_PROMOTION : "discount_applied"
+    INVOICE ||--o{ PAYMENT : "settled_by"
 
     INVOICE {
         bigint invoice_id PK
-        bigint session_id UK_FK
+        bigint session_id FK "UK"
         int customer_id FK
         int cashier_id FK
         numeric play_amount
@@ -177,13 +386,22 @@ erDiagram
         timestamptz issued_at
         timestamptz paid_at
     }
-
+    PROMOTION {
+        int promotion_id PK
+        varchar code "UK"
+        varchar promotion_name
+        varchar promo_type
+        numeric value
+        timestamptz valid_from
+        timestamptz valid_to
+        jsonb conditions
+        boolean is_active
+    }
     INVOICE_PROMOTION {
-        bigint invoice_id PK_FK
-        int promotion_id PK_FK
+        bigint invoice_id PK, FK
+        int promotion_id PK, FK
         numeric discount_amount
     }
-
     PAYMENT {
         bigint payment_id PK
         varchar kind
@@ -194,22 +412,58 @@ erDiagram
         int employee_id FK
         timestamptz paid_at
         varchar reference
+    }`,
+
+            // 4. INVENTORY SCHEMA
+            inventory: `erDiagram
+    PRODUCT_CATEGORY ||--o{ PRODUCT : "classifies"
+    FOOD_ORDER ||--|{ FOOD_ORDER_DETAIL : "has_items"
+    PRODUCT ||--o{ FOOD_ORDER_DETAIL : "ordered_in"
+
+    PRODUCT_CATEGORY {
+        int category_id PK
+        varchar category_name "UK"
     }
+    PRODUCT {
+        int product_id PK
+        varchar sku "UK"
+        varchar product_name
+        int category_id FK
+        numeric unit_price
+        int stock_qty
+        jsonb attributes
+        boolean is_active
+    }
+    FOOD_ORDER {
+        bigint order_id PK
+        bigint session_id FK
+        int employee_id FK
+        timestamptz ordered_at
+        varchar status
+    }
+    FOOD_ORDER_DETAIL {
+        bigint order_id PK, FK
+        int product_id PK, FK
+        int quantity
+        numeric unit_price
+    }`,
+
+            // 5. HR SCHEMA
+            hr: `erDiagram
+    EMPLOYEE ||--o{ MAINTENANCE : "performed_by"
 
     EMPLOYEE {
         int employee_id PK
         varchar full_name
         varchar phone
-        varchar username UK
-        varchar db_username UK
-        varchar password_hash
+        varchar username "UK"
+        varchar db_username "UK"
         varchar emp_role
         varchar default_shift
         numeric salary
         date hired_date
         boolean is_active
     }
-
     MAINTENANCE {
         int maintenance_id PK
         int computer_id FK
@@ -220,30 +474,19 @@ erDiagram
         numeric cost
         jsonb parts_replaced
         varchar status
-    }
+    }`,
 
-    AUDIT_LOG {
-        bigint audit_id PK
-        timestamptz logged_at PK
-        varchar actor
-        varchar table_name
-        varchar action
-        varchar row_pk
-        jsonb old_data
-        jsonb new_data
-    }
-
+            // 6. AI & AUDIT SCHEMA
+            ai: `erDiagram
     AI_ALERT {
         int alert_id PK
         bigint audit_id
-        timestamptz audit_logged_at
         int risk_score
         varchar risk_level
         text reason
         varchar status
         timestamptz created_at
     }
-
     INDEX_RECOMMENDATION {
         int rec_id PK
         varchar table_name
@@ -252,7 +495,6 @@ erDiagram
         text suggested_sql
         timestamptz created_at
     }
-
     DUPLICATE_CANDIDATE {
         int cand_id PK
         int customer_id_a FK
@@ -262,29 +504,85 @@ erDiagram
         varchar status
         timestamptz created_at
     }
-
     ANOMALY_FLAG {
         int flag_id PK
         varchar anomaly_type
         varchar subject_table
         varchar subject_pk
         numeric metric_value
-        jsonb threshold_info
+        jsonb detail_info
         timestamptz detected_at
-        varchar status
     }
-
     PROMOTION_SUGGESTION {
         int sug_id PK
         varchar suggestion_type
         varchar target
         jsonb details
         timestamptz created_at
-    }
-        </pre>
-    </div>
-    <script>
-        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    }`
+        };
+
+        let currentTabKey = 'full';
+
+        async function renderDiagram(key) {
+            currentTabKey = key;
+            const target = document.getElementById('mermaidTarget');
+            target.removeAttribute('data-processed');
+            target.innerHTML = '';
+            
+            const code = diagrams[key];
+            const { svg } = await mermaid.render('mermaidSvgId', code);
+            target.innerHTML = svg;
+        }
+
+        function switchTab(key, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderDiagram(key);
+        }
+
+        // Tải ảnh PNG chất lượng cao
+        function downloadCurrentDiagram() {
+            const svgElement = document.querySelector('#mermaidTarget svg');
+            if (!svgElement) {
+                alert("Vui lòng chờ sơ đồ tải xong!");
+                return;
+            }
+
+            const svgString = new XMLSerializer().serializeToString(svgElement);
+            const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const URL = window.URL || window.webkitURL || window;
+            const blobURL = URL.createObjectURL(svgBlob);
+            
+            const image = new Image();
+            image.onload = () => {
+                const canvas = document.createElement("canvas");
+                // Tăng độ phân giải gấp 2 lần để ảnh nét căng
+                const scale = 2;
+                canvas.width = (svgElement.clientWidth || 1000) * scale;
+                canvas.height = (svgElement.clientHeight || 700) * scale;
+                
+                const context = canvas.getContext("2d");
+                context.fillStyle = "#ffffff";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.scale(scale, scale);
+                context.drawImage(image, 0, 0);
+
+                const png = canvas.toDataURL("image/png");
+                const downloadLink = document.createElement("a");
+                downloadLink.href = png;
+                downloadLink.download = `ERD_NetCafe_${currentTabKey.toUpperCase()}.png`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            };
+            image.src = blobURL;
+        }
+
+        // Khởi động render tab mặc định
+        window.onload = () => {
+            renderDiagram('full');
+        };
     </script>
 </body>
 </html>
