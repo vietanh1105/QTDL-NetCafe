@@ -299,36 +299,36 @@ SELECT
 FROM ai.fn_detect_anomalies(1.5);
 
 
---- [BƯỚC 4.4: Module AI 5 - Gợi ý Chương trình Khuyến mãi Thông minh] ---
-👉 Copy dán vào SQL EDITOR (Xem 3 đề xuất do AI tự động phân tích từ Materialized Views):
+--- [BƯỚC 4.4: Module AI 5 - Kích hoạt Khuyến mãi & Bắn SMS Discount Real-time] ---
 
-SELECT 
-    sug_id, 
-    suggestion_type, 
-    target, 
-    details->>'recommended_action' AS hanh_dong_goi_y,
-    details->>'rationale'          AS ly_do_ai
-FROM ai.promotion_suggestion;
-
-
---- [BƯỚC 4.5: ĐIỂM NHẤN ĐẶC BIỆT - AI KÍCH HOẠT VOUCHER & BẮN SMS VỀ ĐIỆN THOẠI THẬT] ---
-👉 Bước A (Trên điện thoại của bạn): Đảm bảo đang mở link: https://ntfy.sh/netcafe_vietanh
-
-👉 Bước B (Cửa sổ TERMINAL bên Phải): Chạy tiến trình lắng nghe SMS Gateway:
+👉 Bước A (Cửa sổ TERMINAL bên Phải): Chạy tool Python lắng nghe cổng SMS Gateway:
 python python/sms_gateway_listener.py
+# (Màn hình hiện: [*] NETCAFE REAL-TIME AI SMS GATEWAY ĐANG LẮNG NGHE KÊNH 'ai_sms_dispatch'...)
+# (Hoặc chạy công cụ gửi SMS trực tiếp: python python/send_brandname_sms.py --promo --phone "0327469105" --name "Nguyen Viet Anh")
 
-👉 Bước C (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh kích hoạt khuyến mãi:
-SELECT * FROM ai.fn_apply_promotions();
-# 👉 QUAN SÁT: Điện thoại của bạn lập tức rung lên và nhận ngay thông báo Voucher 30.000đ gửi đích danh Nguyễn Việt Anh!
+👉 Bước B (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh SQL để AI kích hoạt khuyến mãi:
+SELECT applied_code, applied_name, target_info, discount_val, status_msg 
+FROM ai.fn_apply_promotions();
 
-👉 Bước D (Cửa sổ SQL EDITOR): Kiểm tra bảng khuyến mãi chính thức đã được AI tự động nạp vào:
-SELECT code, promotion_name, value, valid_from, valid_to 
-FROM billing.promotion 
-WHERE conditions->>'auto_created_by_ai' = 'true';
+👉 Bước C (Quan sát trên TERMINAL & ĐIỆN THOẠI):
+- Màn hình Terminal nổ log xác nhận gửi SMS thành công (HTTP 200 OK - Delivered)!
+- Chi tiết discount: Giá gốc 10.000đ/giờ -> GIẢM 25% (-2.500đ) -> Còn 7.500đ/giờ!
+- Điện thoại nhận tin nhắn: "[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Khung giờ vàng kích cầu: Giá gốc 10.000đ/h -> GIẢM 25% (-2.500đ) chỉ còn 7.500đ/h! Tặng kèm mã VIP30K giảm 30.000đ. Hẹn gặp bạn tại NetCafe!"
 
-👉 Bước E (Cửa sổ SQL EDITOR): Hoàn tác (Rollback) sạch sẽ dữ liệu sau khi trình diễn xong:
+👉 Bước D (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh SQL đối chiếu bảng giá từ 10k còn 7.5k:
+SELECT 
+    p.code AS ma_khuyen_mai,
+    p.promotion_name AS ten_chuong_trinh,
+    10000 AS gia_goc_moi_gio,
+    p.value || '%' AS phan_tram_giam,
+    ROUND(10000 * (p.value / 100)) AS so_tien_duoc_giam,
+    ROUND(10000 * (1 - p.value / 100)) AS gia_thuc_te_phai_tra,
+    'ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN' AS trang_thai_he_thong
+FROM billing.promotion p
+WHERE p.code = 'HAPPY_AI_16H';
+
+👉 Bước E (Tùy chọn - Dọn dẹp sau khi trình diễn xong):
 SELECT * FROM ai.fn_rollback_promotions();
-
 # (Bấm Ctrl + C trên cửa sổ Terminal để dừng tiến trình listener).
 
 

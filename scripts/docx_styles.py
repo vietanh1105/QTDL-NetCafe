@@ -190,3 +190,4 @@ def add_explanation_box(doc, title, text):
     spacer = doc.add_paragraph()
     spacer.paragraph_format.space_before = Pt(0)
     spacer.paragraph_format.space_after = Pt(3)
+

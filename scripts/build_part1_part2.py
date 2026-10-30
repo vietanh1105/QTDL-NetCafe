@@ -246,3 +246,4 @@ def add_part_2(doc):
             ["2", "Trần Thị Bích", "Trần Thị Bích Ngọc", "0.71", "Trùng họ tên tiền tố (Nghi vấn trùng lặp)"]
         ]
     )
+

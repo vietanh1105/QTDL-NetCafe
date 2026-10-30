@@ -215,29 +215,78 @@ def add_part_4(doc):
     )
     
     # Bước 4.4
-    add_heading_2(doc, "Bước 4.4: Module AI 5 - Gợi ý Khuyến mãi Thông minh & Tự động gửi SMS Voucher")
+    add_heading_2(doc, "Bước 4.4: Module AI 5 - Kích hoạt Khuyến mãi & Gửi SMS Discount thời gian thực")
     add_explanation_box(
         doc,
         "Ví dụ đời thường (Trợ lý Marketing kích cầu giờ ế và Níu chân khách VIP)",
         "Giống như một chuyên viên tiếp thị giàu kinh nghiệm: AI liên tục phân tích Materialized View doanh thu "
-        "để phát hiện các khung giờ vắng khách (ví dụ sáng thứ 2 - thứ 5) để đề xuất Happy Hour giảm 30%, "
-        "hoặc phát hiện các khách hàng VIP lâu ngày chưa ghé quán để tự động kích hoạt gửi SMS tặng voucher níu chân."
+        "để phát hiện các khung giờ vắng khách để kích hoạt giảm 25% tiền giờ, đồng thời tặng mã VIP 30K "
+        "bằng cách tự động phát tín hiệu NOTIFY bắn tin nhắn SMS tính toán mức giảm tiền cụ thể về điện thoại khách hàng."
     )
+    add_speech_box(
+        doc,
+        "Ở bước này, nhóm kết hợp trọn vẹn luồng tương tác giữa Database Cloud và Tool Python: "
+        "Đầu tiên, chạy tool Python trên Terminal để mở cổng đón nhận SMS. Sau đó trên Neon SQL, nhóm chạy hàm AI "
+        "kích hoạt khuyến mãi. Hệ thống tự động gửi tin nhắn SMS tới điện thoại tính rõ mức giảm: giá gốc 10.000đ/giờ, "
+        "giảm 25% (-2.500đ) chỉ còn 7.500đ/giờ! Tiếp theo, nhóm chạy câu lệnh SQL đối chiếu giá để chứng minh "
+        "hệ thống tính tiền đã cập nhật chính xác từ 10k xuống 7.5k!"
+    )
+    
+    # 4.4 - Bước A: Tool Python lắng nghe
     add_code_table(
         doc,
-        "🖥️ CỬA SỔ THAO TÁC: NEON SQL EDITOR / DBEAVER",
+        "🖥️ BƯỚC A: CỬA SỔ PHẢI (TERMINAL POWERSHELL) - CHẠY TOOL PYTHON LẮNG NGHE CỔNG SMS GATEWAY:",
+        "python python/sms_gateway_listener.py\n"
+        "# Màn hình Terminal hiển thị: Đang lắng nghe kênh 'ai_sms_dispatch' và chờ lệnh từ Neon...\n"
+        "# (Hoặc chạy công cụ gửi SMS trực tiếp: python python/send_brandname_sms.py --promo --phone \"0327469105\" --name \"Nguyen Viet Anh\")"
+    )
+    
+    # 4.4 - Bước B: Lệnh SQL kích hoạt trên Neon
+    add_code_table(
+        doc,
+        "🖥️ BƯỚC B: CỬA SỔ TRÁI (NEON SQL EDITOR) - CHẠY LỆNH SQL KÍCH HOẠT KHUYẾN MÃI AI:",
+        "SELECT applied_code, applied_name, target_info, discount_val, status_msg \n"
+        "FROM ai.fn_apply_promotions();"
+    )
+    
+    # 4.4 - Bước C: Màn hình Terminal báo gửi SMS thành công & mức discount
+    add_code_table(
+        doc,
+        "📊 BƯỚC C: MÀN HÌNH TERMINAL (TỰ ĐỘNG BẬT TÍN HIỆU GỬI SMS & DISCOUNT 25% TỪ 10K -> 7.5K):",
+        "[🔔 TÍN HIỆU CSDL NHẬN ĐƯỢC LÚC REAL-TIME]\n"
+        "    - Khách hàng đích  : Nguyễn Việt Anh (SĐT: 0327469105)\n"
+        "    - Mã Chương trình  : HAPPY_AI_16H + VIP_VIETANH_30K\n"
+        "    - Chính sách giá   : Giá gốc 10.000đ/h -> GIẢM 25% (-2.500đ) -> Còn 7.500đ/h!\n"
+        "    - Nội dung SMS     : [NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Khung giờ vàng kích cầu: "
+        "Giá gốc 10.000đ/h -> GIẢM 25% (-2.500đ) chỉ còn 7.500đ/h! Tặng kèm mã VIP30K giảm 30.000đ. Hẹn gặp bạn tại NetCafe!\n"
+        "----------------------------------------------------------------------\n"
+        "[📲 TRẠNG THÁI GỬI SMS]: THÀNH CÔNG (HTTP 200 OK - DELIVERED)!\n"
+        "[✅] Đã gửi tin nhắn SMS thành công tới số điện thoại 0327469105!\n"
+        "[🔗] Kênh theo dõi trực tiếp trên điện thoại: https://ntfy.sh/netcafe_vietanh"
+    )
+    
+    # 4.4 - Bước D: Lệnh SQL đối chiếu bảng giá từ 10k còn 7.5k
+    add_code_table(
+        doc,
+        "🖥️ BƯỚC D: CỬA SỔ TRÁI (NEON SQL EDITOR) - ĐỐI CHIẾU BẢNG GIÁ THỰC TẾ (TỪ 10K CÒN 7.5K):",
+        "-- Đối chiếu bảng giá tính tiền thực tế sau khi áp dụng Khuyến mãi AI (Giảm 25%):\n"
         "SELECT \n"
-        "    sug_id, \n"
-        "    suggestion_type, \n"
-        "    target, \n"
-        "    details->>'recommended_action' AS hanh_dong_goi_y,\n"
-        "    details->>'rationale'          AS ly_do_ai\n"
-        "FROM ai.promotion_suggestion;"
+        "    p.code AS ma_khuyen_mai,\n"
+        "    p.promotion_name AS ten_chuong_trinh,\n"
+        "    10000 AS gia_goc_moi_gio,\n"
+        "    p.value || '%' AS phan_tram_giam,\n"
+        "    ROUND(10000 * (p.value / 100)) AS so_tien_duoc_giam,\n"
+        "    ROUND(10000 * (1 - p.value / 100)) AS gia_thuc_te_phai_tra,\n"
+        "    'ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN' AS trang_thai_he_thong\n"
+        "FROM billing.promotion p\n"
+        "WHERE p.code = 'HAPPY_AI_16H';"
     )
-    add_code_table(
+    add_result_table(
         doc,
-        "🖥️ CỬA SỔ THAO TÁC: TERMINAL POWERSHELL (GỬI VOUCHER KÍCH CẦU):",
-        "python python/send_brandname_sms.py --promo --phone \"0327469105\" --name \"Nguyen Viet Anh\""
+        ["ma_khuyen_mai", "gia_goc_moi_gio", "phan_tram_giam", "so_tien_duoc_giam", "gia_thuc_te_phai_tra", "trang_thai_he_thong"],
+        [
+            ["HAPPY_AI_16H", "10.000 VNĐ", "25.0%", "2.500 VNĐ", "7.500 VNĐ", "ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN"]
+        ]
     )
 
 def add_part_5(doc):

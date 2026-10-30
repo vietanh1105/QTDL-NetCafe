@@ -2554,9 +2554,11 @@ BEGIN
         json_build_object(
             'customer_name', 'Nguyễn Việt Anh',
             'phone', '0327469105',
-            'code', 'VIP_VIETANH_30K',
-            'discount', '30,000 VNĐ',
-            'message', '[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Lâu rồi không thấy bạn ghé quán. Tặng bạn mã VIP30K (giảm 30.000đ + 1 lon nước ngọt). Hẹn gặp bạn tại phòng máy!'
+            'code', 'HAPPY_AI_16H',
+            'original_price', '10.000đ/giờ',
+            'discount', 'Giảm 25% (-2.500đ)',
+            'final_price', '7.500đ/giờ',
+            'message', '[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Khung giờ vàng kích cầu: Giá gốc 10.000đ/h -> GIẢM 25% (-2.500đ) chỉ còn 7.500đ/h! Tặng kèm mã VIP30K giảm 30.000đ. Hẹn gặp bạn tại NetCafe!'
         )::text
     );
 

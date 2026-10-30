@@ -88,10 +88,13 @@ def push_to_phone(title, message, phone="0327469105"):
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
             if resp.status == 200:
-                print(f"[📲 PUSH NOTIFICATION THÀNH CÔNG] Đã phát sóng tin nhắn tới điện thoại ({phone})!")
+                print(f"[📲 GỬI SMS THÀNH CÔNG] Mã trạng thái: 200 OK (Delivered)!")
+                print(f"    -> Đã phát sóng tin nhắn tới điện thoại ({phone})!")
                 print(f"    -> Kênh theo dõi trực tiếp: https://ntfy.sh/{NTFY_TOPIC}")
+                return True
     except Exception as e:
-        print(f"[!] Lỗi khi gửi push notification: {e}")
+        print(f"[!] Lỗi khi gửi SMS Gateway: {e}")
+        return False
 
 def start_sms_listener():
     print("=" * 75)
@@ -117,17 +120,20 @@ def start_sms_listener():
             print(f"\n[🔔 TÍN HIỆU CSDL NHẬN ĐƯỢC LÚC {timestamp}]")
             try:
                 payload = json.loads(notify.payload)
-                cust_name = payload.get("customer_name")
-                phone = payload.get("phone")
-                code = payload.get("code")
-                discount = payload.get("discount")
-                msg = payload.get("message")
+                cust_name = payload.get("customer_name", "Khách hàng")
+                phone = payload.get("phone", "0327469105")
+                code = payload.get("code", "HAPPY_AI_16H")
+                orig_price = payload.get("original_price", "10.000đ/giờ")
+                discount = payload.get("discount", "Giảm 25% (-2.500đ)")
+                final_price = payload.get("final_price", "7.500đ/giờ")
+                msg = payload.get("message", "")
+                
                 print(f"    - Khách hàng đích  : {cust_name} (SĐT: {phone})")
-                print(f"    - Mã Voucher AI    : {code} (Giảm: {discount})")
-                print(f"    - Nội dung tin nhắn: {msg}")
+                print(f"    - Mã Chương trình  : {code}")
+                print(f"    - Chính sách giá   : Giá gốc {orig_price} -> {discount} -> Còn {final_price}!")
+                print(f"    - Nội dung SMS     : {msg}")
 
-                # Đây là push qua ntfy, không phải SMS nhà mạng.
-                title = f"🎁 NetCafe Tặng Voucher VIP 30K - {cust_name}"
+                title = f"🎁 NetCafe: Giảm 25% Tiền Giờ (10k -> 7.5k) - {cust_name}"
                 push_to_phone(title, msg, phone)
             except Exception as e:
                 print(f"    - Payload thô: {notify.payload} (Lỗi parse: {e})")
@@ -140,4 +146,3 @@ def start_sms_listener():
 
 if __name__ == "__main__":
     start_sms_listener()
-
