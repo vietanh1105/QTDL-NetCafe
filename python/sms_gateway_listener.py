@@ -65,15 +65,20 @@ def get_db_connection():
 
 def push_to_phone(title, message, phone="0327469105"):
     try:
-        url = f"https://ntfy.sh/{NTFY_TOPIC}"
-        data = message.encode("utf-8")
+        url = "https://ntfy.sh/"
+        payload = {
+            "topic": NTFY_TOPIC,
+            "title": title,
+            "message": message,
+            "priority": 4,
+            "tags": ["tada", "iphone", "partying_face"]
+        }
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(
             url,
             data=data,
             headers={
-                "Title": urllib.request.quote(title),
-                "Priority": "high",
-                "Tags": "tada,iphone,partying_face",
+                "Content-Type": "application/json; charset=utf-8"
             }
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
