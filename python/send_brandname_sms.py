@@ -19,6 +19,11 @@ if sys.stdout.encoding != 'utf-8':
 NTFY_TOPIC = "netcafe_vietanh"
 
 def push_sms(phone, name, amount=None, balance=None, is_promo=False):
+    # Đảm bảo an ninh tuyệt đối: Chỉ gửi đích danh cho Nguyễn Việt Anh (0327469105)
+    if phone != "0327469105":
+        print(f"[!] BẢO VỆ AN TOÀN: Hệ thống chỉ cấu hình gửi riêng cho Nguyễn Việt Anh (0327469105). Từ chối gửi tới {phone}.")
+        return False
+
     if is_promo:
         orig_price = 10000
         discount_percent = 25
@@ -96,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

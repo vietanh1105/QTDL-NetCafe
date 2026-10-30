@@ -69,6 +69,11 @@ def get_db_connection():
         )
 
 def push_to_phone(title, message, phone="0327469105"):
+    # Đảm bảo an ninh tuyệt đối: Chỉ gửi đích danh cho Nguyễn Việt Anh (0327469105)
+    if phone != "0327469105":
+        print(f"[!] BẢO VỆ AN TOÀN: Hệ thống chỉ cấu hình gửi riêng cho Nguyễn Việt Anh (0327469105). Từ chối gửi tới {phone}.")
+        return False
+
     try:
         url = "https://ntfy.sh/"
         payload = {

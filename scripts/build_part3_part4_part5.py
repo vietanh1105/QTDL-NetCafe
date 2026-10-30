@@ -288,6 +288,21 @@ def add_part_4(doc):
             ["HAPPY_AI_16H", "10.000 VNĐ", "25.0%", "2.500 VNĐ", "7.500 VNĐ", "ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN"]
         ]
     )
+    
+    # 4.4 - Bước E: Rà soát lõi CSDL bằng Python Terminal
+    add_code_table(
+        doc,
+        "🖥️ BƯỚC E [ĐIỂM NHẤN THUYẾT PHỤC GIẢNG VIÊN]: TERMINAL POWERSHELL - RÀ SOÁT TẦNG LÕI NHÂN CSDL:",
+        "python python/verify_promotion_engine.py"
+    )
+    add_explanation_box(
+        doc,
+        "Ý nghĩa kiểm định lõi gửi Hội đồng chấm điểm",
+        "Lệnh trên kết nối trực tiếp vào PostgreSQL engine, kiểm chứng 3 điểm cốt tử: "
+        "1. Bảng dữ liệu lõi billing.promotion đã thực sự lưu trữ mã HAPPY_AI_16H với mức giảm 25% (is_active = True); "
+        "2. An ninh SMS: Chỉ gửi đích danh duy nhất Nguyễn Việt Anh (0327469105), không gửi cho khách hàng khác; "
+        "3. Thuật toán tính cước CSDL thực thi tự động: Đơn giá 10.000đ -> Giảm 2.500đ -> Giá thực thu 7.500đ/giờ!"
+    )
 
 def add_part_5(doc):
     """Xây dựng Phần 5: Tổng kết và bảo vệ đề tài."""
