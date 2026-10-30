@@ -445,6 +445,19 @@ def build_report():
     )
     p.paragraph_format.line_spacing = 1.15
 
+    add_callout(doc, "Bộ câu lệnh SQL kiểm định quy trình ETL và phân tách dữ liệu sạch / bẩn",
+                "-- 1. Xem 10 dòng dữ liệu thô bị lỗi ban đầu trong Staging:\n"
+                "SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch\n"
+                "FROM staging.stg_customers ORDER BY raw_id LIMIT 10;\n\n"
+                "-- 2. Xem bảng cách ly các dòng dữ liệu bẩn (Rejected Rows):\n"
+                "SELECT rejected_id, error_reason, raw_record FROM staging.rejected_rows;\n\n"
+                "-- 3. Xem các dữ liệu đã được xử lý và làm sạch nạp vào CSDL chính (core.customer):\n"
+                "SELECT customer_id, full_name, phone, email, username, balance\n"
+                "FROM core.customer\n"
+                "WHERE username LIKE 'user_%'\n"
+                "ORDER BY customer_id\n"
+                "LIMIT 16;")
+
     doc.add_page_break()
 
     # -------------------------------------------------------------------------
