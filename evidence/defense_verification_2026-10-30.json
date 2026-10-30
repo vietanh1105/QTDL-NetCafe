@@ -1,0 +1,43 @@
+{
+  "source_base": "515ac7374488308b5cd4ef3ca6a91aa12592aae9",
+  "integrated_main": "22334e4cef70987be845184aed0467636a8cadd3",
+  "review_dates": [
+    "2026-10-29",
+    "2026-10-30"
+  ],
+  "neon": {
+    "database": "netcafe_db",
+    "server_version_observed": "18.6",
+    "persistent_business_data_changed": false,
+    "migration_14_applied": false,
+    "temporary_fixture_rows": 20000,
+    "plans": [
+      "Nested Loop  (cost=0.00..799.65 rows=1 width=240) (actual time=0.704..1.116 rows=1.00 loops=1)\n  Join Filter: (c.customer_id = d.customer_id)\n  Rows Removed by Join Filter: 13\n  Buffers: shared hit=1, local hit=448\n  ->  Seq Scan on baove_invoice_perf d  (cost=0.00..798.00 rows=1 width=26) (actual time=0.693..1.105 rows=1.00 loops=1)\n        Filter: ((issued_at >= '2026-10-01 00:00:00+07'::timestamp with time zone) AND (issued_at < '2026-10-31 00:00:00+07'::timestamp with time zone) AND (invoice_id = 12345))\n        Rows Removed by Filter: 19999\n        Buffers: local hit=448\n  ->  Seq Scan on customer c  (cost=0.00..1.29 rows=29 width=222) (actual time=0.006..0.007 rows=14.00 loops=1)\n        Buffers: shared hit=1\nPlanning:\n  Buffers: shared hit=33 read=1\nPlanning Time: 0.932 ms\nExecution Time: 1.142 ms",
+      "Hash Join  (cost=8.32..9.73 rows=1 width=240) (actual time=0.042..0.045 rows=1.00 loops=1)\n  Hash Cond: (c.customer_id = d.customer_id)\n  Buffers: shared hit=4, local hit=1 read=2\n  ->  Seq Scan on customer c  (cost=0.00..1.29 rows=29 width=222) (actual time=0.007..0.009 rows=30.00 loops=1)\n        Buffers: shared hit=1\n  ->  Hash  (cost=8.31..8.31 rows=1 width=26) (actual time=0.030..0.030 rows=1.00 loops=1)\n        Buckets: 1024  Batches: 1  Memory Usage: 9kB\n        Buffers: shared hit=3, local hit=1 read=2\n        ->  Index Scan using baove_invoice_perf_lookup on baove_invoice_perf d  (cost=0.29..8.31 rows=1 width=26) (actual time=0.027..0.028 rows=1.00 loops=1)\n              Index Cond: (invoice_id = 12345)\n              Filter: ((issued_at >= '2026-10-01 00:00:00+07'::timestamp with time zone) AND (issued_at < '2026-10-31 00:00:00+07'::timestamp with time zone))\n              Index Searches: 1\n              Buffers: shared hit=3, local hit=1 read=2\nPlanning:\n  Buffers: shared hit=27, local read=1\nPlanning Time: 0.174 ms\nExecution Time: 0.072 ms"
+    ],
+    "python_listener_psycopg3": "PASS on private test channel"
+  },
+  "isolated_postgresql_18_6": {
+    "scripts/run-qa.ps1": "exit 0; build 0 warnings/errors; 29/29 .NET tests; SQL checks passed",
+    "tests/verify_defense_roles.sql": "cashier topup/open/order/close PASS; actor spoof DENIED; ROLLBACK",
+    "cloud_sql_rebuild_twice": "PASS; 14 customers, 20 computers, 9 invoices, 4 service_request FKs",
+    "python_cloud_init": "PASS",
+    "listener_factories_after_main_integration": "PASS; both received psycopg3 notifications; no external HTTP push",
+    "scripts/migrate-main.ps1": "exit 0 on independent netcafe_db; not run on Neon"
+  },
+  "document": {
+    "pages": 42,
+    "questions": 30,
+    "tables_in_dictionary": 25,
+    "sql_blocks_checked_on_qa": 22,
+    "operator_sheet_synced": true,
+    "visual_review_pages": 42,
+    "sha256": "a9dc094f1933f5a21c9741caf39704455bbe4e36cb0a57bac11af3e70ac01208"
+  },
+  "not_certified": [
+    "all headed UI actions",
+    "large concurrent load",
+    "external SMS/ntfy delivery",
+    "Neon disaster recovery"
+  ]
+}

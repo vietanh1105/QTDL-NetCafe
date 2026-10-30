@@ -65,7 +65,13 @@ $port = $config['DB_PORT']
 $user = $ownerUser
 
 $dumpPath = Join-Path $backupDir 'netcafe_db_before_08.dump'
-& $pgDump -h $hostName -p $port -U $user -d $dbName --format=custom --file=$dumpPath
+Push-Location -LiteralPath $backupDir
+try {
+    & $pgDump -h $hostName -p $port -U $user -d $dbName --format=custom --file=netcafe_db_before_08.dump
+}
+finally {
+    Pop-Location
+}
 if ($LASTEXITCODE -ne 0) { throw 'pg_dump backup failed; migration was not started.' }
 
 $countSql = @"
@@ -83,17 +89,36 @@ $migrationPaths = @(
     (Join-Path $repoRoot 'sql\08_station_customer.sql'),
     (Join-Path $repoRoot 'sql\10_admin_operations.sql'),
     (Join-Path $repoRoot 'sql\11_report_alignment.sql'),
-    (Join-Path $repoRoot 'sql\12_security_hardening.sql')
+    (Join-Path $repoRoot 'sql\12_security_hardening.sql'),
+    (Join-Path $repoRoot 'sql\14_defense_demo_fixes.sql')
 )
 foreach ($migrationPath in $migrationPaths) {
     $migrationText = Get-Content -Raw -LiteralPath $migrationPath
-    foreach ($forbiddenToken in @('DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM')) {
-        if ($migrationText -match [regex]::Escape($forbiddenToken)) {
-            throw "Migration bị chặn vì chứa thao tác phá hủy: $forbiddenToken ($migrationPath)"
+    # Chỉ kiểm tra lệnh được chạy ngay, không nhầm DELETE trong thân function với DML migration.
+    $topLevelSql = [regex]::Replace($migrationText, '(?s)/\*.*?\*/', '')
+    $topLevelSql = [regex]::Replace($topLevelSql, '(?m)--.*$', '')
+    $functionBodyPattern = '(?is)\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b.*?(\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$).*?\1'
+    $topLevelSql = [regex]::Replace($topLevelSql, $functionBodyPattern, '')
+    $forbiddenPatterns = @{
+        'DROP DATABASE' = '(?i)\bDROP\s+DATABASE\b'
+        'DROP SCHEMA' = '(?i)\bDROP\s+SCHEMA\b'
+        'TRUNCATE' = '(?im)(?:^|;)\s*TRUNCATE\b'
+        'DELETE FROM' = '(?i)\bDELETE\s+FROM\b'
+    }
+    foreach ($entry in $forbiddenPatterns.GetEnumerator()) {
+        if ($topLevelSql -match $entry.Value) {
+            throw "Migration bị chặn vì chứa thao tác phá hủy: $($entry.Key) ($migrationPath)"
         }
     }
-    & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -f $migrationPath
-    if ($LASTEXITCODE -ne 0) { throw "Migration thất bại: $migrationPath; không chạy reset/seed." }
+    $temporarySql = Join-Path ([IO.Path]::GetTempPath()) ('netcafe_migration_' + [Guid]::NewGuid().ToString('N') + '.sql')
+    try {
+        [IO.File]::WriteAllText($temporarySql, $migrationText, [Text.UTF8Encoding]::new($false))
+        & $pgBin -X -v ON_ERROR_STOP=1 -h $hostName -p $port -U $user -d $dbName -f $temporarySql
+        if ($LASTEXITCODE -ne 0) { throw "Migration thất bại: $migrationPath; không chạy reset/seed." }
+    }
+    finally {
+        Remove-Item -LiteralPath $temporarySql -Force -ErrorAction SilentlyContinue
+    }
 }
 
 $quotedRole = '"' + $stationRole.Replace('"', '""') + '"'

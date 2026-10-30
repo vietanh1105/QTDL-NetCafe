@@ -53,33 +53,12 @@ def get_db_connection():
         return conn
     except ImportError:
         import psycopg
-        ssl_str = f"?sslmode={DB_SSL_MODE.lower()}" if DB_SSL_MODE else ""
-        conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}{ssl_str}"
-        return psycopg.connect(conn_str, autocommit=True)
-
-SQL_FILES = [
-    "sql/01_schema.sql",
-    "sql/02_functions_triggers.sql",
-    "sql/03_views.sql",
-    "sql/04_security.sql",
-    "sql/05_indexes_partition.sql",
-    "sql/06_seed_base.sql",
-    "sql/07_ai_modules.sql",
-    "sql/08_station_customer.sql",
-    "sql/10_admin_operations.sql",
-    "sql/11_report_alignment.sql",
-    "sql/12_security_hardening.sql",
-    "sql/13_ai_demo_situations.sql"
-]
-
-def clean_sql(content: str) -> str:
-    lines = []
-    for line in content.splitlines():
-        trimmed = line.strip()
-        if trimmed.startswith("\\c ") or trimmed == "\\c":
-            continue
-        lines.append(line)
-    return "\n".join(lines)
+        return psycopg.connect(
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+            user=DB_USER, password=DB_PASSWORD,
+            sslmode=DB_SSL_MODE.lower() if DB_SSL_MODE else "prefer",
+            autocommit=True,
+        )
 
 def wipe_cloud():
     print("=" * 70)
@@ -107,37 +86,27 @@ def init_cloud():
     print("   TIẾN TRÌNH KHỞI TẠO CSDL VÀ NẠP DỮ LIỆU MỒI (CLOUD INIT & SEED)   ")
     print("=" * 70)
     print(f"[*] Đang kết nối tới PostgreSQL: {DB_HOST}:{DB_PORT}/{DB_NAME}...")
+    print("[!] INIT tái tạo toàn bộ 8 schema và dữ liệu demo trong database đang chọn.")
     conn = get_db_connection()
     start_time = time.time()
     try:
         with conn.cursor() as cur:
-            for fpath in SQL_FILES:
-                abs_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), fpath)
-                if not os.path.exists(abs_path):
-                    print(f"[!] Bỏ qua (không tìm thấy file): {fpath}")
-                    continue
-                
-                print(f"[*] Đang thực thi: {fpath}...")
-                with open(abs_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                sql = clean_sql(content)
-                cur.execute(sql)
-                print(f"    -> OK: {fpath}")
-
-            # Đảm bảo neondb_owner có quyền SET ROLE sang các vai trò nhân viên
-            print("[*] Đang cấp quyền SET ROLE cho neondb_owner...")
-            try:
-                cur.execute("GRANT role_admin, role_manager, role_cashier, nv_admin, nv_manager, nv_thao, nv_nam, nv_tuan, nv_hung TO neondb_owner;")
-            except Exception as e:
-                print(f"    (Notice: {e})")
+            abs_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "sql", "netcafe_cloud_init.sql"
+            )
+            # File tổng hợp có BEGIN/COMMIT; lỗi khởi tạo không để lại database nửa chừng.
+            with open(abs_path, "r", encoding="utf-8") as sql_file:
+                cur.execute(sql_file.read())
 
             # Đếm số bảng và schemas đã tạo
             cur.execute("""
-                SELECT table_schema, count(table_name) 
-                FROM information_schema.tables 
-                WHERE table_schema IN ('core', 'inventory', 'billing', 'hr', 'audit', 'ai', 'reporting', 'staging')
-                GROUP BY table_schema
-                ORDER BY table_schema;
+                SELECT n.nspname,
+                       count(*) FILTER (WHERE c.relkind IN ('r','p') AND NOT c.relispartition)
+                FROM pg_namespace n LEFT JOIN pg_class c ON c.relnamespace = n.oid
+                WHERE n.nspname IN ('core', 'inventory', 'billing', 'hr', 'audit', 'ai', 'reporting', 'staging')
+                GROUP BY n.nspname
+                ORDER BY n.nspname;
             """)
             stats = cur.fetchall()
             total_tables = sum(r[1] for r in stats)
@@ -145,7 +114,7 @@ def init_cloud():
             elapsed = time.time() - start_time
             print("=" * 70)
             print(f"[+] KHỞI TẠO THÀNH CÔNG TOÀN BỘ CSDL TRONG {elapsed:.2f} GIÂY!")
-            print(f"[*] Tổng số Schemas: {len(stats)} | Tổng số Bảng: {total_tables}")
+            print(f"[*] Schemas: {len(stats)} | Bảng logic (không tính partition/view): {total_tables}")
             for schema, count in stats:
                 print(f"    - Schema '{schema}': {count} bảng")
             print("=" * 70)

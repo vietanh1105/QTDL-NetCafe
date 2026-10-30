@@ -24,25 +24,33 @@ $pgCandidates += Get-ChildItem "C:\Program Files\PostgreSQL" -Directory -ErrorAc
     ForEach-Object { Join-Path $_.FullName "bin\psql.exe" }
 $psql = $pgCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $psql) { throw "Không tìm thấy psql.exe để chạy tests/station_customer.sql." }
-$testSql = Join-Path (Split-Path $PSScriptRoot -Parent) "tests\station_customer.sql"
-& $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -d $env:DB_NAME -f $testSql
+function Invoke-QASql([string]$relativePath, [string]$loginUser) {
+    # psql Windows có thể làm hỏng đường dẫn tuyệt đối chứa tiếng Việt; dùng đường dẫn tương đối.
+    Push-Location -LiteralPath (Split-Path $PSScriptRoot -Parent)
+    try {
+        & $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $loginUser -d $env:DB_NAME -f $relativePath
+        if ($LASTEXITCODE -ne 0) { throw "QA SQL thất bại: $relativePath" }
+    }
+    finally {
+        Pop-Location
+    }
+}
+Invoke-QASql "tests/station_customer.sql" $env:DB_USER
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$prepareStationSql = Join-Path (Split-Path $PSScriptRoot -Parent) "tests\verify_qa_station_prepare.sql"
-$stationSql = Join-Path (Split-Path $PSScriptRoot -Parent) "tests\verify_qa_station.sql"
-$assertStationSql = Join-Path (Split-Path $PSScriptRoot -Parent) "tests\verify_qa_station_assert.sql"
 if (-not $env:STATION_DB_USER -or -not $env:STATION_DB_PASSWORD) {
     throw "QA station bị dừng: cần STATION_DB_USER và STATION_DB_PASSWORD."
 }
-& $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -d $env:DB_NAME -f $prepareStationSql
+Invoke-QASql "tests/verify_qa_station_prepare.sql" $env:DB_USER
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:PGPASSWORD = $env:STATION_DB_PASSWORD
-& $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $env:STATION_DB_USER -d $env:DB_NAME -f $stationSql
+Invoke-QASql "tests/verify_qa_station.sql" $env:STATION_DB_USER
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:PGPASSWORD = $env:DB_PASSWORD
-& $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -d $env:DB_NAME -f $assertStationSql
+Invoke-QASql "tests/verify_qa_station_assert.sql" $env:DB_USER
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$aiSql = Join-Path (Split-Path $PSScriptRoot -Parent) "tests\verify_qa_ai.sql"
-& $psql -v ON_ERROR_STOP=1 -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -d $env:DB_NAME -f $aiSql
+Invoke-QASql "tests/verify_qa_ai.sql" $env:DB_USER
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Invoke-QASql "tests/verify_defense_roles.sql" $env:DB_USER
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 dotnet test (Join-Path (Split-Path $PSScriptRoot -Parent) "app/NetCafe.Data.Tests/NetCafe.Data.Tests.csproj") --no-build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

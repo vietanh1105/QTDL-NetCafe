@@ -141,6 +141,48 @@ CREATE TRIGGER trg_maintenance_sync_computer
 -- 3. STORED FUNCTIONS NGHIỆP VỤ (GỌI TỪ PHẦN MỀM DESKTOP)
 -- ----------------------------------------------------------------------------
 
+-- Kiểm tra tác nhân trước khi nâng quyền ghi; SET ROLE vẫn nhận diện đúng login nghiệp vụ.
+CREATE OR REPLACE FUNCTION hr.fn_assert_employee_actor(p_employee_id INT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, hr
+AS $$
+DECLARE
+    v_effective_user TEXT := COALESCE(NULLIF(current_setting('role', true), 'none'), session_user);
+    v_employee_id INT;
+    v_is_active BOOLEAN;
+BEGIN
+    SELECT employee_id, is_active INTO v_employee_id, v_is_active
+    FROM hr.employee
+    WHERE db_username = v_effective_user;
+
+    IF v_employee_id IS NOT NULL THEN
+        IF v_is_active AND p_employee_id = v_employee_id THEN
+            RETURN;
+        END IF;
+        RAISE EXCEPTION 'Nhân viên thao tác không khớp tài khoản hoặc đã bị khóa.'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- DBA được thao tác trên dữ liệu demo nhưng vẫn phải dùng một nhân viên active.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_effective_user AND rolsuper)
+       OR v_effective_user = (
+           SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()
+       ) THEN
+        IF EXISTS (
+            SELECT 1 FROM hr.employee WHERE employee_id = p_employee_id AND is_active
+        ) THEN
+            RETURN;
+        END IF;
+    END IF;
+
+    RAISE EXCEPTION 'Tài khoản chưa được ánh xạ với nhân viên được phép thao tác.'
+        USING ERRCODE = '42501';
+END;
+$$;
+REVOKE ALL ON FUNCTION hr.fn_assert_employee_actor(INT) FROM PUBLIC;
+
 -- 3.1. Nghiệp vụ: Mở phiên chơi máy cho khách hàng
 CREATE OR REPLACE FUNCTION core.sp_open_session(
     p_customer_id INT,
@@ -155,6 +197,7 @@ DECLARE
     v_hourly_rate NUMERIC;
     v_session_id BIGINT;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_opened_by);
     -- 1. Kiểm tra khách hàng
     SELECT is_active, balance INTO v_cust_active, v_cust_balance
     FROM core.customer 
@@ -208,7 +251,8 @@ BEGIN
     -- Trigger trg_session_sync_computer sẽ tự động cập nhật computer.status = 'in_use'
     RETURN v_session_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION core.sp_open_session IS 'Nghiệp vụ mở phiên chơi: Kiểm tra số dư, trạng thái máy, chốt đơn giá giờ';
 
 -- 3.2. Nghiệp vụ: Đóng phiên chơi và Thanh toán nguyên tử (Atomic Close & Settle)
@@ -359,6 +403,7 @@ CREATE OR REPLACE FUNCTION billing.sp_top_up(
 DECLARE
     v_new_balance NUMERIC;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
     IF p_amount <= 0 THEN
         RAISE EXCEPTION 'Số tiền nạp phải lớn hơn 0 (Số tiền nhập: %)!', p_amount;
     END IF;
@@ -383,7 +428,8 @@ BEGIN
 
     RETURN v_new_balance;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION billing.sp_top_up IS 'Nghiệp vụ nạp tiền tài khoản: Cộng số dư và ghi sổ quỹ';
 
 -- 3.4. Nghiệp vụ: Gọi món F&B cho phiên chơi
@@ -399,6 +445,7 @@ DECLARE
     v_stock_qty INT;
     v_order_id BIGINT;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
     -- Kiểm tra phiên chơi
     SELECT status INTO v_sess_status
     FROM core.gaming_session
@@ -432,5 +479,6 @@ BEGIN
 
     RETURN v_order_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION inventory.sp_place_order IS 'Nghiệp vụ gọi món F&B: Kiểm tra tồn kho, tạo đơn và trừ kho';

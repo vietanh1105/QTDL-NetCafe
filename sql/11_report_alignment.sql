@@ -63,6 +63,6 @@ GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admi
 GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier, role_technician;
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier;
 GRANT ALL ON reporting.mv_revenue_daily TO role_admin;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier, role_technician;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier;

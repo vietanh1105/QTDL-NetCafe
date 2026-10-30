@@ -9,9 +9,9 @@
 
 import os
 import sys
-import select
 import json
 import time
+from notification_stream import iter_notifications
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -21,7 +21,9 @@ if sys.stdout.encoding != 'utf-8':
 
 def load_env_file():
     env_vars = {}
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    env_path = os.getenv("NETCAFE_ENV_FILE") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
+    )
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -54,9 +56,12 @@ def get_db_connection():
         return conn
     except ImportError:
         import psycopg
-        ssl_str = f"?sslmode={DB_SSL_MODE.lower()}" if DB_SSL_MODE else ""
-        conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}{ssl_str}"
-        conn = psycopg.connect(conn_str, autocommit=True)
+        conn = psycopg.connect(
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+            user=DB_USER, password=DB_PASSWORD,
+            sslmode=DB_SSL_MODE.lower() if DB_SSL_MODE else "prefer",
+            autocommit=True,
+        )
         return conn
 
 def start_listening(channel="ai_security_alert"):
@@ -75,30 +80,23 @@ def start_listening(channel="ai_security_alert"):
     print("    Nhấn Ctrl + C để dừng lắng nghe.\n" + "-" * 70)
 
     try:
-        while True:
-            # Chờ tín hiệu từ socket trong 5 giây, lặp lại liên tục
-            if select.select([conn], [], [], 5) == ([], [], []):
-                continue
-            
-            conn.poll()
-            while conn.notifies:
-                notify = conn.notifies.pop(0)
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                print(f"\n[🚨 CẢNH BÁO AN NINH PHÁT HIỆN LÚC {timestamp}]")
-                print(f"    - Kênh (Channel)     : {notify.channel}")
-                print(f"    - Tiến trình phát PID: {notify.pid}")
-                
-                try:
-                    payload = json.loads(notify.payload)
-                    print(f"    - Mã cảnh báo (ID)   : #{payload.get('alert_id')}")
-                    print(f"    - Mức độ rủi ro      : [{payload.get('risk_level', '').upper()}] (Score: {payload.get('risk_score')}/100)")
-                    print(f"    - Bảng bị tác động   : {payload.get('table')}")
-                    print(f"    - Tác nhân thực hiện : {payload.get('actor')}")
-                    print(f"    - Nguyên nhân AI     : {payload.get('reason')}")
-                except Exception:
-                    print(f"    - Dữ liệu thô        : {notify.payload}")
-                
-                print("-" * 70)
+        for notify in iter_notifications(conn):
+            timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            print(f"\n[🚨 CẢNH BÁO AN NINH PHÁT HIỆN LÚC {timestamp}]")
+            print(f"    - Kênh (Channel)     : {notify.channel}")
+            print(f"    - Tiến trình phát PID: {notify.pid}")
+
+            try:
+                payload = json.loads(notify.payload)
+                print(f"    - Mã cảnh báo (ID)   : #{payload.get('alert_id')}")
+                print(f"    - Mức độ rủi ro      : [{payload.get('risk_level', '').upper()}] (Score: {payload.get('risk_score')}/100)")
+                print(f"    - Bảng bị tác động   : {payload.get('table')}")
+                print(f"    - Tác nhân thực hiện : {payload.get('actor')}")
+                print(f"    - Nguyên nhân AI     : {payload.get('reason')}")
+            except Exception:
+                print(f"    - Dữ liệu thô        : {notify.payload}")
+
+            print("-" * 70)
     except KeyboardInterrupt:
         print("\n[*] Đã dừng tiến trình lắng nghe.")
     finally:

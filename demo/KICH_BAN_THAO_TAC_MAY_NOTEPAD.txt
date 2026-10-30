@@ -1,286 +1,371 @@
-================================================================================
-          KỊCH BẢN THAO TÁC MÁY (DÀNH CHO BẠN BẤM LỆNH KHI BẢO VỆ)
-   Dự án: Quản trị Cơ sở Dữ liệu Phòng Game Net (PostgreSQL 17 trên Neon Cloud)
-   Database: netcafe_db | User: neondb_owner
-   Tương ứng 1-1 với file Word: KichBan_ThuyetTrinh_BaoVe_QTDL_MoiNhat.docx
-================================================================================
+KỊCH BẢN THAO TÁC MÁY CHO BUỔI BẢO VỆ NETCAFE
+Đi kèm docs/KichBan_ThuyetTrinh_BaoVe_QTDL_MoiNhat.docx ngày 30/10/2026.
+Các khối lệnh dưới đây được trích nguyên văn từ cùng nguồn tạo bản Word.
+Đọc lời trình bày, điều kiện và kết quả cần quan sát trong Word; không chạy cả file TXT.
 
-CHUẨN BỊ TRƯỚC KHI LÊN NÓI (Mở sẵn trên màn hình máy tính):
-  1. Cửa sổ bên TRÁI: DBeaver / pgAdmin / Neon SQL Editor (đang kết nối 'netcafe_db')
-  2. Cửa sổ bên PHẢI: PowerShell (mở sẵn tại thư mục: c:\Users\Administrator\Documents\QTDL-NetCafe)
-  3. Cửa sổ nhỏ góc: Mở file txt này để copy lệnh
-  4. Trên điện thoại: Mở trình duyệt web gõ sẵn: https://ntfy.sh/netcafe_vietanh (hoặc app ntfy)
+CHUẨN BỊ
+1. Mở DBeaver/pgAdmin trên nhánh Neon demo riêng; Terminal tại gốc repository.
+2. Kiểm tra endpoint và cấu hình .env; không hiển thị mật khẩu khi trình chiếu.
+3. Chạy khối nhận diện môi trường trước. Phiên bản server phải đọc từ kết quả thật.
+4. Khởi tạo: mở sql/netcafe_cloud_init.sql và chạy trên database demo được phép tái tạo.
+   File này xóa và tạo lại tám schema trong transaction. Không dùng cho dữ liệu cần giữ.
+5. Nếu giữ database hiện có: xem backup và sql/14_defense_demo_fixes.sql trước khi cập nhật.
+   Bản bàn giao chưa áp dụng migration này lên Neon; kiểm tra quyền trước khi demo ghi.
+6. ETL có ghi/xóa dữ liệu demo. Kết quả 20 đầu vào = 16 nạp + 4 loại là mốc đã thử,
+   khi trình chiếu phải đọc lại số liệu của lần chạy.
+7. Demo 3 chính: mở demo/demo_6_index_fixture.sql, chạy trên cùng một kết nối.
+   Bảng tạm 20.000 dòng, EXPLAIN trước/sau B-Tree, cuối file ROLLBACK.
+   Không ép planner; đọc kế hoạch và thời gian thật, không hứa mức tăng tốc cố định.
+8. Demo cảnh báo: mở listener Python trước, chờ đăng ký kênh rồi chạy giao dịch nạp tiền.
+   Giao dịch này COMMIT và tăng số dư trên database demo. Đối chiếu alert_id và thời gian.
+9. Chạy từng khối SQL trong cùng phiên; khi cố tình gây lỗi, chạy riêng ROLLBACK sau đó.
+10. Các phần Admin/Station và backup là mở rộng, chỉ dùng sau khi đã tập đúng môi trường.
 
+GIỚI HẠN CẦN NÓI ĐÚNG
+RLS của thu ngân theo employee mapping, không tự động giới hạn theo ca sáng.
+Các module AI hiện dùng quy tắc, so khớp và thống kê; có thể trả về tập rỗng hợp lệ.
+Gateway ntfy là HTTP push, không phải SMS nhà mạng; không có trong chuỗi demo chính.
+Không tự chạy fn_apply_promotions hay gửi thông báo ra điện thoại từ file này.
 
-################################################################################
-PHẦN 1: DEMO KHỞI TẠO, ETL & RÀNG BUỘC TOÀN VẸN (FAIL-SAFE DEMO)
-################################################################################
+========================================================================
+Kịch bản bảo vệ hệ thống quản lý phòng game NetCafe / Chuẩn bị trước buổi bảo vệ
+SQL
 
---- [BƯỚC 1.0: (TÙY CHỌN) Khởi tạo CSDL siêu tốc từ con số 0] ---
-👉 Thao tác trên cửa sổ TERMINAL (PowerShell) - Chỉ chạy khi thầy yêu cầu làm mới DB:
+SELECT current_database() AS database_name,
+       current_user AS effective_user,
+       session_user AS login_user,
+       current_setting('server_version') AS server_version,
+       current_setting('TimeZone') AS time_zone;
 
-# Xóa sạch CSDL trên Cloud trong 0.5 giây:
-python python/reset_and_init_cloud.py --wipe
+========================================================================
+Kịch bản bảo vệ hệ thống quản lý phòng game NetCafe / Luồng nghiệp vụ và giao dịch thanh toán
+SQL
 
-# Khởi tạo toàn bộ Schemas, Bảng và Ràng buộc trong 5.3 giây:
-python python/reset_and_init_cloud.py --init
+SELECT core.fn_calc_session_amount(
+    '2026-10-01 08:00:00+07'::timestamptz,
+    '2026-10-01 09:30:00+07'::timestamptz,
+    12000::numeric
+) AS play_amount;
 
+========================================================================
+Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Nhận diện đối tượng trước khi thao tác
+SQL
 
---- [BƯỚC 1.1: Chạy luồng Python ETL làm sạch dữ liệu bẩn] ---
-👉 Thao tác trên cửa sổ TERMINAL (PowerShell):
+SELECT n.nspname AS schema_name,
+       count(*) FILTER (
+           WHERE c.relkind IN ('r','p') AND NOT c.relispartition
+             AND c.relname <> 'qa_reset_marker'
+       ) AS logical_tables,
+       count(*) FILTER (
+           WHERE c.relkind IN ('r','p') AND c.relispartition
+       ) AS partition_tables,
+       count(*) FILTER (WHERE c.relkind = 'v') AS views,
+       count(*) FILTER (WHERE c.relkind = 'm') AS materialized_views
+FROM pg_namespace n
+LEFT JOIN pg_class c ON c.relnamespace = n.oid
+WHERE n.nspname IN (
+    'core','inventory','billing','hr',
+    'audit','ai','reporting','staging'
+)
+GROUP BY n.nspname
+ORDER BY n.nspname;
 
-# Sinh 20 dòng dữ liệu bẩn vào bảng tạm staging:
+========================================================================
+Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Tạo dữ liệu thô và thực hiện ETL
+POWERSHELL
+
 python python/generate_dirty_data.py
-
-# Chạy tiến trình ETL làm sạch, chuẩn hóa và nạp lại:
 python python/clean_data.py
 
+========================================================================
+Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Tạo dữ liệu thô và thực hiện ETL
+SQL
 
---- [BƯỚC 1.2: Xem dữ liệu thô và bảng cách ly dữ liệu bẩn trên DBeaver / Neon] ---
-👉 Copy dán vào cửa sổ SQL EDITOR rồi bấm Chạy:
+SELECT raw_id, raw_full_name, raw_phone,
+       raw_balance, raw_email, source_batch
+FROM staging.stg_customers
+WHERE source_batch = 'BATCH_DIRTY_01'
+ORDER BY raw_id;
 
--- 1. Xem 10 dòng dữ liệu thô bị lỗi (+84, dấu chấm, tiền âm, in hoa):
-SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch 
-FROM staging.stg_customers 
-ORDER BY raw_id 
-LIMIT 10;
+SELECT error_reason, count(*) AS rejected_count
+FROM staging.rejected_rows
+WHERE source_table = 'core.customer'
+GROUP BY error_reason
+ORDER BY error_reason;
 
--- 2. Xem bảng cách ly dữ liệu bẩn (Rejected Rows) với nguyên nhân cụ thể:
-SELECT rejected_id, source_table, error_reason, raw_record, rejected_at 
-FROM staging.rejected_rows 
-ORDER BY rejected_id DESC 
+SELECT rejected_id, error_reason, raw_record
+FROM staging.rejected_rows
+WHERE source_table = 'core.customer'
+ORDER BY rejected_id;
+
+========================================================================
+Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Chứng minh CHECK và khóa ngoại bằng lỗi thật
+SQL
+
+Lỗi chủ đích: 23514, ck_customer_balance. Sau lỗi chạy riêng ROLLBACK.
+
+BEGIN;
+UPDATE core.customer
+SET balance = -50000
+WHERE customer_id = (
+    SELECT min(customer_id) FROM core.customer
+);
+-- Sau khi quan sát lỗi, chạy riêng dòng sau
+ROLLBACK;
+
+========================================================================
+Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Chứng minh CHECK và khóa ngoại bằng lỗi thật
+SQL
+
+Lỗi chủ đích: RESTRICT; lần thử nhận 23001. Sau lỗi chạy riêng ROLLBACK.
+
+BEGIN;
+DELETE FROM core.room
+WHERE room_id = (
+    SELECT min(room_id) FROM core.computer
+);
+-- Sau khi quan sát lỗi, chạy riêng dòng sau
+ROLLBACK;
+
+========================================================================
+Demo 2 Phân quyền RBAC và bảo mật cấp dòng và cột / Đối chiếu dữ liệu thu ngân và quản lý
+SQL
+
+BEGIN;
+SET LOCAL ROLE nv_thao;
+SELECT current_user,
+       hr.fn_get_current_employee_id() AS employee_id;
+SELECT invoice_id, customer_id, cashier_id,
+       total_amount, status
+FROM billing.invoice
+ORDER BY invoice_id;
+ROLLBACK;
+
+========================================================================
+Demo 2 Phân quyền RBAC và bảo mật cấp dòng và cột / Đối chiếu dữ liệu thu ngân và quản lý
+SQL
+
+BEGIN;
+SET LOCAL ROLE nv_manager;
+SELECT cashier_id, count(*) AS invoice_count,
+       sum(total_amount) AS total_amount
+FROM billing.invoice
+GROUP BY cashier_id
+ORDER BY cashier_id;
+ROLLBACK;
+
+========================================================================
+Demo 2 Phân quyền RBAC và bảo mật cấp dòng và cột / Chứng minh quyền cột lương
+SQL
+
+Lỗi chủ đích: 42501, quyền đọc lương bị chặn. Sau lỗi chạy riêng ROLLBACK.
+
+BEGIN;
+SET LOCAL ROLE nv_thao;
+SELECT employee_id, full_name, salary
+FROM hr.employee;
+-- Sau khi quan sát lỗi, chạy riêng dòng sau
+ROLLBACK;
+
+========================================================================
+Demo 3 Đọc kế hoạch truy vấn và giải thích chỉ mục / Đối chiếu thêm trên bảng hóa đơn hiện có
+SQL
+
+BEGIN;
+DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
+ANALYZE billing.invoice;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT invoice_id, customer_id, cashier_id,
+       total_amount, status
+FROM billing.invoice
+WHERE total_amount = 630000;
+
+CREATE INDEX idx_invoice_total_amount
+ON billing.invoice (total_amount);
+ANALYZE billing.invoice;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT invoice_id, customer_id, cashier_id,
+       total_amount, status
+FROM billing.invoice
+WHERE total_amount = 630000;
+ROLLBACK;
+
+========================================================================
+Demo 3 Đọc kế hoạch truy vấn và giải thích chỉ mục / Module 2 Gợi ý chỉ mục từ catalog
+SQL
+
+SELECT recommendation_id, table_name,
+       column_list, reason, suggested_sql
+FROM ai.fn_recommend_indexes()
+ORDER BY recommendation_id;
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Truy vấn thông số máy trong JSONB
+SQL
+
+SELECT computer_code, computer_name,
+       specs ->> 'cpu' AS cpu_model,
+       specs ->> 'gpu' AS gpu_model,
+       specs ->> 'ram' AS memory_size
+FROM core.computer
+WHERE specs @> '{"gpu":"RTX 4070"}'::jsonb
+ORDER BY computer_code;
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 1 Kiểm toán và cảnh báo rủi ro
+SQL
+
+LISTEN ai_security_alert;
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 1 Kiểm toán và cảnh báo rủi ro
+SQL
+
+BEGIN;
+SET LOCAL ROLE nv_admin;
+SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
+SELECT billing.sp_top_up(
+    (SELECT min(customer_id) FROM core.customer),
+    hr.fn_get_current_employee_id(),
+    10000000::numeric,
+    'cash'::varchar,
+    'DEMO_BAO_VE_ALERT'::varchar
+);
+COMMIT;
+
+SELECT alert_id, risk_score, risk_level,
+       reason, created_at
+FROM ai.fn_security_guard()
+ORDER BY created_at DESC
 LIMIT 5;
 
-
---- [BƯỚC 1.3: Demo Ràng buộc CHECK - Nạp số dư âm bị chặn (Vi phạm ck_customer_balance)] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ -> Đúng kịch bản!):
-
-INSERT INTO core.customer (full_name, phone, username, password_hash, balance) 
-VALUES ('Khách Sai Tiền Âm', '0919999999', 'user_failsafe', 'hash123', -50000);
-
-
---- [BƯỚC 1.4: Demo Ràng buộc Khóa ngoại ON DELETE RESTRICT - Chặn xóa phòng máy đang hoạt động] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ vi phạm Foreign Key RESTRICT -> Đúng kịch bản!):
-
-DELETE FROM core.room WHERE room_id = 1;
-
-
---- [BƯỚC 1.5: (Bổ sung) Demo Ràng buộc CHECK định dạng Email sai] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ vi phạm ck_customer_email -> Đúng kịch bản!):
-
-INSERT INTO core.customer (full_name, phone, email, username, password_hash)
-VALUES ('Khach Hang Test', '0988777666', 'email_sai_dinh_dang', 'user_test', 'hash_pass');
-
-
-
-################################################################################
-PHẦN 2: BẢO MẬT PHÂN QUYỀN VÀ RLS / CLS (ROLE-PLAYING DEMO)
-################################################################################
-
---- [BƯỚC 2.1: Đóng vai Nhân viên Thu ngân Thảo (cashier_id = 3)] ---
-👉 Copy dán vào SQL EDITOR:
-
-SET ROLE nv_thao;
-SELECT CURRENT_USER, SESSION_USER;
-
-
---- [BƯỚC 2.2: Demo RLS - Thảo chỉ thấy hóa đơn do chính mình lập ở ca sáng] ---
-👉 Copy dán vào SQL EDITOR (Chỉ thấy đúng các hóa đơn của Thảo, không thấy của nhân viên khác):
-
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice;
-
-
---- [BƯỚC 2.3: Đổi vai sang Quản lý (Manager) để đối chiếu toàn quyền giám sát] ---
-👉 Copy dán vào SQL EDITOR:
-
-RESET ROLE;
-SET ROLE nv_manager;
-
-SELECT 
-    i.cashier_id, 
-    e.full_name AS ten_nhan_vien, 
-    e.username AS tai_khoan, 
-    e.phone AS so_dien_thoai,
-    e.emp_role AS vai_tro, 
-    e.default_shift AS ca_lam_viec, 
-    count(i.invoice_id) AS so_luong_hoa_don,
-    sum(i.total_amount) AS tong_doanh_thu
-FROM billing.invoice i
-JOIN hr.employee e ON i.cashier_id = e.employee_id
-GROUP BY i.cashier_id, e.full_name, e.username, e.phone, e.emp_role, e.default_shift
-ORDER BY i.cashier_id;
-
-RESET ROLE;
-
-
---- [BƯỚC 2.4: Demo CLS - Thu ngân Thảo cố tình xem lén cột Lương (salary) của nhân viên] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ: permission denied for table employee -> Đúng kịch bản!):
-
-SET ROLE nv_thao;
-
-SELECT employee_id, full_name, salary 
-FROM hr.employee;
-
-RESET ROLE;
-
-
---- [BƯỚC 2.5: Thu ngân xem qua View công khai (vw_employee_public - Đã che giấu lương)] ---
-👉 Copy dán vào SQL EDITOR (Xem thành công danh bạ nội bộ mà không lộ thông tin lương nhạy cảm):
-
-SET ROLE nv_thao;
-
-SELECT * FROM hr.vw_employee_public;
-
-RESET ROLE;
-
-
---- [BƯỚC 2.6: Module AI 3 - Bắt trùng lặp tài khoản khách hàng bằng pg_trgm] ---
-👉 Copy dán vào SQL EDITOR (Phát hiện khách hàng cố tình tạo nhiều nick nhận khuyến mãi):
-
-SELECT candidate_id, customer_name_a, customer_name_b, similarity, reason 
-FROM ai.fn_detect_duplicates(0.65);
-
-RESET ROLE;
-
-
-
-################################################################################
-PHẦN 3: TỐI ƯU HÓA HIỆU NĂNG VÀ MODULE AI 2 (PERFORMANCE DEMO)
-################################################################################
-
---- [BƯỚC 3.1: Đảm bảo quyền Owner & Xóa index cũ để đưa bảng về trạng thái nguyên bản] ---
-👉 Copy dán vào SQL EDITOR:
-
-RESET ROLE;
-DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
-
-
---- [BƯỚC 3.2: Đo khi CHƯA có Index -> Kết quả: Seq Scan (Quét tuần tự toàn bảng)] ---
-👉 Copy dán vào SQL EDITOR (Chỉ chuột vào dòng chữ: 'Seq Scan on invoice'):
-
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice 
-WHERE total_amount = 630000;
-
-
---- [BƯỚC 3.3: Tạo B-Tree Index và đo lại -> Kết quả: Index Scan (Nhảy thẳng đến hóa đơn)] ---
-👉 Copy dán vào SQL EDITOR (Chỉ chuột vào dòng chữ: 'Index Scan using idx_invoice_total_amount'):
-
--- 1. Tạo chỉ mục B-Tree trên cột số tiền hóa đơn:
-CREATE INDEX idx_invoice_total_amount ON billing.invoice (total_amount);
-
--- 2. Bật ép dùng Index và chạy lại câu truy vấn:
-SET enable_seqscan = off;
-
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice 
-WHERE total_amount = 630000;
-
-SET enable_seqscan = on;
-
-
---- [BƯỚC 3.4: Module AI 2 - AI tự động quét Catalog runtime và khuyến nghị Index tối ưu] ---
-👉 Copy dán vào SQL EDITOR:
-
-SELECT recommendation_id, table_name, column_list, reason, suggested_sql 
-FROM ai.fn_recommend_indexes() 
-LIMIT 3;
-
-
-
-################################################################################
-PHẦN 4: ĐIỂM NHẤN TÍCH HỢP & 3 MODULE AI THỜI GIAN THỰC (AI HIGHLIGHTS)
-################################################################################
-
---- [BƯỚC 4.1: Bóc tách dữ liệu bán cấu trúc NoSQL từ cột JSONB (->> và @>)] ---
-👉 Copy dán vào SQL EDITOR:
-
-SELECT 
-    computer_code, 
-    computer_name,
-    specs ->> 'cpu'     AS cpu_chip,
-    specs ->> 'gpu'     AS card_man_hinh,
-    specs ->> 'ram'     AS dung_luong_ram
-FROM core.computer
-WHERE specs ->> 'gpu' ILIKE '%RTX%';
-
--- Truy vấn kết hợp toán tử chứa tập con JSON Containment (@>):
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT computer_code, computer_name, specs 
-FROM core.computer 
-WHERE specs @> '{"gpu": "RTX 4070"}'::jsonb;
-
-
---- [BƯỚC 4.2: AI Cảnh báo rủi ro An ninh thời gian thực (LISTEN / NOTIFY)] ---
-👉 Bước A (Cửa sổ TERMINAL bên Phải): Chạy lệnh lắng nghe tín hiệu:
-python python/listen_ai_alerts.py
-# (Màn hình hiện: [+] ĐÃ KÍCH HOẠT LẮNG NGHE KÊNH: 'ai_security_alert' và đứng chờ)
-
-👉 Bước B (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh nạp tiền lớn bất thường (10 triệu VNĐ):
-INSERT INTO billing.payment (kind, customer_id, method, amount, employee_id, reference)
-VALUES ('topup', 1, 'bank_transfer', 10000000, 3, 'Demo nạp tiền kích còi báo động');
-
-👉 Bước C: Nhìn sang cửa sổ Terminal -> LẬP TỨC NỔ CẢNH BÁO ĐỎ THỜI GIAN THỰC!
-# (Bấm Ctrl + C trên cửa sổ Terminal để dừng tiến trình lắng nghe).
-
-
---- [BƯỚC 4.3: Module AI 4 - Thuật toán thống kê Z-Score phát hiện ngoại lai (Outliers)] ---
-👉 Copy dán vào SQL EDITOR:
-
-SELECT 
-    flag_id, 
-    anomaly_type, 
-    subject_table, 
-    metric_value, 
-    z_score,
-    detail_info->>'mean'   AS trung_binh,
-    detail_info->>'stddev' AS do_lech_chuan
-FROM ai.fn_detect_anomalies(1.5);
-
-
---- [BƯỚC 4.4: Module AI 5 - Gợi ý Chương trình Khuyến mãi Thông minh] ---
-👉 Copy dán vào SQL EDITOR (Xem 3 đề xuất do AI tự động phân tích từ Materialized Views):
-
-SELECT 
-    sug_id, 
-    suggestion_type, 
-    target, 
-    details->>'recommended_action' AS hanh_dong_goi_y,
-    details->>'rationale'          AS ly_do_ai
-FROM ai.promotion_suggestion;
-
-
---- [BƯỚC 4.5: ĐIỂM NHẤN ĐẶC BIỆT - AI KÍCH HOẠT VOUCHER & BẮN SMS VỀ ĐIỆN THOẠI THẬT] ---
-👉 Bước A (Trên điện thoại của bạn): Đảm bảo đang mở link: https://ntfy.sh/netcafe_vietanh
-
-👉 Bước B (Cửa sổ TERMINAL bên Phải): Chạy tiến trình lắng nghe SMS Gateway:
-python python/sms_gateway_listener.py
-
-👉 Bước C (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh kích hoạt khuyến mãi:
-SELECT * FROM ai.fn_apply_promotions();
-# 👉 QUAN SÁT: Điện thoại của bạn lập tức rung lên và nhận ngay thông báo Voucher 30.000đ gửi đích danh Nguyễn Việt Anh!
-
-👉 Bước D (Cửa sổ SQL EDITOR): Kiểm tra bảng khuyến mãi chính thức đã được AI tự động nạp vào:
-SELECT code, promotion_name, value, valid_from, valid_to 
-FROM billing.promotion 
-WHERE conditions->>'auto_created_by_ai' = 'true';
-
-👉 Bước E (Cửa sổ SQL EDITOR): Hoàn tác (Rollback) sạch sẽ dữ liệu sau khi trình diễn xong:
-SELECT * FROM ai.fn_rollback_promotions();
-
-# (Bấm Ctrl + C trên cửa sổ Terminal để dừng tiến trình listener).
-
-
-
-################################################################################
-PHẦN 5: DỰ PHÒNG KHI GIẢNG VIÊN YÊU CẦU KIỂM THỬ TOÀN BỘ BẰNG PYTHON
-################################################################################
-👉 Chạy đúng 1 lệnh duy nhất trên cửa sổ Terminal:
-
-python python/test_all_ai_modules.py
-
-(Hệ thống tự động chạy và in bảng kết quả hoàn hảo của toàn bộ 5 Module AI trong 2 giây!)
-================================================================================
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 1 Kiểm toán và cảnh báo rủi ro
+POWERSHELL
+
+python -u python/listen_ai_alerts.py
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 3 Phát hiện khách hàng có khả năng trùng
+SQL
+
+SELECT candidate_id, customer_id_a, customer_name_a,
+       customer_id_b, customer_name_b, similarity, reason
+FROM ai.fn_detect_duplicates(0.65)
+ORDER BY candidate_id;
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 4 Phát hiện ngoại lai bằng Z score
+SQL
+
+SELECT flag_id, anomaly_type, subject_table,
+       subject_pk, metric_value, z_score,
+       detail_info ->> 'mean' AS mean_value,
+       detail_info ->> 'stddev' AS sample_stddev
+FROM ai.fn_detect_anomalies(1.5)
+ORDER BY flag_id;
+
+========================================================================
+Demo 4 JSONB và năm module phân tích trong PostgreSQL / Module 5 Gợi ý thời điểm ưu đãi và chăm sóc khách
+SQL
+
+SELECT suggestion_id, suggestion_type, target, details
+FROM ai.fn_suggest_promotions()
+ORDER BY suggestion_id;
+
+SELECT sug_id, suggestion_type, target,
+       details ->> 'recommended_action' AS recommended_action,
+       details ->> 'rationale' AS rationale
+FROM ai.promotion_suggestion
+ORDER BY sug_id;
+
+========================================================================
+Phần mở rộng Trình diễn luồng Admin và Station
+POWERSHELL
+
+dotnet run --project app/NetCafe.App
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-station.ps1 -ComputerCode PC001
+
+========================================================================
+Phần mở rộng Trình diễn luồng Admin và Station
+SQL
+
+SELECT c.computer_code, s.session_id, s.status,
+       s.last_heartbeat_at, s.close_reason,
+       i.invoice_id, i.total_amount,
+       p.method, p.amount
+FROM core.gaming_session s
+JOIN core.computer c ON c.computer_id = s.computer_id
+LEFT JOIN billing.invoice i ON i.session_id = s.session_id
+LEFT JOIN billing.payment p ON p.invoice_id = i.invoice_id
+ORDER BY s.session_id DESC
+LIMIT 5;
+
+========================================================================
+Báo cáo và vòng đời dữ liệu
+SQL
+
+SELECT reporting.sp_refresh_materialized_views();
+SELECT revenue_date, total_invoices, net_revenue
+FROM reporting.mv_revenue_daily
+ORDER BY revenue_date DESC;
+
+========================================================================
+Vacuum và sao lưu khôi phục
+POWERSHELL
+
+& "$env:PG_BIN\pg_dump.exe" -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -d $env:DB_NAME -Fc -f backup/baove_demo.dump
+& "$env:PG_BIN\createdb.exe" -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER -T template0 -E UTF8 netcafe_baove_restore
+& "$env:PG_BIN\pg_restore.exe" -h $env:DB_HOST -p $env:DB_PORT -U $env:DB_USER --exit-on-error --no-owner -d netcafe_baove_restore backup/baove_demo.dump
+
+========================================================================
+Đối chiếu yêu cầu bổ sung của giáo viên / Giải thích lựa chọn kiểu dữ liệu
+SQL
+
+SET TIME ZONE 'Asia/Ho_Chi_Minh';
+SHOW TimeZone;
+
+========================================================================
+Đối chiếu yêu cầu bổ sung của giáo viên / Kiểm chứng bốn tiêu chí chất lượng dữ liệu
+SQL
+
+SELECT count(*) AS invalid_customers
+FROM core.customer
+WHERE full_name <> btrim(full_name)
+   OR phone !~ '^0[35789][0-9]{8}$'
+   OR balance < 0;
+
+SELECT count(*) AS wrong_invoice_formula
+FROM billing.invoice
+WHERE total_amount <>
+      play_amount + service_amount + surcharge - discount_amount;
+
+SELECT status, count(*) AS session_count,
+       max(start_time) AS latest_start
+FROM core.gaming_session
+GROUP BY status;
+
+SELECT c.computer_code, c.status,
+       s.session_id, s.last_heartbeat_at
+FROM core.computer c
+LEFT JOIN core.gaming_session s
+  ON s.computer_id = c.computer_id AND s.status = 'active'
+ORDER BY c.computer_code;
+
+========================================================================
+Đối chiếu yêu cầu bổ sung của giáo viên / Ma trận quyền cần mang theo khi phản biện
+SQL
+
+BEGIN;
+SET LOCAL ROLE nv_thao;
+SELECT * FROM billing.invoice ORDER BY invoice_id;
+ROLLBACK;
+
+========================================================================
+Đối chiếu yêu cầu bổ sung của giáo viên / Bộ mã nguồn nộp để tái tạo độc lập
+POWERSHELL
+
+python python/build_full_sql.py
+python python/build_full_sql.py --cloud

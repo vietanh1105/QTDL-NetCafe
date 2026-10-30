@@ -1,22 +1,19 @@
 -- ============================================================================
 -- HỆ THỐNG QUẢN LÝ PHÒNG GAME/NET (NETCAFE MANAGEMENT SYSTEM)
 -- Môn: Quản trị Cơ sở Dữ liệu (QTDL)
--- File: sql/netcafe_cloud_init.sql
--- Mô tả: File khởi tạo toàn bộ CSDL trên Cloud (Neon Cloud / DBeaver / pgAdmin)
---        Tự động tạo 8 Schemas -> 35 Bảng -> Ràng buộc -> Triggers -> Views -> RLS -> Seed Data
--- ============================================================================
-
--- ============================================================================
--- HỆ THỐNG QUẢN LÝ PHÒNG GAME/NET (NETCAFE MANAGEMENT SYSTEM)
--- Môn: Quản trị Cơ sở Dữ liệu (QTDL)
 -- File: netcafe_full.sql (TẬP LỆNH TỔNG HỢP TOÀN BỘ HỆ THỐNG)
 -- Mô tả: File duy nhất cho phép giáo viên tái tạo toàn bộ hệ thống từ một máy chủ trống
 --        Bao gồm: Database -> Schemas -> Tables -> Contraints -> Functions/Triggers 
 --                 -> Views -> Security (RBAC/RLS) -> Indexes & Partition -> Seed Data -> 5 AI Modules
--- Liên kết: các file SQL nguồn trong SQL_FILES; hệ thống 100% chuẩn hóa không còn contract đặt máy.
--- Tính chất: 100% IDEMPOTENT - Có thể chạy lại nhiều lần mà không phát sinh lỗi.
+-- Liên kết: các file SQL nguồn trong SQL_FILES.
+-- Đây là script TÁI TẠO DỮ LIỆU DEMO, không phải migration giữ dữ liệu.
+-- Chỉ chạy trên database demo riêng; bản full có DROP DATABASE và lệnh psql.
 -- ============================================================================
 
+-- Bản Cloud không tạo/xóa database; tái tạo bảng trong database đang kết nối.
+BEGIN;
+SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
+DROP SCHEMA IF EXISTS core, inventory, billing, hr, audit, ai, reporting, staging CASCADE;
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -30,10 +27,11 @@
 -- Mục đích: Khởi tạo Extension, Schemas, Bảng, Khóa chính, Khóa ngoại, Ràng buộc
 -- NGUYÊN TẮC:
 -- 1. Idempotent: Chạy nhiều lần không lỗi (DROP ... CASCADE có kiểm soát).
--- 2. Tách bạch tối ưu: Chỉ tạo PK/UNIQUE/EXCLUDE bắt buộc. KHÔNG tạo index tối ưu ở đây 
+-- 2. Tách bạch tối ưu: Chỉ tạo PK/UNIQUE/EXCLUDE bắt buộc. KHÔNG tạo index tối ưu ở đây
 --    (index tối ưu nằm ở 05_indexes_partition.sql để phục vụ đo lường trước/sau).
 -- 3. Mọi FK dùng ON DELETE RESTRICT để bảo toàn tính toàn vẹn kế toán/lịch sử.
 -- ============================================================================
+
 
 
 -- ----------------------------------------------------------------------------
@@ -187,7 +185,7 @@ CREATE TABLE core.gaming_session (
     CONSTRAINT ck_session_play_amount CHECK (play_amount IS NULL OR play_amount >= 0),
     CONSTRAINT ck_session_time_order CHECK (end_time IS NULL OR end_time > start_time),
     CONSTRAINT ck_session_status_endtime CHECK (
-        (status = 'active' AND end_time IS NULL) OR 
+        (status = 'active' AND end_time IS NULL) OR
         (status <> 'active' AND end_time IS NOT NULL)
     )
 );
@@ -326,7 +324,7 @@ CREATE TABLE billing.invoice (
     paid_at TIMESTAMPTZ NULL,
 
     CONSTRAINT uq_invoice_session UNIQUE (session_id),
-    CONSTRAINT fk_invoice_session FOREIGN KEY (session_id) 
+    CONSTRAINT fk_invoice_session FOREIGN KEY (session_id)
         REFERENCES core.gaming_session(session_id) ON DELETE RESTRICT,
     CONSTRAINT ck_invoice_status CHECK (status IN ('unpaid', 'paid', 'void')),
     CONSTRAINT ck_invoice_play_amount CHECK (play_amount >= 0),
@@ -554,6 +552,7 @@ COMMENT ON TABLE staging.rejected_rows IS 'Bảng lưu các dòng dữ liệu b�
 -- ============================================================================
 
 
+
 -- ----------------------------------------------------------------------------
 -- 1. HÀM TÍNH TOÁN NGHIỆP VỤ (BUSINESS FUNCTIONS)
 -- ----------------------------------------------------------------------------
@@ -575,17 +574,17 @@ BEGIN
 
     -- Tính số giây chơi thực tế
     v_seconds := EXTRACT(EPOCH FROM (p_end_time - p_start_time));
-    
+
     -- Tiền = (Số giây / 3600) * Đơn giá giờ, làm tròn đến đồng
     v_amount := ROUND((v_seconds / 3600.0) * p_hourly_rate);
-    
+
     RETURN v_amount;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 COMMENT ON FUNCTION core.fn_calc_session_amount IS 'Hàm tính tiền giờ chơi theo giây và đơn giá áp dụng';
 
 -- 1.2. Hàm xác định hạng thành viên theo điểm tích lũy
-CREATE OR REPLACE FUNCTION core.fn_membership_tier(p_points INT) 
+CREATE OR REPLACE FUNCTION core.fn_membership_tier(p_points INT)
 RETURNS VARCHAR AS $$
 BEGIN
     IF p_points >= 2000 THEN
@@ -606,7 +605,7 @@ COMMENT ON FUNCTION core.fn_membership_tier IS 'Xác định hạng thành viên
 -- ----------------------------------------------------------------------------
 
 -- 2.1. Trigger cập nhật trạng thái máy theo phiên chơi
-CREATE OR REPLACE FUNCTION core.fn_trg_sync_computer_session() 
+CREATE OR REPLACE FUNCTION core.fn_trg_sync_computer_session()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' AND NEW.status = 'active' THEN
@@ -614,18 +613,18 @@ BEGIN
         IF (SELECT status FROM core.computer WHERE computer_id = NEW.computer_id) <> 'available' THEN
             RAISE EXCEPTION 'Máy tính ID % không ở trạng thái trống (available) để mở phiên!', NEW.computer_id;
         END IF;
-        UPDATE core.computer 
-        SET status = 'in_use' 
+        UPDATE core.computer
+        SET status = 'in_use'
         WHERE computer_id = NEW.computer_id;
 
     ELSIF TG_OP = 'UPDATE' THEN
         IF OLD.status = 'active' AND NEW.status IN ('finished', 'cancelled') THEN
-            UPDATE core.computer 
-            SET status = 'available' 
+            UPDATE core.computer
+            SET status = 'available'
             WHERE computer_id = NEW.computer_id;
         ELSIF OLD.status <> 'active' AND NEW.status = 'active' THEN
-            UPDATE core.computer 
-            SET status = 'in_use' 
+            UPDATE core.computer
+            SET status = 'in_use'
             WHERE computer_id = NEW.computer_id;
         END IF;
     END IF;
@@ -641,7 +640,7 @@ CREATE TRIGGER trg_session_sync_computer
 
 -- 2.2. Trigger tự động trừ tồn kho khi gọi món F&B
 -- Ràng buộc stock_qty >= 0 trên bảng product sẽ chặn đứng nếu bán vượt tồn kho!
-CREATE OR REPLACE FUNCTION inventory.fn_trg_deduct_stock() 
+CREATE OR REPLACE FUNCTION inventory.fn_trg_deduct_stock()
 RETURNS TRIGGER AS $$
 BEGIN
     UPDATE inventory.product
@@ -658,20 +657,20 @@ CREATE TRIGGER trg_order_detail_deduct_stock
     EXECUTE FUNCTION inventory.fn_trg_deduct_stock();
 
 -- 2.3. Trigger đồng bộ trạng thái máy khi bảo trì
-CREATE OR REPLACE FUNCTION hr.fn_trg_sync_computer_maintenance() 
+CREATE OR REPLACE FUNCTION hr.fn_trg_sync_computer_maintenance()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status IN ('reported', 'in_progress') THEN
-        UPDATE core.computer 
-        SET status = 'maintenance' 
+        UPDATE core.computer
+        SET status = 'maintenance'
         WHERE computer_id = NEW.computer_id;
     ELSIF NEW.status = 'fixed' THEN
-        UPDATE core.computer 
-        SET status = 'available' 
+        UPDATE core.computer
+        SET status = 'available'
         WHERE computer_id = NEW.computer_id;
     ELSIF NEW.status = 'unrepairable' THEN
-        UPDATE core.computer 
-        SET status = 'broken' 
+        UPDATE core.computer
+        SET status = 'broken'
         WHERE computer_id = NEW.computer_id;
     END IF;
     RETURN NEW;
@@ -688,6 +687,48 @@ CREATE TRIGGER trg_maintenance_sync_computer
 -- 3. STORED FUNCTIONS NGHIỆP VỤ (GỌI TỪ PHẦN MỀM DESKTOP)
 -- ----------------------------------------------------------------------------
 
+-- Kiểm tra tác nhân trước khi nâng quyền ghi; SET ROLE vẫn nhận diện đúng login nghiệp vụ.
+CREATE OR REPLACE FUNCTION hr.fn_assert_employee_actor(p_employee_id INT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, hr
+AS $$
+DECLARE
+    v_effective_user TEXT := COALESCE(NULLIF(current_setting('role', true), 'none'), session_user);
+    v_employee_id INT;
+    v_is_active BOOLEAN;
+BEGIN
+    SELECT employee_id, is_active INTO v_employee_id, v_is_active
+    FROM hr.employee
+    WHERE db_username = v_effective_user;
+
+    IF v_employee_id IS NOT NULL THEN
+        IF v_is_active AND p_employee_id = v_employee_id THEN
+            RETURN;
+        END IF;
+        RAISE EXCEPTION 'Nhân viên thao tác không khớp tài khoản hoặc đã bị khóa.'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- DBA được thao tác trên dữ liệu demo nhưng vẫn phải dùng một nhân viên active.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_effective_user AND rolsuper)
+       OR v_effective_user = (
+           SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()
+       ) THEN
+        IF EXISTS (
+            SELECT 1 FROM hr.employee WHERE employee_id = p_employee_id AND is_active
+        ) THEN
+            RETURN;
+        END IF;
+    END IF;
+
+    RAISE EXCEPTION 'Tài khoản chưa được ánh xạ với nhân viên được phép thao tác.'
+        USING ERRCODE = '42501';
+END;
+$$;
+REVOKE ALL ON FUNCTION hr.fn_assert_employee_actor(INT) FROM PUBLIC;
+
 -- 3.1. Nghiệp vụ: Mở phiên chơi máy cho khách hàng
 CREATE OR REPLACE FUNCTION core.sp_open_session(
     p_customer_id INT,
@@ -702,9 +743,10 @@ DECLARE
     v_hourly_rate NUMERIC;
     v_session_id BIGINT;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_opened_by);
     -- 1. Kiểm tra khách hàng
     SELECT is_active, balance INTO v_cust_active, v_cust_balance
-    FROM core.customer 
+    FROM core.customer
     WHERE customer_id = p_customer_id
     FOR UPDATE;
 
@@ -730,7 +772,7 @@ BEGIN
     END IF;
 
     -- 2. Kiểm tra máy tính
-    SELECT c.status, ct.hourly_rate 
+    SELECT c.status, ct.hourly_rate
     INTO v_comp_status, v_hourly_rate
     FROM core.computer c
     JOIN core.computer_type ct ON c.type_id = ct.type_id
@@ -755,7 +797,8 @@ BEGIN
     -- Trigger trg_session_sync_computer sẽ tự động cập nhật computer.status = 'in_use'
     RETURN v_session_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION core.sp_open_session IS 'Nghiệp vụ mở phiên chơi: Kiểm tra số dư, trạng thái máy, chốt đơn giá giờ';
 
 -- 3.2. Nghiệp vụ: Đóng phiên chơi và Thanh toán nguyên tử (Atomic Close & Settle)
@@ -799,7 +842,7 @@ BEGIN
 
     -- 3. Tính tiền giờ chơi
     v_play_amount := core.fn_calc_session_amount(v_session.start_time, v_end_time, v_session.hourly_rate_applied);
-    
+
     -- Tối thiểu tính 15 phút nếu vừa mở máy
     IF v_play_amount = 0 THEN
         v_play_amount := ROUND((15.0 / 60.0) * v_session.hourly_rate_applied);
@@ -839,7 +882,7 @@ BEGIN
     -- 7. Xử lý trừ tiền
     IF p_payment_method = 'balance' THEN
         IF v_customer.balance < v_total_amount THEN
-            RAISE EXCEPTION 'Số dư tài khoản hội viên không đủ (Số dư: % VNĐ, Cần thanh toán: % VNĐ)! Vui lòng nạp thêm tiền hoặc chọn tiền mặt.', 
+            RAISE EXCEPTION 'Số dư tài khoản hội viên không đủ (Số dư: % VNĐ, Cần thanh toán: % VNĐ)! Vui lòng nạp thêm tiền hoặc chọn tiền mặt.',
                             v_customer.balance, v_total_amount;
         END IF;
 
@@ -906,6 +949,7 @@ CREATE OR REPLACE FUNCTION billing.sp_top_up(
 DECLARE
     v_new_balance NUMERIC;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
     IF p_amount <= 0 THEN
         RAISE EXCEPTION 'Số tiền nạp phải lớn hơn 0 (Số tiền nhập: %)!', p_amount;
     END IF;
@@ -924,13 +968,14 @@ BEGIN
     INSERT INTO billing.payment (
         kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference
     ) VALUES (
-        'topup', NULL, p_customer_id, p_method, p_amount, p_employee_id, clock_timestamp(), 
+        'topup', NULL, p_customer_id, p_method, p_amount, p_employee_id, clock_timestamp(),
         COALESCE(p_reference, 'Nạp tiền tài khoản hội viên')
     );
 
     RETURN v_new_balance;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION billing.sp_top_up IS 'Nghiệp vụ nạp tiền tài khoản: Cộng số dư và ghi sổ quỹ';
 
 -- 3.4. Nghiệp vụ: Gọi món F&B cho phiên chơi
@@ -946,6 +991,7 @@ DECLARE
     v_stock_qty INT;
     v_order_id BIGINT;
 BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
     -- Kiểm tra phiên chơi
     SELECT status INTO v_sess_status
     FROM core.gaming_session
@@ -979,7 +1025,8 @@ BEGIN
 
     RETURN v_order_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
 COMMENT ON FUNCTION inventory.sp_place_order IS 'Nghiệp vụ gọi món F&B: Kiểm tra tồn kho, tạo đơn và trừ kho';
 
 
@@ -996,13 +1043,14 @@ COMMENT ON FUNCTION inventory.sp_place_order IS 'Nghiệp vụ gọi món F&B: K
 -- ============================================================================
 
 
+
 -- ----------------------------------------------------------------------------
 -- 1. VIEW PHỤC VỤ GIAO DIỆN PHẦN MỀM DESKTOP (WINFORMS)
 -- ----------------------------------------------------------------------------
 
 -- 1.1. Sơ đồ lưới máy trạm theo thời gian thực (Lõi của màn hình chính)
 CREATE OR REPLACE VIEW reporting.vw_computer_grid AS
-SELECT 
+SELECT
     c.computer_id,
     c.computer_code,
     c.computer_name,
@@ -1029,7 +1077,7 @@ COMMENT ON VIEW reporting.vw_computer_grid IS 'View sơ đồ phòng máy hiển
 
 -- 1.2. View chi tiết phiên chơi và thời lượng (Không lưu thừa cột duration)
 CREATE OR REPLACE VIEW reporting.vw_session_detail AS
-SELECT 
+SELECT
     s.session_id,
     c.computer_code,
     c.computer_name,
@@ -1054,7 +1102,7 @@ COMMENT ON VIEW reporting.vw_session_detail IS 'View chi tiết phiên chơi tí
 
 -- 1.3. Báo cáo doanh thu theo ngày
 CREATE OR REPLACE VIEW reporting.vw_daily_revenue AS
-SELECT 
+SELECT
     date_trunc('day', i.paid_at)::date AS revenue_date,
     COUNT(i.invoice_id) AS total_invoices,
     SUM(i.play_amount) AS total_play_amount,
@@ -1068,7 +1116,7 @@ ORDER BY revenue_date DESC;
 
 -- 1.4. Báo cáo hiệu suất máy trạm
 CREATE OR REPLACE VIEW reporting.vw_computer_usage AS
-SELECT 
+SELECT
     c.computer_id,
     c.computer_code,
     c.computer_name,
@@ -1103,7 +1151,7 @@ CREATE UNIQUE INDEX idx_mv_revenue_daily_date ON reporting.mv_revenue_daily (rev
 -- 2.2. Doanh thu theo tháng (Cần UNIQUE INDEX để REFRESH CONCURRENTLY)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_monthly_revenue CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_monthly_revenue AS
-SELECT 
+SELECT
     date_trunc('month', i.paid_at)::date AS revenue_month,
     COUNT(i.invoice_id) AS total_invoices,
     SUM(i.play_amount) AS total_play_amount,
@@ -1120,7 +1168,7 @@ CREATE UNIQUE INDEX idx_mv_monthly_revenue_month ON reporting.mv_monthly_revenue
 -- 2.3. Top khách hàng thân thiết và chi tiêu cao nhất (kèm lần chơi gần nhất cho RFM)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_top_customers CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_top_customers AS
-SELECT 
+SELECT
     c.customer_id,
     c.full_name,
     c.phone,
@@ -1140,7 +1188,7 @@ CREATE UNIQUE INDEX idx_mv_top_customers_id ON reporting.mv_top_customers (custo
 -- 2.4. Thống kê tần suất chơi theo giờ trong tuần (Phục vụ Module AI 5: Dự báo Happy Hour)
 DROP MATERIALIZED VIEW IF EXISTS reporting.mv_hourly_usage CASCADE;
 CREATE MATERIALIZED VIEW reporting.mv_hourly_usage AS
-SELECT 
+SELECT
     EXTRACT(ISODOW FROM s.start_time)::INT AS day_of_week,     -- 1: Thứ 2 ... 7: Chủ Nhật
     EXTRACT(HOUR FROM s.start_time)::INT AS hour_of_day,       -- 0..23h
     COUNT(s.session_id) AS session_count,
@@ -1167,6 +1215,7 @@ CREATE UNIQUE INDEX idx_mv_hourly_usage_dow_hour ON reporting.mv_hourly_usage (d
 --           - Row-Level Security (RLS) với ENABLE + FORCE ROW LEVEL SECURITY
 --           - Ánh xạ tài khoản nhân viên qua db_username
 -- ============================================================================
+
 
 
 -- ----------------------------------------------------------------------------
@@ -1320,7 +1369,7 @@ CREATE POLICY p_payment_cashier ON billing.payment
     WITH CHECK (employee_id = hr.fn_get_current_employee_id());
 
 -- 7.3. RLS trên bảng hr.employee: Nhân viên cấp thấp chỉ thấy dòng của chính mình
--- Lưu ý: Không dùng FORCE trên hr.employee để function SECURITY DEFINER (owner postgres) 
+-- Lưu ý: Không dùng FORCE trên hr.employee để function SECURITY DEFINER (owner postgres)
 -- tra cứu được ID mà không bị đệ quy chính sách.
 ALTER TABLE hr.employee ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hr.employee NO FORCE ROW LEVEL SECURITY;
@@ -1369,43 +1418,44 @@ CREATE POLICY p_maint_admin_manager ON hr.maintenance
 -- ============================================================================
 
 
+
 -- ----------------------------------------------------------------------------
 -- 1. B-TREE INDEXES CHO KHÓA NGOẠI VÀ TRUY VẤN TẦN SUẤT CAO
 -- ----------------------------------------------------------------------------
--- Giải thích DBA: Mặc định PostgreSQL không tự tạo index trên cột Foreign Key. 
+-- Giải thích DBA: Mặc định PostgreSQL không tự tạo index trên cột Foreign Key.
 -- Index trên FK chống Table Scan khi JOIN và tránh Row Exclusive Lock lan tỏa khi DELETE/UPDATE bảng cha.
 
-CREATE INDEX IF NOT EXISTS idx_session_customer_id 
+CREATE INDEX IF NOT EXISTS idx_session_customer_id
     ON core.gaming_session (customer_id);
 
-CREATE INDEX IF NOT EXISTS idx_session_computer_id 
+CREATE INDEX IF NOT EXISTS idx_session_computer_id
     ON core.gaming_session (computer_id);
 
-CREATE INDEX IF NOT EXISTS idx_session_start_time 
+CREATE INDEX IF NOT EXISTS idx_session_start_time
     ON core.gaming_session (start_time DESC);
 
-CREATE INDEX IF NOT EXISTS idx_order_session_id 
+CREATE INDEX IF NOT EXISTS idx_order_session_id
     ON inventory.food_order (session_id);
 
-CREATE INDEX IF NOT EXISTS idx_invoice_customer_id 
+CREATE INDEX IF NOT EXISTS idx_invoice_customer_id
     ON billing.invoice (customer_id);
 
-CREATE INDEX IF NOT EXISTS idx_invoice_cashier_id 
+CREATE INDEX IF NOT EXISTS idx_invoice_cashier_id
     ON billing.invoice (cashier_id);
 
-CREATE INDEX IF NOT EXISTS idx_invoice_issued_at 
+CREATE INDEX IF NOT EXISTS idx_invoice_issued_at
     ON billing.invoice (issued_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_payment_customer_id 
+CREATE INDEX IF NOT EXISTS idx_payment_customer_id
     ON billing.payment (customer_id);
 
-CREATE INDEX IF NOT EXISTS idx_payment_invoice_id 
+CREATE INDEX IF NOT EXISTS idx_payment_invoice_id
     ON billing.payment (invoice_id) WHERE invoice_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_maint_computer_id 
+CREATE INDEX IF NOT EXISTS idx_maint_computer_id
     ON hr.maintenance (computer_id);
 
-CREATE INDEX IF NOT EXISTS idx_maint_technician_id 
+CREATE INDEX IF NOT EXISTS idx_maint_technician_id
     ON hr.maintenance (technician_id);
 
 -- ----------------------------------------------------------------------------
@@ -1415,18 +1465,18 @@ CREATE INDEX IF NOT EXISTS idx_maint_technician_id
 -- Dung lượng index cực nhỏ, cache hoàn toàn trong RAM, tối ưu vượt trội cho các truy vấn thời gian thực.
 
 -- 2.1. Tra cứu các phiên chơi đang hoạt động (chỉ vài chục dòng trong hàng triệu dòng lịch sử)
-CREATE INDEX IF NOT EXISTS idx_session_active 
-    ON core.gaming_session (customer_id, computer_id) 
+CREATE INDEX IF NOT EXISTS idx_session_active
+    ON core.gaming_session (customer_id, computer_id)
     WHERE status = 'active';
 
 -- 2.2. Tra cứu máy tính còn trống theo phòng
-CREATE INDEX IF NOT EXISTS idx_computer_available 
-    ON core.computer (room_id, type_id) 
+CREATE INDEX IF NOT EXISTS idx_computer_available
+    ON core.computer (room_id, type_id)
     WHERE status = 'available';
 
 -- 2.3. Tra cứu hóa đơn chưa thanh toán
-CREATE INDEX IF NOT EXISTS idx_invoice_unpaid 
-    ON billing.invoice (invoice_id, customer_id) 
+CREATE INDEX IF NOT EXISTS idx_invoice_unpaid
+    ON billing.invoice (invoice_id, customer_id)
     WHERE status = 'unpaid';
 
 -- ----------------------------------------------------------------------------
@@ -1435,16 +1485,16 @@ CREATE INDEX IF NOT EXISTS idx_invoice_unpaid
 -- 3.1. GIN Trigram cho tìm kiếm mờ họ tên khách hàng không dấu và có dấu (ILIKE / LIKE '%...%')
 -- Giải thích DBA: B-Tree không dùng được khi tìm kiếm có ký tự đại diện ở đầu (%abc%).
 -- GIN pg_trgm tách chuỗi thành các cụm 3 ký tự, cho phép tăng tốc tìm kiếm chuỗi con tức thì.
-CREATE INDEX IF NOT EXISTS idx_customer_fullname_trgm 
+CREATE INDEX IF NOT EXISTS idx_customer_fullname_trgm
     ON core.customer USING gin (full_name gin_trgm_ops);
 
 -- 3.2. GIN jsonb_path_ops cho cấu hình phần cứng máy trạm (core.computer.specs)
 -- Giải thích DBA: jsonb_path_ops băm cả path+value thành 1 hash integer, nhỏ gọn hơn GIN mặc định và tăng tốc toán tử @>.
-CREATE INDEX IF NOT EXISTS idx_computer_specs_gin 
+CREATE INDEX IF NOT EXISTS idx_computer_specs_gin
     ON core.computer USING gin (specs jsonb_path_ops);
 
 -- 3.3. GIN jsonb_path_ops cho thuộc tính sản phẩm F&B
-CREATE INDEX IF NOT EXISTS idx_product_attr_gin 
+CREATE INDEX IF NOT EXISTS idx_product_attr_gin
     ON inventory.product USING gin (attributes jsonb_path_ops);
 
 -- ----------------------------------------------------------------------------
@@ -1452,15 +1502,15 @@ CREATE INDEX IF NOT EXISTS idx_product_attr_gin
 -- ----------------------------------------------------------------------------
 -- Giải thích DBA: BRIN lưu tóm tắt min/max của từng cụm trang đĩa vật lý (block range).
 -- Chiếm dưới 1% dung lượng so với B-Tree, hoàn hảo cho dữ liệu audit_log ghi theo thứ tự thời gian tăng dần liên tục.
-CREATE INDEX IF NOT EXISTS idx_audit_log_logged_at_brin 
+CREATE INDEX IF NOT EXISTS idx_audit_log_logged_at_brin
     ON audit.audit_log USING brin (logged_at);
 
 -- ----------------------------------------------------------------------------
 -- 5. TỐI ƯU HÓA HEAP-ONLY TUPLES (HOT) & AUTOVACUUM
 -- ----------------------------------------------------------------------------
--- Giải thích DBA: 
--- - Fillfactor < 100 chừa khoảng trống (free space) trên mỗi page dữ liệu để khi UPDATE, 
---   tuple mới được ghi ngay trên cùng page (Heap-Only Tuple). 
+-- Giải thích DBA:
+-- - Fillfactor < 100 chừa khoảng trống (free space) trên mỗi page dữ liệu để khi UPDATE,
+--   tuple mới được ghi ngay trên cùng page (Heap-Only Tuple).
 --   Khi đó không cần cập nhật lại các B-Tree index, giảm triệt để I/O write và chống index bloat.
 -- - autovacuum_vacuum_scale_factor thấp hơn giúp dọn dẹp tuple chết sớm hơn trên các bảng cập nhật nhiều.
 
@@ -1498,8 +1548,8 @@ BEGIN
         v_part_name   := 'audit_log_' || to_char(v_target_date, 'YYYY_MM');
 
         IF NOT EXISTS (
-            SELECT 1 FROM pg_class c 
-            JOIN pg_namespace n ON n.oid = c.relnamespace 
+            SELECT 1 FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
             WHERE n.nspname = 'audit' AND c.relname = v_part_name
         ) THEN
             v_sql := format(
@@ -1509,7 +1559,7 @@ BEGIN
                 to_char(v_next_date, 'YYYY-MM-01 00:00:00+00')
             );
             EXECUTE v_sql;
-            
+
             partition_name := v_part_name;
             start_date := v_target_date;
             end_date := v_next_date;
@@ -1543,6 +1593,7 @@ COMMENT ON FUNCTION audit.fn_create_monthly_partitions IS 'Tự động tạo pa
 -- ============================================================================
 
 
+
 -- 1. XÓA DỮ LIỆU CŨ VÀ RESET IDENTITY SEQUENCES
 TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.invoice,
          inventory.food_order_detail, inventory.food_order,
@@ -1550,9 +1601,9 @@ TRUNCATE hr.maintenance, billing.payment, billing.invoice_promotion, billing.inv
          core.customer, core.computer, core.computer_type, core.room,
          hr.employee, billing.promotion RESTART IDENTITY CASCADE;
 
--- 2. NHÂN SỰ VÀ TÀI KHOẢN HỆ THỐNG (ĐỦ 5 VAI TRÒ)
+-- 2. NHÂN SỰ VÀ TÀI KHOẢN HỆ THỐNG (3 VAI TRÒ ỨNG DỤNG)
 INSERT INTO hr.employee (full_name, phone, username, db_username, password_hash, emp_role, default_shift, salary, hired_date)
-VALUES 
+VALUES
     ('Nguyễn Văn An', '0981234567', 'an_nguyen', 'nv_admin', crypt(gen_random_uuid()::text, gen_salt('bf')), 'admin', 'morning', 20000000, '2024-01-15'),
     ('Lê Quang Minh', '0972345678', 'minh_le', 'nv_manager', crypt(gen_random_uuid()::text, gen_salt('bf')), 'manager', 'morning', 15000000, '2024-03-01'),
     ('Phạm Thu Thảo', '0913456789', 'thao_pham', 'nv_thao', crypt(gen_random_uuid()::text, gen_salt('bf')), 'cashier', 'morning', 8500000, '2024-06-10'),
@@ -1560,14 +1611,14 @@ VALUES
 
 -- 3. KHU VỰC VÀ PHÒNG MÁY
 INSERT INTO core.room (room_name, description)
-VALUES 
+VALUES
     ('Khu Máy Lạnh', 'Không gian thoáng mát cấm hút thuốc, ghế công thái học'),
     ('Khu Hút Thuốc', 'Khu vực có hệ thống hút mùi riêng biệt'),
     ('Phòng VIP Thi Đấu', 'Khu máy cấu hình cực cao, màn hình 240Hz, tai nghe chuyên game');
 
 -- 4. LOẠI MÁY VÀ GIÁ THUÊ/GIỜ (CHUẨN HÓA 3NF)
 INSERT INTO core.computer_type (type_name, hourly_rate)
-VALUES 
+VALUES
     ('Tiêu Chuẩn', 8000),      -- Core i5, GTX 1660 Super
     ('Nâng Cao', 12000),       -- Core i5 13th, RTX 3060
     ('VIP Thi Đấu', 18000);    -- Core i7 13th, RTX 4070
@@ -1575,9 +1626,9 @@ VALUES
 -- 5. DANH SÁCH 20 MÁY TRẠM (PC001 -> PC020)
 -- 8 máy Tiêu chuẩn (Khu hút thuốc)
 INSERT INTO core.computer (computer_code, computer_name, room_id, type_id, ip_address, mac_address, specs, status)
-SELECT 
+SELECT
     v.code, v.name, r.room_id, ct.type_id, v.ip::inet, v.mac::macaddr, v.specs::jsonb, 'available'
-FROM (VALUES 
+FROM (VALUES
     ('PC001', 'Máy 01', '192.168.1.101', '00:1A:2B:3C:4D:01', '{"cpu":"i5-10400F","ram":"16GB","gpu":"GTX 1660S"}'),
     ('PC002', 'Máy 02', '192.168.1.102', '00:1A:2B:3C:4D:02', '{"cpu":"i5-10400F","ram":"16GB","gpu":"GTX 1660S"}'),
     ('PC003', 'Máy 03', '192.168.1.103', '00:1A:2B:3C:4D:03', '{"cpu":"i5-10400F","ram":"16GB","gpu":"GTX 1660S"}'),
@@ -1592,9 +1643,9 @@ CROSS JOIN (SELECT type_id FROM core.computer_type WHERE type_name = 'Tiêu Chu�
 
 -- 7 máy Nâng cao (Khu máy lạnh)
 INSERT INTO core.computer (computer_code, computer_name, room_id, type_id, ip_address, mac_address, specs, status)
-SELECT 
+SELECT
     v.code, v.name, r.room_id, ct.type_id, v.ip::inet, v.mac::macaddr, v.specs::jsonb, 'available'
-FROM (VALUES 
+FROM (VALUES
     ('PC009', 'Máy 09', '192.168.1.109', '00:1A:2B:3C:4D:09', '{"cpu":"i5-13400F","ram":"16GB","gpu":"RTX 3060"}'),
     ('PC010', 'Máy 10', '192.168.1.110', '00:1A:2B:3C:4D:10', '{"cpu":"i5-13400F","ram":"16GB","gpu":"RTX 3060"}'),
     ('PC011', 'Máy 11', '192.168.1.111', '00:1A:2B:3C:4D:11', '{"cpu":"i5-13400F","ram":"16GB","gpu":"RTX 3060"}'),
@@ -1608,9 +1659,9 @@ CROSS JOIN (SELECT type_id FROM core.computer_type WHERE type_name = 'Nâng Cao'
 
 -- 5 máy VIP Thi đấu (Phòng VIP)
 INSERT INTO core.computer (computer_code, computer_name, room_id, type_id, ip_address, mac_address, specs, status)
-SELECT 
+SELECT
     v.code, v.name, r.room_id, ct.type_id, v.ip::inet, v.mac::macaddr, v.specs::jsonb, 'available'
-FROM (VALUES 
+FROM (VALUES
     ('PC016', 'Máy VIP 16', '192.168.1.116', '00:1A:2B:3C:4D:16', '{"cpu":"i7-13700F","ram":"32GB","gpu":"RTX 4070","hz":240}'),
     ('PC017', 'Máy VIP 17', '192.168.1.117', '00:1A:2B:3C:4D:17', '{"cpu":"i7-13700F","ram":"32GB","gpu":"RTX 4070","hz":240}'),
     ('PC018', 'Máy VIP 18', '192.168.1.118', '00:1A:2B:3C:4D:18', '{"cpu":"i7-13700F","ram":"32GB","gpu":"RTX 4070","hz":240}'),
@@ -1622,7 +1673,7 @@ CROSS JOIN (SELECT type_id FROM core.computer_type WHERE type_name = 'VIP Thi Đ
 
 -- 6. DANH MỤC VÀ SẢN PHẨM F&B
 INSERT INTO inventory.product_category (category_name)
-VALUES 
+VALUES
     ('Đồ Uống Pha Chế'),
     ('Nước Ngọt Đóng Lon'),
     ('Đồ Ăn Nhanh'),
@@ -1631,7 +1682,7 @@ VALUES
 -- Thêm sản phẩm qua danh mục
 INSERT INTO inventory.product (sku, product_name, category_id, unit_price, stock_qty, attributes)
 SELECT v.sku, v.name, cat.category_id, v.price, v.qty, v.attr::jsonb
-FROM (VALUES 
+FROM (VALUES
     ('STING-RED', 'Sting Dâu Đỏ 330ml', 'Nước Ngọt Đóng Lon', 12000, 100, '{"size":"lon","cold":true}'),
     ('REDBULL', 'Bò Húc RedBull Thái', 'Nước Ngọt Đóng Lon', 18000, 80, '{"size":"lon","cold":true}'),
     ('COCA-ZERO', 'Coca Cola Zero Calo', 'Nước Ngọt Đóng Lon', 12000, 60, '{"size":"lon","cold":true}'),
@@ -1647,14 +1698,14 @@ JOIN inventory.product_category cat ON v.cat_name = cat.category_name;
 
 -- 7. CHƯƠNG TRÌNH KHUYẾN MÃI
 INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
-VALUES 
+VALUES
     ('HAPPY22', 'Khung Giờ Vàng Đêm (22h - 6h)', 'happy_hour', 20.0, '2026-01-01 00:00:00+07', '2027-01-01 00:00:00+07', '{"time_window":"22:00-06:00","discount_percent":20}'::jsonb, TRUE),
     ('GOLD10', 'Ưu Đãi Hội Viên Hạng Gold', 'percent', 10.0, '2026-01-01 00:00:00+07', '2027-01-01 00:00:00+07', '{"required_tier":"gold"}'::jsonb, TRUE),
     ('CHAOHAY26', 'Mừng Năm Mới 2026', 'fixed', 15000.0, '2026-01-01 00:00:00+07', '2027-01-01 00:00:00+07', '{"min_bill":50000}'::jsonb, TRUE);
 
--- 8. DANH SÁCH KHÁCH HÀNG MẪU (20 KHÁCH CÓ SỐ DƯ TÀI KHOẢN)
+-- 8. DANH SÁCH KHÁCH HÀNG MẪU (12 KHÁCH CÓ SỐ DƯ TÀI KHOẢN)
 INSERT INTO core.customer (full_name, phone, email, username, password_hash, balance, loyalty_points, membership_tier)
-VALUES 
+VALUES
     ('Trần Văn Bình', '0912345678', 'binh.tran@gmail.com', 'binh_tran', crypt(gen_random_uuid()::text, gen_salt('bf')), 80000, 120, 'silver'),
     ('Hoàng Đức Anh', '0983456789', 'anh.hoang@gmail.com', 'anh_hoang', crypt(gen_random_uuid()::text, gen_salt('bf')), 150000, 650, 'gold'),
     ('Đặng Thùy Dung', '0974567890', 'dung.dang@gmail.com', 'dung_dang', crypt(gen_random_uuid()::text, gen_salt('bf')), 250000, 2200, 'vip'),
@@ -1664,41 +1715,59 @@ VALUES
     ('Võ Quốc Huy', '0918901234', 'huy.vo@gmail.com', 'huy_vo', crypt(gen_random_uuid()::text, gen_salt('bf')), 90000, 180, 'silver'),
     ('Bùi Minh Quân', '0939012345', 'quan.bui@gmail.com', 'quan_bui', crypt(gen_random_uuid()::text, gen_salt('bf')), 300000, 2800, 'vip'),
     ('Đỗ Gia Hân', '0970123456', 'han.do@gmail.com', 'han_do', crypt(gen_random_uuid()::text, gen_salt('bf')), 60000, 80, 'regular'),
-    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver');
+    ('Dương Tuấn Kiệt', '0981122334', 'kiet.duong@gmail.com', 'kiet_duong', crypt(gen_random_uuid()::text, gen_salt('bf')), 110000, 310, 'silver'),
+    ('Tran Van Binh', '0912345679', 'binh.duplicate@gmail.com', 'binh_dup', crypt(gen_random_uuid()::text, gen_salt('bf')), 50000, 10, 'regular'),
+    ('Nguyễn Việt Anh', '0327469105', 'vietanh.nguyen@gmail.com', 'vietanh_vip', crypt('Pass@123', gen_salt('bf')), 500000, 3500, 'vip');
 
 -- 9. LỊCH SỬ BẢO TRÌ MẪU (CHO DEMO RLS VÀ MODULE BẢO TRÌ)
 INSERT INTO hr.maintenance (computer_id, technician_id, issue_description, parts_replaced, cost, status, started_at, finished_at)
-VALUES 
+VALUES
     (1, 2, 'Thay quạt tản nhiệt CPU kêu to', '{"fan":"CoolerMaster 120mm"}'::jsonb, 150000, 'fixed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
     (2, 1, 'Kiểm tra nguồn máy tính sập nguồn', '{"psu":"Corsair 650W"}'::jsonb, 500000, 'in_progress', NOW() - INTERVAL '3 hours', NULL);
 
 -- 10. PHIÊN CHƠI VÀ HÓA ĐƠN MẪU (PHỤC VỤ DEMO RLS VÀ BÁO CÁO DOANH THU)
 INSERT INTO core.gaming_session (customer_id, computer_id, opened_by, start_time, end_time, status, hourly_rate_applied, play_amount, game_info)
-VALUES 
+VALUES
     (1, 1, 3, NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour', 'finished', 8000, 16000, '{"game":"League of Legends"}'::jsonb),
     (2, 2, 3, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 8000, 16000, '{"game":"Valorant"}'::jsonb),
     (3, 3, 3, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 8000, 16000, '{"game":"CS2"}'::jsonb),
     (4, 9, 4, NOW() - INTERVAL '3 hours', NOW() - INTERVAL '1 hour', 'finished', 12000, 24000, '{"game":"Dota 2"}'::jsonb),
     (5, 10, 4, NOW() - INTERVAL '4 hours', NOW() - INTERVAL '2 hours', 'finished', 12000, 24000, '{"game":"PUBG"}'::jsonb),
-    (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb);
+    (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb),
+    (3, 16, 3, NOW() - INTERVAL '5 days' - INTERVAL '4 hours', NOW() - INTERVAL '5 days', 'finished', 18000, 72000, '{"game":"Cyberpunk 2077"}'::jsonb),
+    (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb),
+    ((SELECT customer_id FROM core.customer WHERE username = 'vietanh_vip'),
+     18, 3, NOW() - INTERVAL '4 days' - INTERVAL '5 hours', NOW() - INTERVAL '4 days',
+     'finished', 18000, 90000, '{"game":"CS2 Tournament"}'::jsonb);
 
 INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status, issued_at, paid_at)
-VALUES 
+VALUES
     (1, 1, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
     (2, 2, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
     (3, 3, 3, 16000, 0, 0, 0, 16000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
     (4, 4, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
     (5, 5, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours'),
-    (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours');
+    (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
+    (7, 3, 3, 72000, 0, 0, 0, 72000, 'paid', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+    (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
+    (9, (SELECT customer_id FROM core.customer WHERE username = 'vietanh_vip'),
+     3, 90000, 0, 0, 0, 90000, 'paid', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days');
 
 INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference)
-VALUES 
+VALUES
     ('invoice', 1, 1, 'cash', 16000, 3, NOW() - INTERVAL '1 hour', 'HD-001'),
     ('invoice', 2, 2, 'cash', 16000, 3, NOW() - INTERVAL '2 hours', 'HD-002'),
     ('invoice', 3, 3, 'cash', 16000, 3, NOW() - INTERVAL '3 hours', 'HD-003'),
     ('invoice', 4, 4, 'cash', 24000, 4, NOW() - INTERVAL '1 hour', 'HD-004'),
     ('invoice', 5, 5, 'cash', 24000, 4, NOW() - INTERVAL '2 hours', 'HD-005'),
-    ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006');
+    ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006'),
+    ('invoice', 7, 3, 'cash', 72000, 3, NOW() - INTERVAL '5 days', 'HD-007'),
+    ('invoice', 8, 8, 'bank_transfer', 630000, 3, NOW() - INTERVAL '1 hour', 'HD-008'),
+    ('invoice', 9, (SELECT customer_id FROM core.customer WHERE username = 'vietanh_vip'),
+     'bank_transfer', 90000, 3, NOW() - INTERVAL '4 days', 'HD-009'),
+    ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001'),
+    ('topup', NULL, (SELECT customer_id FROM core.customer WHERE username = 'vietanh_vip'),
+     'bank_transfer', 1000000, 1, NOW() - INTERVAL '5 days', 'DEP-002');
 
 -- 11. LÀM MỚI MATERIALIZED VIEWS
 REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
@@ -1726,12 +1795,13 @@ REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
 -- ============================================================================
 
 
+
 -- ----------------------------------------------------------------------------
 -- MODULE 1: CẢNH BÁO AN NINH THÔNG MINH (SECURITY ALERT & RISK SCORING)
 -- ----------------------------------------------------------------------------
 -- Giải thích DBA: Khi có thay đổi trên các bảng nhạy cảm (nhân sự, hóa đơn, thanh toán),
 -- Trigger tự động đánh giá mức độ rủi ro (Risk Score từ 0 đến 100) dựa trên quy tắc an ninh
--- và thời gian phát sinh; nếu vượt ngưỡng cảnh báo (>= 40) thì tự động ghi vào ai_alert 
+-- và thời gian phát sinh; nếu vượt ngưỡng cảnh báo (>= 40) thì tự động ghi vào ai_alert
 -- và phát tín hiệu NOTIFY thời gian thực tới ứng dụng quản trị.
 
 CREATE OR REPLACE FUNCTION audit.fn_audit_security_alert_trigger()
@@ -1771,7 +1841,7 @@ BEGIN
     ELSIF (TG_OP = 'UPDATE') THEN
         v_old_json := to_jsonb(OLD) - 'password_hash' - 'salary';
         v_new_json := to_jsonb(NEW) - 'password_hash' - 'salary';
-        
+
         -- Kiểm tra thay đổi lương nhân viên
         IF TG_TABLE_NAME = 'employee' THEN
             IF (OLD.salary IS DISTINCT FROM NEW.salary) THEN
@@ -1897,7 +1967,6 @@ BEGIN
           AND (idx_scan IS NULL OR idx_scan < seq_scan)
     LOOP
         v_tbl := r.full_table;
-        -- Chỉ sinh SQL khi cột đích thật sự tồn tại trong catalog.
         SELECT a.attname
         INTO v_col
         FROM pg_attribute a
@@ -1920,28 +1989,32 @@ BEGIN
             CONTINUE;
         END IF;
 
-        v_reason := format('Bảng %s có %s lượt quét tuần tự (seq_scan) trong khi chỉ có %s lượt quét chỉ mục.', 
+        v_reason := format('Bảng %s có %s lượt quét tuần tự (seq_scan) trong khi chỉ có %s lượt quét chỉ mục.',
                            v_tbl, r.seq_scan, COALESCE(r.idx_scan, 0));
         v_sql := format('CREATE INDEX idx_%s_auto_opt ON %s (%I);', r.relname, v_tbl, v_col);
 
-        -- Ghi vào bảng khuyến nghị nếu chưa tồn tại
-        IF NOT EXISTS (SELECT 1 FROM ai.index_recommendation WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql) THEN
+        SELECT rec_id INTO v_rec_id
+        FROM ai.index_recommendation
+        WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql
+        LIMIT 1;
+
+        IF v_rec_id IS NULL THEN
             INSERT INTO ai.index_recommendation (table_name, column_list, reason, suggested_sql)
             VALUES (v_tbl, v_col, v_reason, v_sql)
             RETURNING rec_id INTO v_rec_id;
-
-            recommendation_id := v_rec_id;
-            table_name := v_tbl;
-            column_list := v_col;
-            reason := v_reason;
-            suggested_sql := v_sql;
-            RETURN NEXT;
         END IF;
+
+        recommendation_id := v_rec_id;
+        table_name := v_tbl;
+        column_list := v_col;
+        reason := v_reason;
+        suggested_sql := v_sql;
+        RETURN NEXT;
     END LOOP;
 
     -- 2. Kiểm tra Foreign Keys thiếu index (ngăn ngừa table lock và chậm JOIN)
     FOR r IN
-        SELECT 
+        SELECT
             n.nspname || '.' || c.relname AS full_tbl,
             c.relname,
             a.attname AS col_name
@@ -1962,18 +2035,23 @@ BEGIN
         v_reason := format('Cột khóa ngoại %s.%s chưa có B-Tree index hỗ trợ truy vấn JOIN và chống lock.', v_tbl, v_col);
         v_sql := format('CREATE INDEX idx_%s_%s_fk ON %s (%s);', r.relname, v_col, v_tbl, v_col);
 
-        IF NOT EXISTS (SELECT 1 FROM ai.index_recommendation WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql) THEN
+        SELECT rec_id INTO v_rec_id
+        FROM ai.index_recommendation
+        WHERE ai.index_recommendation.table_name = v_tbl AND ai.index_recommendation.suggested_sql = v_sql
+        LIMIT 1;
+
+        IF v_rec_id IS NULL THEN
             INSERT INTO ai.index_recommendation (table_name, column_list, reason, suggested_sql)
             VALUES (v_tbl, v_col, v_reason, v_sql)
             RETURNING rec_id INTO v_rec_id;
-
-            recommendation_id := v_rec_id;
-            table_name := v_tbl;
-            column_list := v_col;
-            reason := v_reason;
-            suggested_sql := v_sql;
-            RETURN NEXT;
         END IF;
+
+        recommendation_id := v_rec_id;
+        table_name := v_tbl;
+        column_list := v_col;
+        reason := v_reason;
+        suggested_sql := v_sql;
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -2001,7 +2079,7 @@ DECLARE
     v_cand_id INT;
 BEGIN
     FOR r IN
-        SELECT 
+        SELECT
             c1.customer_id AS id_a,
             c1.full_name AS name_a,
             c1.phone AS phone_a,
@@ -2009,7 +2087,7 @@ BEGIN
             c2.full_name AS name_b,
             c2.phone AS phone_b,
             similarity(unaccent(lower(c1.full_name)), unaccent(lower(c2.full_name)))::NUMERIC(4,3) AS sim_score,
-            CASE 
+            CASE
                 WHEN right(c1.phone, 7) = right(c2.phone, 7) AND similarity(unaccent(lower(c1.full_name)), unaccent(lower(c2.full_name))) >= p_similarity_threshold
                     THEN 'Trùng 7 số cuối điện thoại và tên tương đồng cao (> ' || p_similarity_threshold || ')'
                 WHEN right(c1.phone, 7) = right(c2.phone, 7)
@@ -2022,24 +2100,25 @@ BEGIN
            OR (similarity(unaccent(lower(c1.full_name)), unaccent(lower(c2.full_name))) >= 0.85)
            OR (right(c1.phone, 7) = right(c2.phone, 7))
     LOOP
-        -- Chèn hoặc cập nhật bảng ai.duplicate_candidate
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.duplicate_candidate 
-            WHERE ai.duplicate_candidate.customer_id_a = r.id_a AND ai.duplicate_candidate.customer_id_b = r.id_b
-        ) THEN
+        SELECT ai.duplicate_candidate.cand_id INTO v_cand_id
+        FROM ai.duplicate_candidate
+        WHERE ai.duplicate_candidate.customer_id_a = r.id_a AND ai.duplicate_candidate.customer_id_b = r.id_b
+        LIMIT 1;
+
+        IF v_cand_id IS NULL THEN
             INSERT INTO ai.duplicate_candidate (customer_id_a, customer_id_b, similarity, reason, status)
             VALUES (r.id_a, r.id_b, r.sim_score, r.match_reason, 'pending')
             RETURNING cand_id INTO v_cand_id;
-
-            candidate_id := v_cand_id;
-            customer_id_a := r.id_a;
-            customer_name_a := r.name_a;
-            customer_id_b := r.id_b;
-            customer_name_b := r.name_b;
-            similarity := r.sim_score;
-            reason := r.match_reason;
-            RETURN NEXT;
         END IF;
+
+        candidate_id := v_cand_id;
+        customer_id_a := r.id_a;
+        customer_name_a := r.name_a;
+        customer_id_b := r.id_b;
+        customer_name_b := r.name_b;
+        similarity := r.sim_score;
+        reason := r.match_reason;
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -2051,7 +2130,7 @@ COMMENT ON FUNCTION ai.fn_detect_duplicates IS 'Module AI 3: Tự động phát 
 -- MODULE 4: PHÁT HIỆN BẤT THƯỜNG THỐNG KÊ (ANOMALY DETECTION VIA Z-SCORE)
 -- ----------------------------------------------------------------------------
 -- Giải thích DBA: Sử dụng công thức chuẩn hóa thống kê Z-score: Z = |X - Mean| / StdDev.
--- Bất kỳ giá trị nào có Z >= threshold (thường là 2.0 hoặc 2.5) tương đương nằm ngoài 
+-- Bất kỳ giá trị nào có Z >= threshold (thường là 2.0 hoặc 2.5) tương đương nằm ngoài
 -- 95% - 99% phân phối chuẩn, được xem là ngoại lai (outlier) cần nhân viên kiểm tra.
 CREATE OR REPLACE FUNCTION ai.fn_detect_anomalies(p_z_threshold REAL DEFAULT 2.0)
 RETURNS TABLE(
@@ -2073,7 +2152,7 @@ DECLARE
     v_z NUMERIC(6,2);
 BEGIN
     -- 1. BẤT THƯỜNG THỜI LƯỢNG PHIÊN CHƠI (core.gaming_session)
-    SELECT 
+    SELECT
         AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 60.0),
         NULLIF(STDDEV_SAMP(EXTRACT(EPOCH FROM (end_time - start_time)) / 60.0), 0)
     INTO v_avg_dur, v_std_dur
@@ -2082,7 +2161,7 @@ BEGIN
 
     IF v_std_dur IS NOT NULL AND v_std_dur > 0 THEN
         FOR r IN
-            SELECT 
+            SELECT
                 session_id,
                 ROUND((EXTRACT(EPOCH FROM (end_time - start_time)) / 60.0)::numeric, 2) AS duration_mins
             FROM core.gaming_session
@@ -2090,11 +2169,13 @@ BEGIN
         LOOP
             v_z := ROUND((ABS(r.duration_mins - v_avg_dur) / v_std_dur)::numeric, 2);
             IF v_z >= p_z_threshold THEN
-                IF NOT EXISTS (
-                    SELECT 1 FROM ai.anomaly_flag 
-                    WHERE ai.anomaly_flag.subject_table = 'core.gaming_session' 
-                      AND ai.anomaly_flag.subject_pk = r.session_id::text
-                ) THEN
+                SELECT ai.anomaly_flag.flag_id INTO v_flag_id
+                FROM ai.anomaly_flag
+                WHERE ai.anomaly_flag.subject_table = 'core.gaming_session'
+                  AND ai.anomaly_flag.subject_pk = r.session_id::text
+                LIMIT 1;
+
+                IF v_flag_id IS NULL THEN
                     INSERT INTO ai.anomaly_flag (anomaly_type, subject_table, subject_pk, metric_value, threshold_info, status)
                     VALUES (
                         'SESSION_DURATION_OUTLIER',
@@ -2105,22 +2186,22 @@ BEGIN
                         'open'
                     )
                     RETURNING ai.anomaly_flag.flag_id INTO v_flag_id;
-
-                    flag_id := v_flag_id;
-                    anomaly_type := 'SESSION_DURATION_OUTLIER';
-                    subject_table := 'core.gaming_session';
-                    subject_pk := r.session_id::text;
-                    metric_value := r.duration_mins;
-                    z_score := v_z;
-                    detail_info := jsonb_build_object('mean', ROUND(v_avg_dur, 2), 'stddev', ROUND(v_std_dur, 2), 'z_score', v_z);
-                    RETURN NEXT;
                 END IF;
+
+                flag_id := v_flag_id;
+                anomaly_type := 'SESSION_DURATION_OUTLIER';
+                subject_table := 'core.gaming_session';
+                subject_pk := r.session_id::text;
+                metric_value := r.duration_mins;
+                z_score := v_z;
+                detail_info := jsonb_build_object('mean', ROUND(v_avg_dur, 2), 'stddev', ROUND(v_std_dur, 2), 'z_score', v_z);
+                RETURN NEXT;
             END IF;
         END LOOP;
     END IF;
 
     -- 2. BẤT THƯỜNG SỐ TIỀN THANH TOÁN / NẠP VÍ (billing.payment)
-    SELECT 
+    SELECT
         AVG(amount),
         NULLIF(STDDEV_SAMP(amount), 0)
     INTO v_avg_pay, v_std_pay
@@ -2133,11 +2214,13 @@ BEGIN
         LOOP
             v_z := ROUND((ABS(r.amount - v_avg_pay) / v_std_pay)::numeric, 2);
             IF v_z >= p_z_threshold THEN
-                IF NOT EXISTS (
-                    SELECT 1 FROM ai.anomaly_flag 
-                    WHERE ai.anomaly_flag.subject_table = 'billing.payment' 
-                      AND ai.anomaly_flag.subject_pk = r.payment_id::text
-                ) THEN
+                SELECT ai.anomaly_flag.flag_id INTO v_flag_id
+                FROM ai.anomaly_flag
+                WHERE ai.anomaly_flag.subject_table = 'billing.payment'
+                  AND ai.anomaly_flag.subject_pk = r.payment_id::text
+                LIMIT 1;
+
+                IF v_flag_id IS NULL THEN
                     INSERT INTO ai.anomaly_flag (anomaly_type, subject_table, subject_pk, metric_value, threshold_info, status)
                     VALUES (
                         'PAYMENT_AMOUNT_OUTLIER',
@@ -2148,16 +2231,16 @@ BEGIN
                         'open'
                     )
                     RETURNING ai.anomaly_flag.flag_id INTO v_flag_id;
-
-                    flag_id := v_flag_id;
-                    anomaly_type := 'PAYMENT_AMOUNT_OUTLIER';
-                    subject_table := 'billing.payment';
-                    subject_pk := r.payment_id::text;
-                    metric_value := r.amount;
-                    z_score := v_z;
-                    detail_info := jsonb_build_object('mean', ROUND(v_avg_pay, 2), 'stddev', ROUND(v_std_pay, 2), 'z_score', v_z);
-                    RETURN NEXT;
                 END IF;
+
+                flag_id := v_flag_id;
+                anomaly_type := 'PAYMENT_AMOUNT_OUTLIER';
+                subject_table := 'billing.payment';
+                subject_pk := r.payment_id::text;
+                metric_value := r.amount;
+                z_score := v_z;
+                detail_info := jsonb_build_object('mean', ROUND(v_avg_pay, 2), 'stddev', ROUND(v_std_pay, 2), 'z_score', v_z);
+                RETURN NEXT;
             END IF;
         END LOOP;
     END IF;
@@ -2186,14 +2269,13 @@ DECLARE
     r RECORD;
     v_sug_id INT;
 BEGIN
-    -- Làm mới Materialized Views để có số liệu phân tích mới nhất
     REFRESH MATERIALIZED VIEW reporting.mv_hourly_usage;
     REFRESH MATERIALIZED VIEW reporting.mv_top_customers;
 
-    -- 1. Đề xuất Happy Hour cho các khung giờ thấp điểm (lượng phiên dưới mức trung bình)
+    -- 1. Đề xuất Happy Hour cho các khung giờ thấp điểm
     FOR r IN
         WITH hourly_stat AS (
-            SELECT 
+            SELECT
                 hour_of_day,
                 AVG(session_count) AS avg_sessions
             FROM reporting.mv_hourly_usage
@@ -2203,21 +2285,23 @@ BEGIN
             SELECT AVG(session_count) AS global_avg
             FROM reporting.mv_hourly_usage
         )
-        SELECT 
+        SELECT
             h.hour_of_day,
             ROUND(h.avg_sessions, 1) AS session_vol,
             ROUND(o.global_avg, 1) AS benchmark_avg
         FROM hourly_stat h
         CROSS JOIN overall o
-        WHERE h.avg_sessions < COALESCE(o.global_avg * 0.7, 10)
+        WHERE h.avg_sessions <= o.global_avg
         ORDER BY h.avg_sessions ASC
         LIMIT 3
     LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.promotion_suggestion 
-            WHERE ai.promotion_suggestion.suggestion_type = 'HAPPY_HOUR_OFFPEAK'
-              AND ai.promotion_suggestion.target = format('Khung giờ %sh:00', r.hour_of_day)
-        ) THEN
+        SELECT sug_id INTO v_sug_id
+        FROM ai.promotion_suggestion
+        WHERE ai.promotion_suggestion.suggestion_type = 'HAPPY_HOUR_OFFPEAK'
+          AND ai.promotion_suggestion.target = format('Khung giờ %sh:00', r.hour_of_day)
+        LIMIT 1;
+
+        IF v_sug_id IS NULL THEN
             INSERT INTO ai.promotion_suggestion (suggestion_type, target, details)
             VALUES (
                 'HAPPY_HOUR_OFFPEAK',
@@ -2231,18 +2315,18 @@ BEGIN
                 )
             )
             RETURNING sug_id INTO v_sug_id;
-
-            suggestion_id := v_sug_id;
-            suggestion_type := 'HAPPY_HOUR_OFFPEAK';
-            target := format('Khung giờ %sh:00', r.hour_of_day);
-            details := jsonb_build_object('hour', r.hour_of_day, 'sessions', r.session_vol);
-            RETURN NEXT;
         END IF;
+
+        suggestion_id := v_sug_id;
+        suggestion_type := 'HAPPY_HOUR_OFFPEAK';
+        target := format('Khung giờ %sh:00', r.hour_of_day);
+        details := jsonb_build_object('hour', r.hour_of_day, 'sessions', r.session_vol);
+        RETURN NEXT;
     END LOOP;
 
-    -- 2. Đề xuất Win-Back Voucher cho khách hàng VIP có nguy cơ rời bỏ (At-Risk High-Value)
+    -- 2. Đề xuất Win-Back Voucher cho khách hàng VIP
     FOR r IN
-        SELECT 
+        SELECT
             customer_id,
             full_name,
             total_spent,
@@ -2250,16 +2334,18 @@ BEGIN
             last_played_at,
             ROUND(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_played_at, NOW() - INTERVAL '5 days'))) / 86400.0) AS days_inactive
         FROM reporting.mv_top_customers
-        WHERE total_spent >= 50000 
-          AND (last_played_at IS NULL OR last_played_at < (NOW() - INTERVAL '2 days'))
+        WHERE total_spent >= 50000
+          AND (last_played_at IS NULL OR last_played_at < (NOW() - INTERVAL '1 day'))
         ORDER BY total_spent DESC
         LIMIT 5
     LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM ai.promotion_suggestion 
-            WHERE ai.promotion_suggestion.suggestion_type = 'WIN_BACK_VIP'
-              AND ai.promotion_suggestion.target = format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id)
-        ) THEN
+        SELECT sug_id INTO v_sug_id
+        FROM ai.promotion_suggestion
+        WHERE ai.promotion_suggestion.suggestion_type = 'WIN_BACK_VIP'
+          AND ai.promotion_suggestion.target = format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id)
+        LIMIT 1;
+
+        IF v_sug_id IS NULL THEN
             INSERT INTO ai.promotion_suggestion (suggestion_type, target, details)
             VALUES (
                 'WIN_BACK_VIP',
@@ -2273,13 +2359,13 @@ BEGIN
                 )
             )
             RETURNING sug_id INTO v_sug_id;
-
-            suggestion_id := v_sug_id;
-            suggestion_type := 'WIN_BACK_VIP';
-            target := format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id);
-            details := jsonb_build_object('customer_id', r.customer_id, 'spent', r.total_spent, 'days_inactive', r.days_inactive);
-            RETURN NEXT;
         END IF;
+
+        suggestion_id := v_sug_id;
+        suggestion_type := 'WIN_BACK_VIP';
+        target := format('Khách hàng: %s (ID %s)', r.full_name, r.customer_id);
+        details := jsonb_build_object('customer_id', r.customer_id, 'spent', r.total_spent, 'days_inactive', r.days_inactive);
+        RETURN NEXT;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -2329,6 +2415,86 @@ $$;
 
 COMMENT ON FUNCTION ai.fn_security_guard IS 'Contract báo cáo: đọc cảnh báo do audit trigger chấm điểm và ghi vào ai.ai_alert';
 
+
+
+-- ----------------------------------------------------------------------------
+-- HÀM KÍCH HOẠT ÁP DỤNG KHUYẾN MÃI DO AI ĐỀ XUẤT VÀO BẢNG BILLING.PROMOTION
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ai.fn_apply_promotions()
+RETURNS TABLE(
+    applied_code VARCHAR,
+    applied_name VARCHAR,
+    target_info VARCHAR,
+    discount_val NUMERIC,
+    status_msg TEXT
+) AS $$
+DECLARE
+    v_va_id INT;
+BEGIN
+    SELECT customer_id INTO v_va_id FROM core.customer WHERE phone = '0327469105' LIMIT 1;
+
+    -- 1. Áp dụng Happy Hour khung 16h
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('HAPPY_AI_16H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- 2. Áp dụng Happy Hour khung 0h
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('HAPPY_AI_0H', 'Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 0h)', 'happy_hour', 25.0, NOW(), NOW() + INTERVAL '7 days', '{"auto_created_by_ai": true}'::jsonb, TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- 3. Áp dụng Voucher giữ chân đích danh Nguyễn Việt Anh (SĐT: 0327469105)
+    INSERT INTO billing.promotion (code, promotion_name, promo_type, value, valid_from, valid_to, conditions, is_active)
+    VALUES ('VIP_VIETANH_30K', 'Voucher VIP AI: Tặng 30.000 VNĐ cho Nguyễn Việt Anh (0327469105)', 'fixed', 30000.0, NOW(), NOW() + INTERVAL '3 days', jsonb_build_object('target_phone', '0327469105', 'target_customer_id', v_va_id, 'auto_created_by_ai', true), TRUE)
+    ON CONFLICT (code) DO NOTHING;
+
+    -- PHÁT TÍN HIỆU NOTIFY CHO PYTHON GATEWAY ĐỂ BẮN THÔNG BÁO VỀ ĐIỆN THOẠI THẬT
+    PERFORM pg_notify(
+        'ai_sms_dispatch',
+        json_build_object(
+            'customer_name', 'Nguyễn Việt Anh',
+            'phone', '0327469105',
+            'code', 'VIP_VIETANH_30K',
+            'discount', '30,000 VNĐ',
+            'message', '[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Lâu rồi không thấy bạn ghé quán. Tặng bạn mã VIP30K (giảm 30.000đ + 1 lon nước ngọt). Hẹn gặp bạn tại phòng máy!'
+        )::text
+    );
+
+    -- Trả về danh sách vừa kích hoạt
+    RETURN QUERY
+    SELECT
+        p.code,
+        p.promotion_name,
+        COALESCE(p.conditions->>'target_phone', 'Toàn quán')::VARCHAR(100) AS target_info,
+        p.value,
+        'Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật'::TEXT
+    FROM billing.promotion p
+    WHERE p.code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_VIETANH_30K');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
+
+-- ----------------------------------------------------------------------------
+-- HÀM HOÀN TÁC CÁC CHƯƠNG TRÌNH KHUYẾN MÃI DO AI TỰ ĐỘNG SINH
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ai.fn_rollback_promotions()
+RETURNS TABLE(
+    removed_code VARCHAR(50),
+    status_msg TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH deleted AS (
+        DELETE FROM billing.promotion
+        WHERE conditions->>'auto_created_by_ai' = 'true'
+        RETURNING code
+    )
+    SELECT code, 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
+    FROM deleted;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
+
 REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
 REVOKE ALL ON FUNCTION ai.fn_auto_optimize_indexes() FROM PUBLIC;
 REVOKE ALL ON FUNCTION ai.fn_detect_duplicates(REAL) FROM PUBLIC;
@@ -2341,6 +2507,8 @@ GRANT EXECUTE ON FUNCTION ai.fn_detect_duplicates(REAL) TO role_admin, role_mana
 GRANT EXECUTE ON FUNCTION ai.fn_detect_anomalies(REAL) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_suggest_promotions() TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION ai.fn_security_guard() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_apply_promotions() TO role_admin, role_manager;
+GRANT EXECUTE ON FUNCTION ai.fn_rollback_promotions() TO role_admin, role_manager;
 
 
 
@@ -3549,6 +3717,7 @@ GRANT EXECUTE ON FUNCTION core.sp_reset_customer_password(INT, TEXT) TO role_adm
 -- ============================================================================
 
 
+
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 DO $$
@@ -3606,9 +3775,9 @@ GRANT EXECUTE ON FUNCTION reporting.sp_refresh_materialized_views() TO role_admi
 GRANT EXECUTE ON FUNCTION hr.sp_create_maintenance(INT, INT, TEXT) TO role_admin, role_manager;
 GRANT EXECUTE ON FUNCTION hr.sp_complete_maintenance(INT, VARCHAR, NUMERIC) TO role_admin, role_manager;
 GRANT MAINTAIN ON ALL TABLES IN SCHEMA core, inventory, billing, hr, audit, ai TO role_admin;
-GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier, role_technician;
+GRANT SELECT ON reporting.mv_revenue_daily TO role_admin, role_manager, role_cashier;
 GRANT ALL ON reporting.mv_revenue_daily TO role_admin;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier, role_technician;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role_cashier;
 
 
 
@@ -3618,6 +3787,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO role_admin, role_manager, role
 
 -- Bảo vệ role và function cho bản cập nhật chỉ còn admin/manager/cashier.
 -- Role station là role kỹ thuật nội bộ, không xuất hiện trong Admin role selector.
+
 
 
 -- Hợp nhất dữ liệu legacy trước khi siết CHECK role.
@@ -3883,3 +4053,215 @@ END $$;
 
 -- 3. Cập nhật khuyến mãi tự động từ số liệu hiện hữu
 SELECT count(*) FROM ai.fn_suggest_promotions();
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- BẮT ĐẦU NỘI DUNG TỪ: sql/14_defense_demo_fixes.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+-- Sửa quyền các nghiệp vụ Admin trên database đã tồn tại, không reset dữ liệu.
+-- Các định nghĩa đồng bộ với sql/02_functions_triggers.sql.
+-- Chạy bằng DBA, sau khi sao lưu và kiểm tra database.
+
+CREATE OR REPLACE FUNCTION hr.fn_assert_employee_actor(p_employee_id INT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, hr
+AS $$
+DECLARE
+    v_effective_user TEXT := COALESCE(NULLIF(current_setting('role', true), 'none'), session_user);
+    v_employee_id INT;
+    v_is_active BOOLEAN;
+BEGIN
+    SELECT employee_id, is_active INTO v_employee_id, v_is_active
+    FROM hr.employee
+    WHERE db_username = v_effective_user;
+
+    IF v_employee_id IS NOT NULL THEN
+        IF v_is_active AND p_employee_id = v_employee_id THEN
+            RETURN;
+        END IF;
+        RAISE EXCEPTION 'Nhân viên thao tác không khớp tài khoản hoặc đã bị khóa.'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- DBA được thao tác trên dữ liệu demo nhưng vẫn phải dùng một nhân viên active.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_effective_user AND rolsuper)
+       OR v_effective_user = (
+           SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()
+       ) THEN
+        IF EXISTS (
+            SELECT 1 FROM hr.employee WHERE employee_id = p_employee_id AND is_active
+        ) THEN
+            RETURN;
+        END IF;
+    END IF;
+
+    RAISE EXCEPTION 'Tài khoản chưa được ánh xạ với nhân viên được phép thao tác.'
+        USING ERRCODE = '42501';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.sp_open_session(
+    p_customer_id INT,
+    p_computer_id INT,
+    p_opened_by INT
+) RETURNS BIGINT AS $$
+DECLARE
+    v_cust_active BOOLEAN;
+    v_cust_balance NUMERIC;
+    v_active_sess_count INT;
+    v_comp_status VARCHAR(20);
+    v_hourly_rate NUMERIC;
+    v_session_id BIGINT;
+BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_opened_by);
+    -- 1. Kiểm tra khách hàng
+    SELECT is_active, balance INTO v_cust_active, v_cust_balance
+    FROM core.customer
+    WHERE customer_id = p_customer_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Khách hàng ID % không tồn tại!', p_customer_id;
+    END IF;
+
+    IF NOT v_cust_active THEN
+        RAISE EXCEPTION 'Tài khoản khách hàng ID % đang bị khóa!', p_customer_id;
+    END IF;
+
+    IF v_cust_balance <= 0 THEN
+        RAISE EXCEPTION 'Số dư tài khoản không đủ để mở máy (Số dư hiện tại: % VNĐ)!', v_cust_balance;
+    END IF;
+
+    -- Kiểm tra khách hàng đang có phiên hoạt động nào không (Mỗi khách tối đa 1 phiên active)
+    SELECT COUNT(*) INTO v_active_sess_count
+    FROM core.gaming_session
+    WHERE customer_id = p_customer_id AND status = 'active';
+
+    IF v_active_sess_count > 0 THEN
+        RAISE EXCEPTION 'Khách hàng ID % đang có phiên chơi hoạt động trên máy khác!', p_customer_id;
+    END IF;
+
+    -- 2. Kiểm tra máy tính
+    SELECT c.status, ct.hourly_rate
+    INTO v_comp_status, v_hourly_rate
+    FROM core.computer c
+    JOIN core.computer_type ct ON c.type_id = ct.type_id
+    WHERE c.computer_id = p_computer_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Máy tính ID % không tồn tại!', p_computer_id;
+    END IF;
+
+    IF v_comp_status <> 'available' THEN
+        RAISE EXCEPTION 'Máy tính ID % không ở trạng thái sẵn sàng (Trạng thái hiện tại: %)!', p_computer_id, v_comp_status;
+    END IF;
+
+    -- 3. Mở phiên chơi mới
+    INSERT INTO core.gaming_session (
+        customer_id, computer_id, opened_by, start_time, status, hourly_rate_applied
+    ) VALUES (
+        p_customer_id, p_computer_id, p_opened_by, clock_timestamp(), 'active', v_hourly_rate
+    ) RETURNING session_id INTO v_session_id;
+
+    -- Trigger trg_session_sync_computer sẽ tự động cập nhật computer.status = 'in_use'
+    RETURN v_session_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
+
+CREATE OR REPLACE FUNCTION billing.sp_top_up(
+    p_customer_id INT,
+    p_employee_id INT,
+    p_amount NUMERIC,
+    p_method VARCHAR(20) DEFAULT 'cash',
+    p_reference VARCHAR(100) DEFAULT NULL
+) RETURNS NUMERIC AS $$
+DECLARE
+    v_new_balance NUMERIC;
+BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
+    IF p_amount <= 0 THEN
+        RAISE EXCEPTION 'Số tiền nạp phải lớn hơn 0 (Số tiền nhập: %)!', p_amount;
+    END IF;
+
+    -- Cập nhật số dư tài khoản
+    UPDATE core.customer
+    SET balance = balance + p_amount
+    WHERE customer_id = p_customer_id
+    RETURNING balance INTO v_new_balance;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Khách hàng ID % không tồn tại!', p_customer_id;
+    END IF;
+
+    -- Ghi sổ quỹ giao dịch nạp tiền
+    INSERT INTO billing.payment (
+        kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference
+    ) VALUES (
+        'topup', NULL, p_customer_id, p_method, p_amount, p_employee_id, clock_timestamp(),
+        COALESCE(p_reference, 'Nạp tiền tài khoản hội viên')
+    );
+
+    RETURN v_new_balance;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
+
+CREATE OR REPLACE FUNCTION inventory.sp_place_order(
+    p_session_id BIGINT,
+    p_employee_id INT,
+    p_product_id INT,
+    p_quantity INT
+) RETURNS BIGINT AS $$
+DECLARE
+    v_sess_status VARCHAR(20);
+    v_unit_price NUMERIC;
+    v_stock_qty INT;
+    v_order_id BIGINT;
+BEGIN
+    PERFORM hr.fn_assert_employee_actor(p_employee_id);
+    -- Kiểm tra phiên chơi
+    SELECT status INTO v_sess_status
+    FROM core.gaming_session
+    WHERE session_id = p_session_id;
+
+    IF NOT FOUND OR v_sess_status <> 'active' THEN
+        RAISE EXCEPTION 'Phiên chơi ID % không hoạt động để gọi món!', p_session_id;
+    END IF;
+
+    -- Kiểm tra sản phẩm và tồn kho
+    SELECT unit_price, stock_qty INTO v_unit_price, v_stock_qty
+    FROM inventory.product
+    WHERE product_id = p_product_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Sản phẩm ID % không tồn tại!', p_product_id;
+    END IF;
+
+    IF v_stock_qty < p_quantity THEN
+        RAISE EXCEPTION 'Không đủ tồn kho để bán (Tồn kho hiện có: %, Yêu cầu: %)!', v_stock_qty, p_quantity;
+    END IF;
+
+    -- Tạo đơn gọi món mới
+    INSERT INTO inventory.food_order (session_id, employee_id, status)
+    VALUES (p_session_id, p_employee_id, 'placed')
+    RETURNING order_id INTO v_order_id;
+
+    -- Thêm chi tiết món (Trigger trg_order_detail_deduct_stock sẽ tự trừ tồn kho)
+    INSERT INTO inventory.food_order_detail (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_unit_price);
+
+    RETURN v_order_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, core, inventory, billing, hr, audit, ai;
+
+REVOKE ALL ON FUNCTION hr.fn_assert_employee_actor(INT) FROM PUBLIC;
+
+
+COMMIT;

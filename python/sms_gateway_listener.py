@@ -9,10 +9,10 @@
 
 import os
 import sys
-import select
 import json
 import time
 import urllib.request
+from notification_stream import iter_notifications
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -22,7 +22,9 @@ if sys.stdout.encoding != 'utf-8':
 
 def load_env_file():
     env_vars = {}
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    env_path = os.getenv("NETCAFE_ENV_FILE") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
+    )
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -59,9 +61,12 @@ def get_db_connection():
         return conn
     except ImportError:
         import psycopg
-        ssl_str = f"?sslmode={DB_SSL_MODE.lower()}" if DB_SSL_MODE else ""
-        conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}{ssl_str}"
-        return psycopg.connect(conn_str, autocommit=True)
+        return psycopg.connect(
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+            user=DB_USER, password=DB_PASSWORD,
+            sslmode=DB_SSL_MODE.lower() if DB_SSL_MODE else "prefer",
+            autocommit=True,
+        )
 
 def push_to_phone(title, message, phone="0327469105"):
     try:
@@ -107,34 +112,25 @@ def start_sms_listener():
     cur.execute("LISTEN ai_sms_dispatch;")
 
     try:
-        while True:
-            if select.select([conn], [], [], 5) == ([], [], []):
-                continue
+        for notify in iter_notifications(conn):
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"\n[🔔 TÍN HIỆU CSDL NHẬN ĐƯỢC LÚC {timestamp}]")
+            try:
+                payload = json.loads(notify.payload)
+                cust_name = payload.get("customer_name")
+                phone = payload.get("phone")
+                code = payload.get("code")
+                discount = payload.get("discount")
+                msg = payload.get("message")
+                print(f"    - Khách hàng đích  : {cust_name} (SĐT: {phone})")
+                print(f"    - Mã Voucher AI    : {code} (Giảm: {discount})")
+                print(f"    - Nội dung tin nhắn: {msg}")
 
-            conn.poll()
-            while conn.notifies:
-                notify = conn.notifies.pop(0)
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-
-                print(f"\n[🔔 TÍN HIỆU CSDL NHẬN ĐƯỢC LÚC {timestamp}]")
-                try:
-                    payload = json.loads(notify.payload)
-                    cust_name = payload.get("customer_name")
-                    phone = payload.get("phone")
-                    code = payload.get("code")
-                    discount = payload.get("discount")
-                    msg = payload.get("message")
-
-                    print(f"    - Khách hàng đích  : {cust_name} (SĐT: {phone})")
-                    print(f"    - Mã Voucher AI    : {code} (Giảm: {discount})")
-                    print(f"    - Nội dung tin nhắn: {msg}")
-
-                    # Bắn thông báo về điện thoại thật
-                    title = f"🎁 NetCafe Tặng Voucher VIP 30K - {cust_name}"
-                    push_to_phone(title, msg, phone)
-
-                except Exception as e:
-                    print(f"    - Payload thô: {notify.payload} (Lỗi parse: {e})")
+                # Đây là push qua ntfy, không phải SMS nhà mạng.
+                title = f"🎁 NetCafe Tặng Voucher VIP 30K - {cust_name}"
+                push_to_phone(title, msg, phone)
+            except Exception as e:
+                print(f"    - Payload thô: {notify.payload} (Lỗi parse: {e})")
 
     except KeyboardInterrupt:
         print("\n[*] Đã dừng tiến trình SMS Gateway Dispatcher.")
