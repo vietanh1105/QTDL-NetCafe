@@ -9,7 +9,7 @@ BÁO CÁO THỐNG KÊ LÀM SẠCH VÀ CHUẨN HÓA DỮ LIỆU (ETL CLEANING)
 
 4. Thống kê thao tác chuẩn hóa thành công:
    - Số điện thoại chuẩn hóa (+84/dấu chấm/cách): 1 trường hợp
-   - Họ tên cắt khoảng trắng thừa / Title Case:   2 trường hợp
+   - Họ tên cắt khoảng trắng thừa / Title Case:   8 trường hợp
 
 5. Chi tiết các lý do từ chối (staging.rejected_rows):
    - NEGATIVE_BALANCE              : 2 dòng

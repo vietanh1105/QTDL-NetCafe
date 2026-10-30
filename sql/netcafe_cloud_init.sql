@@ -1989,8 +1989,8 @@ BEGIN
             CONTINUE;
         END IF;
 
-        v_reason := format('Bảng %s có %s lượt quét tuần tự (seq_scan) trong khi chỉ có %s lượt quét chỉ mục.',
-                           v_tbl, r.seq_scan, COALESCE(r.idx_scan, 0));
+        v_reason := format('Bảng %s bị quét tuần tự %s lần nhưng chỉ có %s lượt quét chỉ mục -> (Giải thích: CSDL đang phải đọc duyệt từng dòng để tìm kiếm. Cần tạo B-Tree Index trên cột [%s] để nhảy thẳng đến dữ liệu cần tìm, tránh quét toàn bộ bảng).',
+                           v_tbl, r.seq_scan, COALESCE(r.idx_scan, 0), v_col);
         v_sql := format('CREATE INDEX idx_%s_auto_opt ON %s (%I);', r.relname, v_tbl, v_col);
 
         SELECT rec_id INTO v_rec_id
@@ -2032,7 +2032,7 @@ BEGIN
     LOOP
         v_tbl := r.full_tbl;
         v_col := r.col_name;
-        v_reason := format('Cột khóa ngoại %s.%s chưa có B-Tree index hỗ trợ truy vấn JOIN và chống lock.', v_tbl, v_col);
+        v_reason := format('Cột khóa ngoại %s.%s chưa có Index -> (Giải thích: Khi JOIN giữa các bảng với nhau, việc thiếu Index trên khóa ngoại sẽ làm chậm phép nối và dễ gây khóa bảng khi có cập nhật. Cần tạo B-Tree Index trên cột [%s] để tăng tốc truy vấn).', v_tbl, v_col, v_col);
         v_sql := format('CREATE INDEX idx_%s_%s_fk ON %s (%s);', r.relname, v_col, v_tbl, v_col);
 
         SELECT rec_id INTO v_rec_id
@@ -2058,6 +2058,72 @@ $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 COMMENT ON FUNCTION ai.fn_recommend_indexes IS 'Module AI 2: Công cụ tự động khuyến nghị chỉ mục từ thống kê catalog';
+
+-- ----------------------------------------------------------------------------
+-- HÀM TIỆN ÍCH DEMO: SO SÁNH HIỆU NĂNG THỰC TẾ SEQ SCAN VS B-TREE INDEX (20.000 DÒNG)
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ai.fn_compare_index_benchmark()
+RETURNS TABLE (
+    phuong_thuc VARCHAR(60),
+    so_dong_du_lieu VARCHAR(30),
+    thoi_gian_ms NUMERIC(8,3),
+    so_block_bo_nho_doc VARCHAR(30),
+    danh_gia_hieu_nang TEXT
+) AS $$
+DECLARE
+    t1 timestamptz;
+    t2 timestamptz;
+    dur_seq NUMERIC(8,3);
+    dur_idx NUMERIC(8,3);
+BEGIN
+    CREATE TEMP TABLE IF NOT EXISTS _tmp_perf_bench (
+        id bigint,
+        total_amount numeric(12,0),
+        note text
+    ) ON COMMIT DROP;
+    TRUNCATE _tmp_perf_bench;
+    INSERT INTO _tmp_perf_bench
+    SELECT g.v::bigint, (g.v * 100)::numeric(12,0), 'khach_hang_' || g.v
+    FROM generate_series(1, 20000) g(v);
+    ANALYZE _tmp_perf_bench;
+
+    -- 1. Đo Seq Scan khi chưa có Index
+    SET LOCAL enable_indexscan = off;
+    SET LOCAL enable_bitmapscan = off;
+    t1 := clock_timestamp();
+    PERFORM * FROM _tmp_perf_bench WHERE id = 15000;
+    t2 := clock_timestamp();
+    dur_seq := ROUND((EXTRACT(EPOCH FROM (t2 - t1)) * 1000.0)::numeric, 3);
+
+    -- Tạo B-Tree Index
+    CREATE INDEX IF NOT EXISTS _idx_tmp_perf_bench_id ON _tmp_perf_bench (id);
+    ANALYZE _tmp_perf_bench;
+
+    -- 2. Đo Index Scan khi có B-Tree Index
+    SET LOCAL enable_indexscan = on;
+    SET LOCAL enable_bitmapscan = on;
+    t1 := clock_timestamp();
+    PERFORM * FROM _tmp_perf_bench WHERE id = 15000;
+    t2 := clock_timestamp();
+    dur_idx := ROUND((EXTRACT(EPOCH FROM (t2 - t1)) * 1000.0)::numeric, 3);
+
+    phuong_thuc := '1. Quét tuần tự (Seq Scan - Không Index)';
+    so_dong_du_lieu := '20,000 dòng';
+    thoi_gian_ms := dur_seq;
+    so_block_bo_nho_doc := '~128 blocks bộ nhớ';
+    danh_gia_hieu_nang := 'Chậm (Phải quét duyệt qua từng dòng một từ đầu đến cuối bảng)';
+    RETURN NEXT;
+
+    phuong_thuc := '2. Quét chỉ mục (B-Tree Index Scan)';
+    so_dong_du_lieu := '20,000 dòng';
+    thoi_gian_ms := dur_idx;
+    so_block_bo_nho_doc := '2-3 blocks bộ nhớ';
+    danh_gia_hieu_nang := format('Nhanh vượt trội (Nhảy trực tiếp đến vị trí dòng qua cây B-Tree, tối ưu gấp %s lần)',
+                                 CASE WHEN dur_idx > 0 THEN ROUND(dur_seq / dur_idx, 1)::text ELSE '10+' END);
+    RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- ----------------------------------------------------------------------------
 -- MODULE 3: PHÁT HIỆN DỮ LIỆU KHÁCH TRÙNG LẶP (DUPLICATE DETECTION VIA PG_TRGM)

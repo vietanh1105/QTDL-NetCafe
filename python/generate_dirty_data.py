@@ -84,36 +84,48 @@ def generate_dirty_customers(n=20):
 
         # CÀI ĐẶT RÕ RÀNG CÁC TRƯỜNG HỢP LỖI BẨN TRONG 20 DÒNG (ĐỂ THẦY NHÌN THẤY NGAY)
         if i == 1:
-            # Dòng 1: SĐT dính mã quốc tế +84 (cứu được -> bỏ +84)
+            # Dòng 1: SĐT dính mã quốc tế +84 (cứu được -> chuẩn hóa bỏ +84 về 0977...)
             clean_phone = "+84" + clean_phone[1:]
         elif i == 2:
-            # Dòng 2: SĐT dính dấu chấm phân cách (cứu được -> bỏ dấu chấm)
+            # Dòng 2: Tên viết thường toàn bộ + thừa khoảng trắng, SĐT dính dấu chấm
+            full_name = "   lê   thanh   phong   "
             clean_phone = f"{clean_phone[:4]}.{clean_phone[4:7]}.{clean_phone[7:]}"
         elif i == 3:
             # Dòng 3: Tên in hoa toàn bộ và thụt lề thừa khoảng trắng (cứu được -> Title Case)
             full_name = f"   {full_name.upper()}   "
         elif i == 4:
-            # Dòng 4: Số dư âm vô lý (lỗi nặng -> cách ly vào rejected_rows)
+            # Dòng 4: Số dư âm vô lý (lỗi vi phạm tài chính -> cách ly vào rejected_rows)
             balance = "-50000"
         elif i == 5:
             # Dòng 5: SĐT cụt chỉ có 5 số (lỗi nặng -> cách ly vào rejected_rows)
             clean_phone = "12345"
         elif i == 6:
-            # Dòng 6: Email sai cấu trúc (cứu được -> bỏ email hỏng)
-            email = "sai-email-khong-hop-le"
+            # Dòng 6: Tên lộn xộn hoa thường, email có khoảng trắng và chữ hoa (cứu được -> chuẩn hóa đầy đủ)
+            full_name = "  pHạM   tHị   nAm  "
+            email = "   PhamThiNam@gmail.com   "
         elif i == 7:
-            # Dòng 7: SĐT dính dấu chấm phân cách (cứu được -> bỏ dấu chấm)
+            # Dòng 7: Tên viết thường, SĐT dính dấu chấm phân cách (cứu được -> Title Case và bỏ dấu chấm)
+            full_name = "võ xuân bình"
             clean_phone = f"{clean_phone[:4]}.{clean_phone[4:7]}.{clean_phone[7:]}"
         elif i == 8:
-            # Dòng 8: Số dư âm vô lý (lỗi nặng -> cách ly vào rejected_rows)
+            # Dòng 8: Số dư âm vô lý (lỗi vi phạm tài chính -> cách ly vào rejected_rows)
             balance = "-100000"
         elif i == 9:
             # Dòng 9: SĐT cụt chỉ có 4 số (lỗi nặng -> cách ly vào rejected_rows)
             clean_phone = "8888"
         elif i == 10:
-            # Dòng 10: Tên thừa khoảng trắng (cứu được -> chuẩn hóa)
+            # Dòng 10: Tên in hoa toàn bộ thừa khoảng trắng
             full_name = f"   {full_name.upper()}   "
-        # Các dòng 11 đến 20 là các khách hàng sạch bình thường
+        elif i == 11:
+            # Dòng 11: Tên viết thường thừa khoảng trắng
+            full_name = "  đỗ   đình   minh  "
+        elif i == 14:
+            # Dòng 14: Tên pha trộn chữ hoa chữ thường
+            full_name = "tRầN   đỨc   bÌnH"
+        elif i == 17:
+            # Dòng 17: Tên in hoa toàn bộ
+            full_name = "   NGÔ THANH NAM   "
+        # Các dòng còn lại là khách hàng hợp lệ với đa dạng họ tên Việt Nam
 
         rows.append((full_name, clean_phone, email, username, balance, points, tier, "BATCH_DIRTY_01"))
 
