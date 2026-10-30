@@ -98,6 +98,13 @@ FROM staging.rejected_rows
 WHERE source_table = 'core.customer'
 ORDER BY rejected_id;
 
+-- Xem 16 khách hàng sạch vừa được chuẩn hóa và nạp thành công vào CSDL chính:
+SELECT customer_id, full_name, phone, email, username, balance
+FROM core.customer
+WHERE username LIKE 'user_%'
+ORDER BY customer_id
+LIMIT 16;
+
 ========================================================================
 Demo 1 Làm sạch dữ liệu và ràng buộc toàn vẹn / Chứng minh CHECK và khóa ngoại bằng lỗi thật
 SQL
