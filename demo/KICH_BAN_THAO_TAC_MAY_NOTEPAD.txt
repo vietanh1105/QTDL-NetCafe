@@ -115,7 +115,7 @@ SELECT
 -- 2. Quản lý xem toàn bộ chi tiết từng hóa đơn của tất cả nhân viên (vượt qua giới hạn RLS của Thu ngân):
 SELECT 
     i.invoice_id AS ma_hoa_don,
-    i.created_at AS thoi_gian_lap,
+    i.issued_at AS thoi_gian_lap,
     i.total_amount AS tong_tien,
     i.status AS trang_thai,
     i.cashier_id AS ma_nhan_vien,
