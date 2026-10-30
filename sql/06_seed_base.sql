@@ -150,7 +150,7 @@ VALUES
     (6, 11, 4, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '3 hours', 'finished', 12000, 24000, '{"game":"Genshin Impact"}'::jsonb),
     (3, 16, 3, NOW() - INTERVAL '5 days' - INTERVAL '4 hours', NOW() - INTERVAL '5 days', 'finished', 18000, 72000, '{"game":"Cyberpunk 2077"}'::jsonb),
     (8, 17, 3, NOW() - INTERVAL '36 hours', NOW() - INTERVAL '1 hour', 'finished', 18000, 630000, '{"game":"Marathon Stream"}'::jsonb),
-    (31, 18, 3, NOW() - INTERVAL '4 days' - INTERVAL '5 hours', NOW() - INTERVAL '4 days', 'finished', 18000, 720000, '{"game":"CS2 Tournament"}'::jsonb);
+    (12, 18, 3, NOW() - INTERVAL '4 days' - INTERVAL '5 hours', NOW() - INTERVAL '4 days', 'finished', 18000, 720000, '{"game":"CS2 Tournament"}'::jsonb);
 
 INSERT INTO billing.invoice (session_id, customer_id, cashier_id, play_amount, service_amount, surcharge, discount_amount, total_amount, status, issued_at, paid_at)
 VALUES 
@@ -162,7 +162,7 @@ VALUES
     (6, 6, 4, 24000, 0, 0, 0, 24000, 'paid', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours'),
     (7, 3, 3, 72000, 0, 0, 0, 72000, 'paid', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
     (8, 8, 3, 630000, 0, 0, 0, 630000, 'paid', NOW() - INTERVAL '1 hour', NOW() - INTERVAL '1 hour'),
-    (9, 31, 3, 720000, 0, 0, 0, 720000, 'paid', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days');
+    (9, 12, 3, 720000, 0, 0, 0, 720000, 'paid', NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days');
 
 INSERT INTO billing.payment (kind, invoice_id, customer_id, method, amount, employee_id, paid_at, reference)
 VALUES 
@@ -174,9 +174,9 @@ VALUES
     ('invoice', 6, 6, 'cash', 24000, 4, NOW() - INTERVAL '3 hours', 'HD-006'),
     ('invoice', 7, 3, 'cash', 72000, 3, NOW() - INTERVAL '5 days', 'HD-007'),
     ('invoice', 8, 8, 'bank_transfer', 630000, 3, NOW() - INTERVAL '1 hour', 'HD-008'),
-    ('invoice', 9, 31, 'bank_transfer', 720000, 3, NOW() - INTERVAL '4 days', 'HD-009'),
+    ('invoice', 9, 12, 'bank_transfer', 720000, 3, NOW() - INTERVAL '4 days', 'HD-009'),
     ('topup', NULL, 8, 'bank_transfer', 10000000, 1, NOW() - INTERVAL '1 day', 'DEP-001'),
-    ('topup', NULL, 31, 'bank_transfer', 1000000, 1, NOW() - INTERVAL '5 days', 'DEP-002');
+    ('topup', NULL, 12, 'bank_transfer', 1000000, 1, NOW() - INTERVAL '5 days', 'DEP-002');
 
 -- 11. LÀM MỚI MATERIALIZED VIEWS
 REFRESH MATERIALIZED VIEW reporting.mv_revenue_daily;
