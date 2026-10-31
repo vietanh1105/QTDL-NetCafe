@@ -285,8 +285,8 @@ def add_part_2(doc):
         doc,
         ["ma_nhan_vien", "ten_nhan_vien", "tai_khoan", "so_dien_thoai", "vai_tro", "ca_lam_viec", "so_luong_hoa_don", "tong_doanh_thu"],
         [
-            ["3", "Phạm Thu Thảo", "cashier_thao", "0903333333", "cashier", "morning", "6 hóa đơn", "838.000 VNĐ"],
-            ["4", "Trần Đức Nam", "cashier_nam", "0904444444", "cashier", "afternoon", "3 hóa đơn", "72.000 VNĐ"]
+            ["3", "Phạm Thu Thảo", "thao_pham", "0913456789", "cashier", "morning", "6 hóa đơn", "840.000 VNĐ"],
+            ["4", "Trần Đức Nam", "nam_tran", "0934567890", "cashier", "afternoon", "3 hóa đơn", "72.000 VNĐ"]
         ]
     )
     
@@ -319,7 +319,8 @@ def add_part_2(doc):
     add_speech_box(
         doc,
         "Thay vào đó, thu ngân Thảo được cấp quyền tra cứu qua View an toàn hr.vw_employee_public. "
-        "Lệnh này trả về đầy đủ 5 nhân sự, số điện thoại và ca trực để phối hợp công việc mà cột lương đã bị giấu hoàn toàn."
+        "Lệnh này trả về đầy đủ 4 nhân sự thực tế, số điện thoại, tài khoản, ca trực và trạng thái đang hoạt động (is_active = t) "
+        "để phối hợp công việc, trong khi cột lương salary đã bị che giấu hoàn toàn."
     )
     add_code_table(
         doc,
@@ -330,13 +331,12 @@ def add_part_2(doc):
     )
     add_result_table(
         doc,
-        ["employee_id", "full_name", "phone", "emp_role", "default_shift", "Trạng thái hiển thị cột salary"],
+        ["employee_id", "full_name", "phone", "username", "db_username", "emp_role", "default_shift", "is_active", "Trạng thái cột salary"],
         [
-            ["1", "Nguyễn Văn Quản Lý", "0901111111", "manager", "morning", "ĐÃ ẨN HOÀN TOÀN (Bảo mật)"],
-            ["2", "Lê Thị Thu Ngân", "0902222222", "cashier", "morning", "ĐÃ ẨN HOÀN TOÀN (Bảo mật)"],
-            ["3", "Phạm Thu Thảo", "0903333333", "cashier", "morning", "ĐÃ ẨN HOÀN TOÀN (Bảo mật)"],
-            ["4", "Trần Đức Nam", "0904444444", "cashier", "afternoon", "ĐÃ ẨN HOÀN TOÀN (Bảo mật)"],
-            ["5", "Hoàng Văn Kỹ Thuật", "0905555555", "technician", "night", "ĐÃ ẨN HOÀN TOÀN (Bảo mật)"]
+            ["1", "Nguyễn Văn An", "0981234567", "an_nguyen", "nv_admin", "admin", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
+            ["2", "Lê Quang Minh", "0972345678", "minh_le", "nv_manager", "manager", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
+            ["3", "Phạm Thu Thảo", "0913456789", "thao_pham", "nv_thao", "cashier", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
+            ["4", "Trần Đức Nam", "0934567890", "nam_tran", "nv_nam", "cashier", "afternoon", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"]
         ]
     )
     

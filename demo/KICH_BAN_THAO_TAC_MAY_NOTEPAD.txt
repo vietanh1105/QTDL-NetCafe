@@ -89,7 +89,7 @@ Thảo chỉ nhìn thấy đúng 6 hóa đơn do chính tay mình lập. Toàn b
 [Lời thuyết trình]:
 Để đối chứng, nhóm chuyển sang vai trò Quản lý phòng máy. Do có đặc quyền Bypass RLS, Quản lý nhìn thấy
 đầy đủ toàn bộ 9 hóa đơn của cả nhân viên Thảo lẫn nhân viên Nam.
-Đồng thời, Quản lý xem được báo cáo tổng hợp doanh thu theo từng nhân viên: ca của Thảo lập 6 hóa đơn đạt 838 nghìn đồng,
+Đồng thời, Quản lý xem được báo cáo tổng hợp doanh thu theo từng nhân viên: ca của Thảo lập 6 hóa đơn đạt 840 nghìn đồng,
 ca của Nam lập 3 hóa đơn đạt 72 nghìn đồng.
 
 --- BƯỚC 2.4 & 2.5: BẢO MẬT CẤP CỘT (CLS) VÀ TRUY CẬP AN TOÀN QUA VIEW ---
@@ -98,8 +98,8 @@ ca của Nam lập 3 hóa đơn đạt 72 nghìn đồng.
 Tiếp theo, thu ngân Thảo cố tình truy cập vào cột salary để xem trộm tiền lương của đồng nghiệp.
 CSDL lập tức kích hoạt cơ chế CLS và trả về lỗi từ chối truy cập Permission Denied.
 Để nhân viên vẫn làm việc được mà không lộ thông tin nhạy cảm, hệ thống cấp quyền cho Thảo tra cứu qua View an toàn.
-Qua View này, Thảo xem được đầy đủ họ tên, số điện thoại và ca trực của 5 nhân viên để tiện giao ca,
-nhưng cột tiền lương đã được giấu kín hoàn toàn.
+Qua View này, Thảo xem được đầy đủ họ tên, số điện thoại, tài khoản, ca trực và trạng thái đang làm việc (is_active = t)
+của 4 nhân viên để tiện giao ca, nhưng cột tiền lương đã được giấu kín hoàn toàn.
 
 --- BƯỚC 2.6: MODULE AI 3 - PHÁT HIỆN TRÙNG LẶP TÀI KHOẢN GIAN LẬN ---
 [Thao tác]: Bạn chạy hàm ai.fn_detect_duplicates trên SQL.

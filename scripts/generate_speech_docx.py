@@ -273,7 +273,7 @@ def build_speech_document(output_path):
         "Để đối chứng, nhóm chuyển sang vai trò Quản lý phòng máy bằng SET ROLE nv_manager. "
         "Do có đặc quyền BYPASSRLS, ở câu truy vấn thứ hai Quản lý nhìn thấy đầy đủ toàn bộ 9 hóa đơn của cả nhân viên Thảo (6 hóa đơn) "
         "lẫn nhân viên Nam (3 hóa đơn). Ở câu truy vấn thứ ba, Quản lý xem được báo cáo tổng hợp doanh thu theo từng nhân viên ca trực: "
-        "ca của Thảo lập 6 hóa đơn đạt 838 nghìn đồng, ca của Nam lập 3 hóa đơn đạt 72 nghìn đồng."
+        "ca của Thảo lập 6 hóa đơn đạt 840 nghìn đồng, ca của Nam lập 3 hóa đơn đạt 72 nghìn đồng."
     )
     
     add_heading_2(doc, "Bước 2.4 & 2.5: Bảo mật cấp cột (CLS) và Truy cập an toàn qua View công khai")
@@ -283,8 +283,8 @@ def build_speech_document(output_path):
         "Tiếp theo, thu ngân Thảo chuyển lại vai trò và cố tình truy cập vào cột salary để xem trộm tiền lương của đồng nghiệp. "
         "CSDL lập tức kích hoạt cơ chế CLS và trả về lỗi từ chối truy cập ERROR: permission denied for table employee.\n\n"
         "Để nhân viên vẫn làm việc phối hợp được mà không lộ thông tin nhạy cảm, hệ thống cấp quyền cho Thảo tra cứu qua View an toàn "
-        "hr.vw_employee_public. Qua View này, Thảo xem được đầy đủ họ tên, số điện thoại và ca trực của 5 nhân viên để tiện giao ca, "
-        "nhưng cột tiền lương đã được che giấu an toàn tuyệt đối."
+        "hr.vw_employee_public. Qua View này, Thảo xem được đầy đủ họ tên, số điện thoại, tài khoản, ca trực và trạng thái đang hoạt động (is_active = t) "
+        "của 4 nhân viên thực tế để tiện giao ca, nhưng cột tiền lương đã được che giấu an toàn tuyệt đối."
     )
     
     add_heading_2(doc, "Bước 2.6: Module AI 3 - Phát hiện tài khoản trùng lặp gian lận bằng pg_trgm")
@@ -412,3 +412,4 @@ def build_speech_document(output_path):
 if __name__ == "__main__":
     out_file = os.path.join("docs", "KichBan_LoiNoi_ThuyetTrinh_BaoVe.docx")
     build_speech_document(out_file)
+
