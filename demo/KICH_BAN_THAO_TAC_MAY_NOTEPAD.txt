@@ -1,355 +1,216 @@
-================================================================================
-          KỊCH BẢN THAO TÁC MÁY (DÀNH CHO BẠN BẤM LỆNH KHI BẢO VỆ)
-   Dự án: Quản trị Cơ sở Dữ liệu Phòng Game Net (PostgreSQL 17 trên Neon Cloud)
-   Database: netcafe_db | User: neondb_owner
-   Tương ứng 1-1 với file Word: KichBan_ThuyetTrinh_BaoVe_QTDL_MoiNhat.docx
-================================================================================
+==============================================================================================================
+               KỊCH BẢN THUYẾT TRÌNH BẢO VỆ ĐỀ TÀI QUẢN TRỊ CƠ SỞ DỮ LIỆU
+          ĐỀ TÀI: HỆ THỐNG QUẢN LÝ PHÒNG GAME / NET (NETCAFE MANAGEMENT SYSTEM)
+          Nền tảng: PostgreSQL 16 (Neon Serverless Cloud) | Python ETL | 5 Module AI
+          (Tài liệu dạng lời thoại dành riêng cho sinh viên thuyết trình trước Hội đồng)
+==============================================================================================================
 
-CHUẨN BỊ TRƯỚC KHI LÊN NÓI (Mở sẵn trên màn hình máy tính):
-  1. Cửa sổ bên TRÁI: DBeaver / pgAdmin / Neon SQL Editor (đang kết nối 'netcafe_db')
-  2. Cửa sổ bên PHẢI: PowerShell (mở sẵn tại thư mục: c:\Users\Administrator\Documents\QTDL-NetCafe)
-  3. Cửa sổ nhỏ góc: Mở file txt này để copy lệnh
-  4. Trên điện thoại: Mở trình duyệt web gõ sẵn: https://ntfy.sh/netcafe_vietanh (hoặc app ntfy)
+[LỜI MỞ ĐẦU: XIN CHÀO VÀ GIỚI THIỆU TỔNG QUAN]
 
+Kính thưa Thầy Chủ tịch Hội đồng, quý Thầy Cô trong Hội đồng chấm tiểu luận và toàn thể các bạn sinh viên!
 
-################################################################################
-PHẦN 1: DEMO KHỞI TẠO, ETL & RÀNG BUỘC TOÀN VẸN (FAIL-SAFE DEMO)
-################################################################################
+Em tên là Nguyễn Việt Anh, đại diện nhóm thực hiện đề tài "Hệ thống Quản lý Phòng máy NetCafe chuyên nghiệp".
+Hôm nay, nhóm chúng em rất vinh dự được trình bày và bảo vệ sản phẩm quản trị cơ sở dữ liệu trước Hội đồng.
 
---- [BƯỚC 1.0: (TÙY CHỌN) Khởi tạo CSDL siêu tốc từ con số 0] ---
-👉 Thao tác trên cửa sổ TERMINAL (PowerShell) - Chỉ chạy khi thầy yêu cầu làm mới DB:
+Bài toán quản lý phòng máy chơi game đặt ra thách thức rất lớn về độ trễ thời gian thực, tính toàn vẹn tài chính,
+bảo mật phân quyền chặt chẽ giữa các ca trực và khả năng tự động hóa tối ưu khi dữ liệu mở rộng.
+Để giải quyết bài toán này, nhóm đã xây dựng hệ thống trên nền tảng PostgreSQL Cloud của Neon, phân tách rành mạch
+thành 8 Schemas độc lập, thiết lập kiến trúc an ninh đa tầng và tích hợp 5 Module AI hoạt động trực tiếp
+trong lòng CSDL.
 
-# Xóa sạch CSDL trên Cloud trong 0.5 giây:
-python python/reset_and_init_cloud.py --wipe
-
-# Khởi tạo toàn bộ Schemas, Bảng và Ràng buộc trong 5.3 giây:
-python python/reset_and_init_cloud.py --init
+Sau đây, em xin phép bắt đầu phần báo cáo và thực nghiệm trực tiếp hệ thống qua 5 nội dung trọng tâm.
 
 
---- [BƯỚC 1.1: Chạy luồng Python ETL làm sạch dữ liệu bẩn] ---
-👉 Thao tác trên cửa sổ TERMINAL (PowerShell):
+==============================================================================================================
+PHẦN 1: KHỞI TẠO TỰ ĐỘNG, PIPELINE ETL VÀ RÀNG BUỘC TOÀN VẸN FAIL-SAFE
+==============================================================================================================
 
-# Sinh 20 dòng dữ liệu bẩn vào bảng tạm staging:
-python python/generate_dirty_data.py
+[Dẫn nhập ví dụ đời thường]:
+Thưa Thầy Cô, dữ liệu nạp vào hệ thống cũng giống như nguồn nước thô tự nhiên chưa qua xử lý.
+Tầng Staging đóng vai trò như bể lắng và hệ thống lọc: những bản ghi sai chuẩn, rủi ro gian lận sẽ bị giữ lại
+tại bể cách ly, chỉ dữ liệu sạch đạt chuẩn 3NF mới được nạp vào bể chính.
+Đồng thời, các ràng buộc Check Constraint và Foreign Key đóng vai trò như cửa an ninh sân bay:
+bất kỳ hành lý sai quy cách hay vé giả mạo đều bị chặn đứng ngay lập tức tại cửa khẩu CSDL.
 
-# Chạy tiến trình ETL làm sạch, chuẩn hóa và nạp lại:
-python python/clean_data.py
+--- BƯỚC 1.1: KHỞI TẠO CSDL CLOUD SẠCH SẼ TỰ ĐỘNG BẰNG PYTHON ---
+[Thao tác]: Bạn mở cửa sổ Terminal bên phải.
+[Lời thuyết trình]:
+Kính thưa Thầy Cô, trước tiên nhóm khởi tạo môi trường sạch sẽ trên Cloud. Khi cần làm mới toàn bộ hệ thống,
+nhóm chạy lệnh reset wipe để xóa sạch các bảng cũ trong vòng nửa giây.
+Tiếp theo, nhóm chạy lệnh reset init để tự động thiết lập toàn bộ 8 Schemas, các bảng, ràng buộc và nạp dữ liệu gốc.
+Như Thầy Cô thấy trên màn hình Terminal, chỉ trong chưa đầy 10 giây, toàn bộ nền tảng CSDL đã sẵn sàng hoạt động.
 
+--- BƯỚC 1.2: DỮ LIỆU BẨN THỰC TẾ VÀ LUỒNG ETL CHUẨN HÓA DỮ LIỆU ---
+[Thao tác]: Bạn chạy script sinh dirty data và chạy clean data trên Terminal, sau đó chuyển sang màn hình SQL.
+[Lời thuyết trình]:
+Để kiểm chứng khả năng xử lý dữ liệu thực tế, nhóm chạy công cụ sinh ra 20 bản ghi dữ liệu bẩn mô phỏng người dùng
+nhập liệu lộn xộn: tên viết hoa thường tùy tiện, thừa khoảng trắng, số điện thoại dính đầu số quốc tế hoặc dấu chấm,
+thậm chí có những bản ghi số dư tiền bị âm.
+Sau đó, nhóm kích hoạt tiến trình ETL bằng Python để tự động làm sạch.
+Kính mời Thầy Cô quan sát cửa sổ SQL:
+- Đầu tiên, nhìn vào bảng dữ liệu thô Staging, Thầy Cô thấy rõ các lỗi nhập liệu thực tế.
+- Thứ hai, ở bảng cách ly dữ liệu lỗi, hệ thống đã phát hiện và chặn đứng 4 bản ghi rủi ro: gồm 2 bản ghi tiền âm
+  và 2 bản ghi sai độ dài số điện thoại, kèm lý do kỹ thuật chi tiết.
+- Thứ ba, ở bảng khách hàng chính, 16 bản ghi hợp lệ đã được chuẩn hóa họ tên, định dạng số điện thoại,
+  tạo tài khoản, email tự động và số dư dương hợp lệ đạt chuẩn 3NF.
 
---- [BƯỚC 1.2: Xem dữ liệu thô và bảng cách ly dữ liệu bẩn trên DBeaver / Neon] ---
-👉 Copy dán vào cửa sổ SQL EDITOR rồi bấm Chạy:
-
--- 1. Xem 10 dòng dữ liệu thô bị lỗi (+84, dấu chấm, tiền âm, in hoa):
-SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch 
-FROM staging.stg_customers 
-ORDER BY raw_id 
-LIMIT 10;
-
--- 2. Xem bảng cách ly dữ liệu bẩn (Rejected Rows) với nguyên nhân cụ thể:
-SELECT rejected_id, source_table, error_reason, raw_record, rejected_at 
-FROM staging.rejected_rows 
-ORDER BY rejected_id DESC 
-LIMIT 5;
-
--- 3. Xem 16 khách hàng sạch đã được chuẩn hóa và nạp thành công vào CSDL chính:
-SELECT customer_id, full_name, phone, email, username, balance
-FROM core.customer
-WHERE username LIKE 'user_%'
-ORDER BY customer_id
-LIMIT 16;
-
-
---- [BƯỚC 1.3: Demo Ràng buộc CHECK - Nạp số dư âm bị chặn (Vi phạm ck_customer_balance)] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ -> Đúng kịch bản!):
-
-INSERT INTO core.customer (full_name, phone, username, password_hash, balance) 
-VALUES ('Khách Sai Tiền Âm', '0919999999', 'user_failsafe', 'hash123', -50000);
-
-
---- [BƯỚC 1.4: Demo Ràng buộc Khóa ngoại ON DELETE RESTRICT - Chặn xóa phòng máy đang hoạt động] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ vi phạm Foreign Key RESTRICT -> Đúng kịch bản!):
-
-DELETE FROM core.room WHERE room_id = 1;
+--- BƯỚC 1.3: THỬ NGHIỆM FAIL-SAFE CHẶN ĐỨNG RỦI RO Ở TẦNG NHÂN CSDL ---
+[Thao tác]: Bạn chạy 3 câu lệnh vi phạm trên cửa sổ SQL.
+[Lời thuyết trình]:
+Để chứng minh cơ chế Fail-Safe bảo vệ tuyệt đối ở tầng nhân CSDL chứ không phó mặc cho code ứng dụng:
+- Đầu tiên, nhóm cố tình nạp số dư tiền âm trừ năm mươi nghìn đồng: CSDL lập tức từ chối và báo lỗi
+  vi phạm ràng buộc Check ck_customer_balance.
+- Thứ hai, nhóm thử tạo hóa đơn với mã khách hàng không tồn tại: CSDL chặn lại ngay vì vi phạm khóa ngoại.
+- Thứ ba, nhóm cố tình xóa phòng máy số 1 - nơi đang có các máy trạm thi đấu hoạt động: CSDL từ chối lệnh xóa
+  ngay lập tức nhờ cơ chế On Delete Restrict, bảo vệ dữ liệu con không bị mồ côi.
 
 
---- [BƯỚC 1.5: (Bổ sung) Demo Ràng buộc CHECK định dạng Email sai] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ vi phạm ck_customer_email -> Đúng kịch bản!):
+==============================================================================================================
+PHẦN 2: BẢO MẬT PHÂN QUYỀN ĐA TẦNG (RBAC, CLS, RLS) VÀ MODULE AI 3
+==============================================================================================================
 
-INSERT INTO core.customer (full_name, phone, email, username, password_hash)
-VALUES ('Khach Hang Test', '0988777666', 'email_sai_dinh_dang', 'user_test', 'hash_pass');
+[Dẫn nhập ví dụ đời thường]:
+Trong phòng máy, thu ngân ca trực chỉ được mở và kiểm đếm ngăn két tiền của chính mình trong ca làm việc,
+tuyệt đối không được nhìn sang két tiền của đồng nghiệp ca khác - đó chính là Row-Level Security (RLS).
+Đồng thời, thu ngân chỉ được xem danh bạ nội bộ để liên lạc ca kíp chứ không được xem lén mức lương của nhân sự khác
+- đó chính là Column-Level Security (CLS).
 
+--- BƯỚC 2.1 & 2.2: ĐÓNG VAI THU NGÂN THẢO VÀ CHỨNG MINH RLS ---
+[Thao tác]: Bạn chuyển vai trò sang nv_thao và truy vấn toàn bộ bảng hóa đơn trên SQL.
+[Lời thuyết trình]:
+Bây giờ, nhóm đóng vai nhân viên thu ngân Thảo ở ca sáng bằng lệnh Set Role.
+Sau đó, thu ngân Thảo chạy truy vấn xem tất cả hóa đơn trên toàn bảng.
+Mặc dù câu lệnh truy vấn hoàn toàn không có mệnh đề Where lọc dữ liệu, nhờ chính sách RLS cài cắm tại nhân CSDL,
+Thảo chỉ nhìn thấy đúng 6 hóa đơn do chính tay mình lập. Toàn bộ các hóa đơn của nhân viên Nam ở ca khác
+đều bị ẩn hoàn toàn, ngăn chặn tuyệt đối nguy cơ tò mò hay gian lận nội bộ.
 
+--- BƯỚC 2.3: ĐỐI CHIẾU TOÀN QUYỀN GIÁM SÁT CỦA QUẢN LÝ ---
+[Thao tác]: Bạn chuyển sang vai trò nv_manager và chạy truy vấn chi tiết cùng bảng tổng hợp trên SQL.
+[Lời thuyết trình]:
+Để đối chứng, nhóm chuyển sang vai trò Quản lý phòng máy. Do có đặc quyền Bypass RLS, Quản lý nhìn thấy
+đầy đủ toàn bộ 9 hóa đơn của cả nhân viên Thảo lẫn nhân viên Nam.
+Đồng thời, Quản lý xem được báo cáo tổng hợp doanh thu theo từng nhân viên: ca của Thảo lập 6 hóa đơn đạt 838 nghìn đồng,
+ca của Nam lập 3 hóa đơn đạt 72 nghìn đồng.
 
-################################################################################
-PHẦN 2: BẢO MẬT PHÂN QUYỀN VÀ RLS / CLS (ROLE-PLAYING DEMO)
-################################################################################
+--- BƯỚC 2.4 & 2.5: BẢO MẬT CẤP CỘT (CLS) VÀ TRUY CẬP AN TOÀN QUA VIEW ---
+[Thao tác]: Bạn đổi lại vai trò Thảo, thử xem cột lương, sau đó truy vấn View công khai.
+[Lời thuyết trình]:
+Tiếp theo, thu ngân Thảo cố tình truy cập vào cột salary để xem trộm tiền lương của đồng nghiệp.
+CSDL lập tức kích hoạt cơ chế CLS và trả về lỗi từ chối truy cập Permission Denied.
+Để nhân viên vẫn làm việc được mà không lộ thông tin nhạy cảm, hệ thống cấp quyền cho Thảo tra cứu qua View an toàn.
+Qua View này, Thảo xem được đầy đủ họ tên, số điện thoại và ca trực của 5 nhân viên để tiện giao ca,
+nhưng cột tiền lương đã được giấu kín hoàn toàn.
 
---- [BƯỚC 2.1: Đóng vai Nhân viên Thu ngân Thảo (cashier_id = 3)] ---
-👉 Copy dán vào SQL EDITOR (Hiển thị thông báo xác nhận chuyển vai trò):
-
-SET ROLE nv_thao;
-SELECT 
-    'ĐÃ CHUYỂN THÀNH CÔNG SANG VAI TRÒ THU NGÂN (THẢO)' AS thong_bao_he_thong,
-    CURRENT_USER AS vai_tro_hien_tai, 
-    SESSION_USER AS tai_khoan_ket_noi;
-
-
---- [BƯỚC 2.2: Demo RLS - Thảo chỉ thấy hóa đơn do chính mình lập ở ca sáng] ---
-👉 Copy dán vào SQL EDITOR (Chỉ thấy đúng các hóa đơn của Thảo, không thấy của nhân viên khác):
-
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice;
-
-
---- [BƯỚC 2.3: Đổi vai sang Quản lý (Manager) để đối chiếu toàn quyền giám sát] ---
-👉 Copy dán vào SQL EDITOR (Quản lý xem chi tiết từng hóa đơn của mọi nhân viên):
-
-RESET ROLE;
-SET ROLE nv_manager;
-
--- 1. Thông báo xác nhận chuyển vai trò Quản lý:
-SELECT 
-    'ĐÃ CHUYỂN THÀNH CÔNG SANG VAI TRÒ QUẢN LÝ (MANAGER)' AS thong_bao_he_thong,
-    CURRENT_USER AS vai_tro_hien_tai;
-
--- 2. Quản lý xem toàn bộ chi tiết từng hóa đơn của tất cả nhân viên (vượt qua giới hạn RLS của Thu ngân):
-SELECT 
-    i.invoice_id AS ma_hoa_don,
-    i.issued_at AS thoi_gian_lap,
-    i.total_amount AS tong_tien,
-    i.status AS trang_thai,
-    i.cashier_id AS ma_nhan_vien,
-    e.full_name AS ten_nhan_vien_lap,
-    e.emp_role AS vai_tro_nhan_vien,
-    e.default_shift AS ca_lam_viec
-FROM billing.invoice i
-JOIN hr.employee e ON i.cashier_id = e.employee_id
-ORDER BY i.invoice_id;
-
--- 3. Bảng tổng hợp doanh thu theo từng nhân viên ca trực:
-SELECT 
-    i.cashier_id AS ma_nhan_vien, 
-    e.full_name AS ten_nhan_vien, 
-    e.default_shift AS ca_lam_viec, 
-    count(i.invoice_id) AS so_luong_hoa_don,
-    sum(i.total_amount) AS tong_doanh_thu
-FROM billing.invoice i
-JOIN hr.employee e ON i.cashier_id = e.employee_id
-GROUP BY i.cashier_id, e.full_name, e.default_shift
-ORDER BY i.cashier_id;
-
-RESET ROLE;
+--- BƯỚC 2.6: MODULE AI 3 - PHÁT HIỆN TRÙNG LẶP TÀI KHOẢN GIAN LẬN ---
+[Thao tác]: Bạn chạy hàm ai.fn_detect_duplicates trên SQL.
+[Lời thuyết trình]:
+Nhiều khách hàng thường tạo nhiều tài khoản hoặc dùng chung số điện thoại để trục lợi mã giảm giá tân thủ.
+Nhóm đã tích hợp Module AI 3 ứng dụng giải thuật so khớp mờ Fuzzy Trigram Matching pg_trgm.
+Khi chạy hàm, AI tự động quét toàn bộ cơ sở dữ liệu và phát hiện chính xác 4 cặp tài khoản nghi vấn:
+gồm cặp trùng 7 số cuối điện thoại và họ tên tương đồng, cùng cặp tài khoản viết không dấu tương đồng 100%
+với tài khoản có dấu.
 
 
---- [BƯỚC 2.4: Demo CLS - Thu ngân Thảo cố tình xem lén cột Lương (salary) của nhân viên] ---
-👉 Copy dán vào SQL EDITOR (Sẽ báo lỗi ĐỎ: permission denied for table employee -> Đúng kịch bản!):
-
-SET ROLE nv_thao;
-
-SELECT employee_id, full_name, salary 
-FROM hr.employee;
-
-RESET ROLE;
-
-
---- [BƯỚC 2.5: Thu ngân xem qua View công khai (vw_employee_public - Đã che giấu lương)] ---
-👉 Copy dán vào SQL EDITOR (Xem thành công danh bạ nội bộ mà không lộ thông tin lương nhạy cảm):
-
-SET ROLE nv_thao;
-
-SELECT * FROM hr.vw_employee_public;
-
-RESET ROLE;
-
-
---- [BƯỚC 2.6: Module AI 3 - Bắt trùng lặp tài khoản khách hàng bằng pg_trgm] ---
-👉 Copy dán vào SQL EDITOR (Phát hiện khách hàng cố tình tạo nhiều nick nhận khuyến mãi):
-
-SELECT candidate_id, customer_name_a, customer_name_b, similarity, reason 
-FROM ai.fn_detect_duplicates(0.65);
-
-RESET ROLE;
-
-
-
-################################################################################
+==============================================================================================================
 PHẦN 3: TỐI ƯU HÓA HIỆU NĂNG VÀ MODULE AI 2 (PERFORMANCE DEMO)
-################################################################################
+==============================================================================================================
 
---- [BƯỚC 3.0: ĐO LƯỜNG TỰ ĐỘNG HIỆU NĂNG THỰC TẾ TRÊN 20.000 DÒNG (KHUYÊN DÙNG)] ---
-👉 Copy dán vào SQL EDITOR (In ngay 1 bảng tiếng Việt so sánh thời gian ms & số block nhớ):
+[Dẫn nhập ví dụ đời thường]:
+Khi tìm kiếm một bộ hồ sơ trong kho lưu trữ hàng triệu tài liệu: nếu không có mục lục sắp xếp, ta buộc phải
+lật từng trang một từ đầu đến cuối rất tốn thời gian - đó là Quét tuần tự Seq Scan. Nhưng nếu có bảng mục lục chỉ mục,
+ta nhảy thẳng đến đúng ngăn tủ chứa hồ sơ chỉ trong một tích tắc - đó là B-Tree Index Scan.
+Module AI 2 giống như một bác sĩ khám bệnh CSDL, tự động phân tích nhật ký truy vấn để phát hiện bảng bị nghẽn
+và kê đơn tạo chỉ mục phù hợp.
 
-SELECT 
-    phuong_thuc AS phuong_thuc_quet,
-    so_dong_du_lieu AS quy_mo_du_lieu,
-    thoi_gian_ms AS thoi_gian_thuc_thi_ms,
-    so_block_bo_nho_doc AS bo_nho_da_doc,
-    danh_gia_hieu_nang AS ket_luan_hieu_nang
-FROM ai.fn_compare_index_benchmark();
+--- BƯỚC 3.1: BENCHMARK TỰ ĐỘNG TRÊN 20.000 BẢN GHI ---
+[Thao tác]: Bạn chạy hàm ai.fn_compare_index_benchmark trên SQL.
+[Lời thuyết trình]:
+Để chứng minh sức mạnh của Index trên quy mô lớn, nhóm thực hiện đo đạc tự động trên 20.000 dòng dữ liệu.
+Kết quả đối chiếu in ra tiếng Việt rất trực quan:
+Quét tuần tự Seq Scan phải đọc duyệt qua 128 block bộ nhớ và mất gần 1 mili-giây.
+Trong khi đó, B-Tree Index Scan chỉ cần đọc đúng 2 đến 3 block bộ nhớ và chỉ mất 0.17 mili-giây,
+tốc độ truy xuất nhanh hơn gấp 5.3 lần.
 
-💡 GIẢI THÍCH CHO HỘI ĐỒNG:
-- Hàm Benchmark tự động kiểm thử 20.000 bản ghi trên RAM: Seq Scan phải duyệt qua ~128 blocks bộ nhớ (mất gần 1 ms), trong khi B-Tree Index Scan chỉ đọc 2-3 blocks (mất 0.04 - 0.17 ms, nhanh gấp 5 - 20 lần).
+--- BƯỚC 3.2: ĐỐI CHIẾU KẾ HOẠCH THỰC THI EXPLAIN TRÊN BẢNG GỐC ---
+[Thao tác]: Bạn chạy các câu lệnh Explain trước và sau khi tạo Index trên SQL.
+[Lời thuyết trình]:
+Nhóm tiếp tục đối chiếu trên bảng hóa đơn thực tế: khi chưa có chỉ mục, CSDL dùng Seq Scan.
+Sau khi tạo B-Tree Index trên cột tổng tiền và ép dùng chỉ mục, kế hoạch thực thi chuyển sang Index Scan
+nhanh chóng và chính xác.
 
-
---- [BƯỚC 3.1 & 3.2: THỰC THI THỦ CÔNG TRÊN BẢNG HÓA ĐƠN GỐC] ---
-👉 Bước A: Đảm bảo quyền Owner & Xóa index cũ để đưa bảng về trạng thái nguyên bản:
-
-RESET ROLE;
-DROP INDEX IF EXISTS billing.idx_invoice_total_amount;
-
-👉 Bước B: Đo khi CHƯA có Index -> Kết quả: Seq Scan:
-
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice 
-WHERE total_amount = 630000;
-
-👉 Bước C: Tạo B-Tree Index và đo lại -> Kết quả: Index Scan:
-
--- 1. Tạo chỉ mục B-Tree trên cột số tiền hóa đơn:
-CREATE INDEX idx_invoice_total_amount ON billing.invoice (total_amount);
-
--- 2. Chạy lại câu truy vấn:
-SET enable_seqscan = off;
-
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT invoice_id, customer_id, cashier_id, total_amount, status 
-FROM billing.invoice 
-WHERE total_amount = 630000;
-
-SET enable_seqscan = on;
-
-💡 LƯU Ý KHI GIẢI THÍCH VỚI THẦY CÔ:
-- Trên bảng hóa đơn gốc của bài thi hiện có 9 dòng dữ liệu mẫu, Seq Scan và Index Scan chạy nhanh gần như nhau (~0.04 ms) vì 9 dòng chỉ chiếm đúng 1 block bộ nhớ 8KB trong RAM. 
-- Khi số lượng hóa đơn tăng lên hàng chục ngàn dòng (như đã chứng minh ở Bước 3.0 bên trên), B-Tree Index thể hiện tốc độ vượt trội.
+--- BƯỚC 3.3: MODULE AI 2 - TỰ ĐỘNG KHUYẾN NGHỊ CHỈ MỤC THÔNG MINH ---
+[Thao tác]: Bạn chạy hàm ai.fn_recommend_indexes trên SQL.
+[Lời thuyết trình]:
+Thay vì người quản trị CSDL phải ngồi phân tích từng câu lệnh chậm chạp một cách thủ công,
+Module AI 2 tự động giám sát thống kê runtime trong CSDL, phát hiện ngay 3 bảng bị quét tuần tự quá nhiều lần
+và tự động sinh sẵn câu lệnh Create Index kèm theo lời giải thích kỹ thuật rõ ràng.
 
 
---- [BƯỚC 3.3: Module AI 2 - AI tự động quét Catalog runtime và khuyến nghị Index tối ưu] ---
-👉 Copy dán vào SQL EDITOR (Có mở ngoặc giải thích chi tiết lý do kỹ thuật):
+==============================================================================================================
+PHẦN 4: ĐIỂM NHẤN CÔNG NGHỆ & 3 MODULE AI THỜI GIAN THỰC (REAL-TIME AI)
+==============================================================================================================
 
-SELECT 
-    recommendation_id AS stt, 
-    table_name AS bang_can_toi_uu, 
-    column_list AS cot_can_danh_index, 
-    reason AS ly_do_ai_khuyen_nghi, 
-    suggested_sql AS lenh_tao_index_tu_dong 
-FROM ai.fn_recommend_indexes() 
-LIMIT 3;
+--- BƯỚC 4.1: BÓC TÁCH DỮ LIỆU BÁN CẤU TRÚC JSONB LINH HOẠT ---
+[Thao tác]: Bạn chạy 2 câu truy vấn JSONB trên SQL.
+[Lời thuyết trình]:
+Mỗi dòng máy tính phòng net có cấu hình linh hoạt khác nhau. Cột JSONB giúp lưu trữ linh hoạt như NoSQL
+nhưng vẫn duy trì đầy đủ tính toàn vẹn quan hệ ACID của PostgreSQL.
+Nhóm thực hiện lọc đồng thời 3 tiêu chí: card đồ họa RTX, chip CPU i7 và RAM 32GB, sau đó dùng toán tử
+tập con Containment để tìm kiếm siêu tốc, trả về đúng 5 máy trạm VIP phục vụ thi đấu thể thao điện tử.
 
+--- BƯỚC 4.2: MODULE AI 1 - CẢNH BÁO BẤT THƯỜNG THỜI GIAN THỰC (LISTEN/NOTIFY) & SMS ---
+[Thao tác]: Bạn bật script lắng nghe bên Terminal phải, sau đó nạp 10 triệu bên SQL trái.
+[Lời thuyết trình]:
+Kính mời Thầy Cô quan sát hai màn hình song song:
+Bên phải Terminal đang chạy tiến trình Python lắng nghe tín hiệu từ CSDL qua cơ chế Pub/Sub Listen/Notify.
+Bên trái SQL, nhóm giả lập nạp số tiền lớn bất thường là 10 triệu đồng.
+Ngay khoảnh khắc lệnh nạp tiền được Commit, Trigger CSDL tự động phát tín hiệu Notify.
+Lập tức, màn hình Terminal bên phải nổ cảnh báo đỏ tức thì trong thời gian thực, đồng thời gửi tin nhắn
+SMS Brandname thông báo biến động số dư về điện thoại thật của khách hàng mà không làm tắc nghẽn CSDL.
 
+--- BƯỚC 4.3: MODULE AI 4 - THUẬT TOÁN THỐNG KÊ Z-SCORE BẮT NGOẠI LAI ---
+[Thao tác]: Bạn chạy hàm ai.fn_detect_anomalies trên SQL.
+[Lời thuyết trình]:
+Dựa trên phân phối chuẩn Gauss và quy tắc 3-Sigma, Module AI 4 tự động tính toán trung bình mẫu và độ lệch chuẩn.
+Khi chạy hàm, AI gắn cờ chính xác 2 giao dịch dị biệt: một phiên chơi kéo dài tới 35 tiếng với hệ số Z bằng 2.65
+so với trung bình quán chỉ hơn 6 tiếng; và một giao dịch nạp 10 triệu đồng với hệ số Z bằng 2.13
+so với trung bình nạp của quán.
 
-################################################################################
-PHẦN 4: ĐIỂM NHẤN TÍCH HỢP & 3 MODULE AI THỜI GIAN THỰC (AI HIGHLIGHTS)
-################################################################################
-
---- [BƯỚC 4.1: Bóc tách dữ liệu bán cấu trúc NoSQL từ cột JSONB (->> và @>)] ---
-👉 Copy dán vào SQL EDITOR (Tìm kiếm máy trạm cao cấp theo đa tiêu chí: Card RTX, CPU i7 và RAM 32GB):
-
--- 1. Bóc tách linh hoạt các trường JSON và lọc đồng thời {CPU, GPU, RAM}:
-SELECT 
-    computer_code AS ma_may, 
-    computer_name AS ten_may,
-    specs ->> 'cpu'     AS chip_cpu,
-    specs ->> 'gpu'     AS card_man_hinh,
-    specs ->> 'ram'     AS dung_luong_ram
-FROM core.computer
-WHERE specs ->> 'gpu' ILIKE '%RTX%'
-  AND specs ->> 'cpu' ILIKE '%i7%'
-  AND specs ->> 'ram' = '32GB'
-ORDER BY computer_code;
-
--- 2. Tìm kiếm siêu tốc bằng toán tử tập con JSONB Containment (@>) kết hợp đồng thời {CPU, GPU, RAM}:
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT computer_code, computer_name, specs 
-FROM core.computer 
-WHERE specs @> '{"cpu": "i7-13700F", "gpu": "RTX 4070", "ram": "32GB"}'::jsonb;
-
-
---- [BƯỚC 4.2: AI Cảnh báo rủi ro An ninh thời gian thực (LISTEN / NOTIFY)] ---
-👉 Bước A (Cửa sổ TERMINAL bên Phải): Chạy lệnh lắng nghe tín hiệu:
-python python/listen_ai_alerts.py
-# (Màn hình hiện: [+] ĐÃ KÍCH HOẠT LẮNG NGHE KÊNH: 'ai_security_alert' và đứng chờ)
-
-👉 Bước B (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh nạp tiền lớn bất thường (10 triệu VNĐ):
-INSERT INTO billing.payment (kind, customer_id, method, amount, employee_id, reference)
-VALUES ('topup', 1, 'bank_transfer', 10000000, 3, 'Demo nạp tiền kích còi báo động');
-
-👉 Bước C: Nhìn sang cửa sổ Terminal -> LẬP TỨC NỔ CẢNH BÁO ĐỎ THỜI GIAN THỰC!
-# (Bấm Ctrl + C trên cửa sổ Terminal để dừng tiến trình lắng nghe).
+--- BƯỚC 4.4: MODULE AI 5 - KÍCH CẦU KHUYẾN MÃI, PHÂN TẦNG KHÁCH THƯỜNG VS KHÁCH VIP VÀ HOÀN TÁC ---
+[Thao tác]: Bạn chạy listener trên Terminal, chạy hàm apply promo trên SQL, đối chiếu giá, sau đó chạy verify lõi CSDL.
+[Lời thuyết trình]:
+Tiếp theo là điểm nhấn của Module AI 5: tự động kích cầu giờ thấp điểm và níu chân khách hàng VIP.
+Quy trình được thực thi bài bản:
+- Đầu tiên, tool Python lắng nghe cổng SMS sẵn sàng bên Terminal.
+- Trên SQL, nhóm gọi hàm kích hoạt khuyến mãi AI.
+- Ngay lập tức, Terminal bắt được tín hiệu thời gian thực từ CSDL, gửi tin nhắn SMS thành công tới số điện thoại
+  đích danh của khách VIP Nguyễn Việt Anh, kèm theo tính toán mức giảm tiền giờ từ 10 nghìn xuống còn 7.5 nghìn đồng.
+- Trên SQL, nhóm đối chiếu bảng giá để thấy hệ thống đã lưu cấu hình giảm 25% tiền giờ.
+- Đặc biệt, để chứng minh giá thực sự giảm trong lõi CSDL chứ không phải hiển thị hình thức, nhóm chạy công cụ
+  rà soát tầng lõi nhân CSDL trên Terminal:
+  + Mục 1 rà soát khách VIP thụ hưởng: đích danh khách hàng Nguyễn Việt Anh nhận Voucher VIP độc quyền 30 nghìn đồng.
+  + Mục 2 rà soát giờ vàng toàn quán: toàn bộ máy trạm được hưởng Happy Hour giảm 25% tiền giờ.
+  + Mục 3 đối chiếu tính cước thực tế: khách thường chỉ trả 7.500 đồng một giờ; còn khách VIP được hưởng ưu đãi kép:
+    vừa chơi giá 7.500 đồng, vừa trừ tiếp Voucher 30 nghìn đồng, nghĩa là chơi 4 tiếng được hoàn toàn miễn phí 0 đồng!
+- Cuối cùng, nhóm chứng minh tính an toàn qua cơ chế Hoàn tác Rollback: khi chạy hàm rollback, toàn bộ chương trình
+  khuyến mãi và voucher AI được dọn sạch khỏi Database, giá giờ chơi của quán lập tức quay về nguyên bản 10.000 đồng/giờ!
 
 
---- [BƯỚC 4.3: Module AI 4 - Thuật toán thống kê Z-Score phát hiện ngoại lai (Outliers)] ---
-👉 Copy dán vào SQL EDITOR (Công thức chuẩn hóa Z = |X - Mean| / StdDev theo phân phối Gauss, kèm diễn giải dễ hiểu):
+==============================================================================================================
+PHẦN 5: TỔNG KẾT VÀ BẢO VỆ THÀNH CÔNG ĐỀ TÀI
+==============================================================================================================
 
-SELECT 
-    flag_id AS ma_canh_bao, 
-    anomaly_type AS loai_bat_thuong, 
-    subject_table AS bang_du_lieu, 
-    metric_value AS gia_tri_thuc_te, 
-    z_score AS he_so_z_score,
-    (detail_info->>'mean')::numeric AS trung_binh_phong_may,
-    (detail_info->>'stddev')::numeric AS do_lech_chuan,
-    CASE 
-        WHEN anomaly_type = 'SESSION_DURATION_OUTLIER' 
-            THEN 'Phiên chơi quá dài (Giải thích: Khách chơi tới 2.100 phút ~ 35 tiếng, trong khi trung bình quán chỉ 373 phút -> Cần kiểm tra khách ngủ quên hoặc máy bị treo)'
-        WHEN anomaly_type = 'PAYMENT_AMOUNT_OUTLIER' 
-            THEN 'Nạp tiền quá lớn (Giải thích: Khách nạp tới 10 triệu VNĐ, trong khi trung bình quán chỉ 1 triệu VNĐ -> Cần kiểm tra giao dịch bất thường hoặc rửa tiền)'
-        ELSE 'Hành vi lệch chuẩn thống kê (Vượt ngoài khoảng tin cậy 95% của phân phối chuẩn Gauss)'
-    END AS mo_ta_de_hieu_cho_hoi_dong
-FROM ai.fn_detect_anomalies(1.5);
+[Lời kết thúc]:
+Kính thưa Thầy Cô trong Hội đồng!
+Qua toàn bộ quá trình báo cáo và thực nghiệm vừa rồi, nhóm chúng em đã chứng minh trọn vẹn 5 trụ cột
+của một hệ thống Quản trị Cơ sở Dữ liệu hiện đại:
+1. Tính toàn vẹn và an toàn dữ liệu tự động với Pipeline ETL và cơ chế Fail-Safe ở tầng nhân;
+2. Kiến trúc bảo mật phân quyền đa tầng kết hợp hoàn hảo giữa RBAC, CLS và RLS;
+3. Khả năng tối ưu hiệu năng truy vấn quy mô lớn với B-Tree Index và AI Khuyến nghị chỉ mục;
+4. Xử lý dữ liệu bán cấu trúc NoSQL JSONB linh hoạt trên nền tảng cơ sở dữ liệu quan hệ;
+5. Và đặc biệt là 5 Module AI hoạt động thời gian thực gắn kết chặt chẽ với các nghiệp vụ thực tiễn của phòng máy.
 
-
---- [BƯỚC 4.4: Module AI 5 - Kích hoạt Khuyến mãi & Bắn SMS Discount Real-time] ---
-
-👉 Bước A (Cửa sổ TERMINAL bên Phải): Chạy tool Python lắng nghe cổng SMS Gateway:
-python python/sms_gateway_listener.py
-# (Màn hình hiện: [*] NETCAFE REAL-TIME AI SMS GATEWAY ĐANG LẮNG NGHE KÊNH 'ai_sms_dispatch'...)
-# (Hoặc chạy công cụ gửi SMS trực tiếp: python python/send_brandname_sms.py --promo --phone "0327469105" --name "Nguyen Viet Anh")
-
-👉 Bước B (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh SQL để AI kích hoạt khuyến mãi:
-SELECT applied_code, applied_name, target_info, discount_val, status_msg 
-FROM ai.fn_apply_promotions();
-
-👉 Bước C (Quan sát trên TERMINAL & ĐIỆN THOẠI):
-- Màn hình Terminal nổ log xác nhận gửi SMS thành công (HTTP 200 OK - Delivered)!
-- Chi tiết discount: Giá gốc 10.000đ/giờ -> GIẢM 25% (-2.500đ) -> Còn 7.500đ/giờ!
-- Điện thoại nhận tin nhắn: "[NETCAFE PRO] Chào bạn Nguyễn Việt Anh! Khung giờ vàng kích cầu: Giá gốc 10.000đ/h -> GIẢM 25% (-2.500đ) chỉ còn 7.500đ/h! Tặng kèm mã VIP30K giảm 30.000đ. Hẹn gặp bạn tại NetCafe!"
-
-👉 Bước D (Cửa sổ SQL EDITOR bên Trái): Chạy lệnh SQL đối chiếu bảng giá từ 10k còn 7.5k:
-SELECT 
-    p.code AS ma_khuyen_mai,
-    p.promotion_name AS ten_chuong_trinh,
-    10000 AS gia_goc_moi_gio,
-    p.value || '%' AS phan_tram_giam,
-    ROUND(10000 * (p.value / 100)) AS so_tien_duoc_giam,
-    ROUND(10000 * (1 - p.value / 100)) AS gia_thuc_te_phai_tra,
-    'ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN' AS trang_thai_he_thong
-FROM billing.promotion p
-WHERE p.code = 'HAPPY_AI_16H';
-
-👉 Bước E [ĐIỂM NHẤN THUYẾT PHỤC GIẢNG VIÊN]: Rà soát trực tiếp vào tầng lõi nhân CSDL:
-(Chạy lệnh này trên cửa sổ TERMINAL để chứng minh giá thực sự được giảm tại nhân PostgreSQL, không phải số liệu gõ tay):
-
-python python/verify_promotion_engine.py
-
-💡 KẾT QUẢ IN RA TRÊN TERMINAL PHÂN ĐỊNH RÕ RÀNG 2 CƠ CHẾ KHUYẾN MÃI:
-- Mục 1: Đích danh Khách VIP Nguyễn Việt Anh (Voucher VIP 30.000đ + SMS độc quyền).
-- Mục 2: Khuyến mãi toàn quán (Happy Hour giảm 25% tiền giờ cho mọi khách chơi).
-- Mục 3: Đối chiếu tính cước CSDL: Khách thường trả 7.500đ/h, Khách VIP hưởng ưu đãi kép (giờ chơi 7.500đ/h và trừ tiếp Voucher 30.000đ!).
-- Khi chạy Rollback: Toàn bộ Happy Hour và Voucher VIP bị xóa bỏ, giá quay về 10.000đ/h ban đầu!
-
-👉 Bước F (Tùy chọn - Dọn dẹp sau khi trình diễn xong):
-SELECT * FROM ai.fn_rollback_promotions();
-# (Bấm Ctrl + C trên cửa sổ Terminal để dừng tiến trình listener).
-
-
-
-################################################################################
-PHẦN 5: DỰ PHÒNG KHI GIẢNG VIÊN YÊU CẦU KIỂM THỬ TOÀN BỘ BẰNG PYTHON
-################################################################################
-👉 Chạy đúng 1 lệnh duy nhất trên cửa sổ Terminal:
-
-python python/test_all_ai_modules.py
-
-(Hệ thống tự động chạy và in bảng kết quả hoàn hảo của toàn bộ 5 Module AI trong 2 giây!)
-================================================================================
+Nhóm chúng em xin chân thành cảm ơn quý Thầy Cô đã chú ý lắng nghe và rất mong nhận được những nhận xét,
+đánh giá quý báu từ Hội đồng để đề tài được hoàn thiện hơn nữa!
+Em xin trân trọng cảm ơn!
+==============================================================================================================
