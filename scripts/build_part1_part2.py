@@ -22,22 +22,27 @@ def add_part_1(doc):
     add_heading_2(doc, "Bước 1.1: Khởi tạo CSDL Cloud sạch sẽ tự động bằng Python")
     add_speech_box(
         doc,
-        "Kính thưa Thầy Cô và Hội đồng, trước tiên trên cửa sổ Terminal PowerShell bên phải, nhóm chạy lệnh: "
-        "python python/reset_and_init_cloud.py --init. Lệnh này kết nối trực tiếp lên Neon PostgreSQL Cloud, "
-        "xóa sạch các bảng cũ và tự động tái lập hoàn chỉnh 8 Schemas, toàn bộ các bảng, ràng buộc và dữ liệu gốc "
-        "trong vòng chưa đầy 10 giây. Trên màn hình Terminal, Thầy Cô có thể thấy các dòng thông báo xanh xác nhận "
-        "kết nối thành công, 8 Schemas và dữ liệu gốc đã sẵn sàng."
+        "Kính thưa Thầy Cô và Hội đồng, trước tiên trên cửa sổ Terminal PowerShell bên phải, "
+        "khi cần làm sạch hoàn toàn hệ thống, nhóm chạy lệnh: python python/reset_and_init_cloud.py --wipe "
+        "để xóa sạch toàn bộ các schemas và bảng cũ trên Cloud trong 0.5 giây. Sau đó, nhóm chạy tiếp: "
+        "python python/reset_and_init_cloud.py --init để tự động tái lập hoàn chỉnh 8 Schemas, "
+        "toàn bộ các bảng, ràng buộc và nạp dữ liệu gốc trong vòng chưa đầy 10 giây. Trên màn hình Terminal, "
+        "Thầy Cô có thể thấy các dòng thông báo xanh xác nhận kết nối thành công, 8 Schemas và dữ liệu gốc đã sẵn sàng."
     )
     add_code_table(
         doc,
         "🖥️ CỬA SỔ THAO TÁC: TERMINAL POWERSHELL",
+        "# 1. Xóa sạch toàn bộ CSDL trên Cloud trong 0.5 giây (khi cần làm mới):\n"
+        "python python/reset_and_init_cloud.py --wipe\n\n"
+        "# 2. Khởi tạo toàn bộ 8 Schemas, Bảng, Ràng buộc và Nạp dữ liệu gốc:\n"
         "python python/reset_and_init_cloud.py --init"
     )
     add_result_table(
         doc,
-        ["Trạng thái thực thi trên Terminal", "Chi tiết đối tượng CSDL được khởi tạo"],
+        ["Trạng thái thực thi trên Terminal", "Chi tiết đối tượng CSDL được xử lý"],
         [
-            ["[+] KẾT NỐI NEON CLOUD THÀNH CÔNG", "Host: ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech"],
+            ["[+] ĐÃ XÓA SẠCH CSDL CLOUD (--wipe)", "Đã drop toàn bộ 8 Schemas, bảng cũ và quan hệ trong 0.5 giây"],
+            ["[+] KẾT NỐI NEON CLOUD THÀNH CÔNG (--init)", "Host: ep-blue-cherry-b8mrp18t.c-14.us-east-1.aws.neon.tech"],
             ["[+] HOÀN TẤT KHỞI TẠO 8 SCHEMAS", "core, inventory, billing, hr, reporting, staging, audit, ai"],
             ["[+] NẠP BẢN GHI DỮ LIỆU GỐC (SEED)", "25+ Bảng, Triggers, Views, RLS Policies và 5 Module AI sẵn sàng"]
         ]
@@ -123,10 +128,12 @@ def add_part_1(doc):
     add_speech_box(
         doc,
         "Để chứng minh cơ chế Fail-Safe bảo vệ ở tầng nhân CSDL chứ không chỉ phụ thuộc vào code ứng dụng, "
-        "trên Neon SQL nhóm cố tình chạy trực tiếp 2 câu lệnh INSERT vi phạm: "
-        "Dòng lệnh 1 chèn khách hàng số dư âm -50.000 VNĐ, CSDL bắn lỗi vi phạm ràng buộc CHECK ck_customer_balance. "
-        "Dòng lệnh 2 chèn hóa đơn với mã khách 9999 không tồn tại, CSDL từ chối và báo lỗi vi phạm khóa ngoại "
-        "FOREIGN KEY invoice_customer_id_fkey. CSDL bảo vệ toàn vẹn tuyệt đối dữ liệu."
+        "trên Neon SQL nhóm cố tình chạy trực tiếp 3 câu lệnh vi phạm: "
+        "Thứ nhất: Chèn khách hàng số dư âm -50.000 VNĐ, CSDL bắn lỗi vi phạm ràng buộc CHECK ck_customer_balance. "
+        "Thứ hai: Chèn hóa đơn với mã khách 9999 không tồn tại, CSDL từ chối và báo lỗi vi phạm khóa ngoại "
+        "FOREIGN KEY invoice_customer_id_fkey. "
+        "Thứ ba: Cố tình xóa phòng máy số 1 (dữ liệu cha) đang chứa các máy trạm hoạt động (dữ liệu con), "
+        "CSDL chặn đứng ngay lập tức do vi phạm ràng buộc khóa ngoại ON DELETE RESTRICT computer_room_id_fkey."
     )
     add_code_table(
         doc,
@@ -136,14 +143,17 @@ def add_part_1(doc):
         "VALUES ('Test Check Error', '0988888888', 'test@gmail.com', 'test_fail', -50000);\n\n"
         "-- 2. Thử chèn hóa đơn với ID khách không tồn tại -> Vi phạm FOREIGN KEY:\n"
         "INSERT INTO billing.invoice (session_id, customer_id, cashier_id, total_amount, status)\n"
-        "VALUES (9999, 9999, 9999, 100000, 'unpaid');"
+        "VALUES (9999, 9999, 9999, 100000, 'unpaid');\n\n"
+        "-- 3. Cố tình xóa bản ghi cha (Room 1) đang có máy con tham chiếu -> Vi phạm ON DELETE RESTRICT:\n"
+        "DELETE FROM core.room WHERE room_id = 1;"
     )
     add_result_table(
         doc,
         ["Lệnh thử nghiệm vi phạm", "Thông báo lỗi thực tế trả về từ PostgreSQL (Neon Cloud)"],
         [
             ["INSERT số dư -50.000 VNĐ", "ERROR: new row for relation \"customer\" violates check constraint \"ck_customer_balance\" (Failing row: balance = -50000)"],
-            ["INSERT hóa đơn khách 9999", "ERROR: insert or update on table \"invoice\" violates foreign key constraint \"invoice_customer_id_fkey\" (customer_id=9999 not present)"]
+            ["INSERT hóa đơn khách 9999", "ERROR: insert or update on table \"invoice\" violates foreign key constraint \"invoice_customer_id_fkey\" (customer_id=9999 not present)"],
+            ["DELETE phòng máy số 1 (RESTRICT)", "ERROR: update or delete on table \"room\" violates RESTRICT setting of foreign key constraint \"computer_room_id_fkey\" on table \"computer\" (Key room_id=1 is referenced)"]
         ]
     )
 
