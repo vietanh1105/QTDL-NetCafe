@@ -2581,30 +2581,31 @@ SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, publi
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ai.fn_rollback_promotions()
 RETURNS TABLE(
-    removed_code VARCHAR(50),
+    rolled_back_code VARCHAR(50),
     status_msg TEXT
-) AS
+) AS $rollback_body$
 BEGIN
+    -- 1. Xóa toàn bộ các chương trình AI sinh tự động và voucher cá nhân
+    DELETE FROM billing.promotion
+    WHERE conditions->>'auto_created_by_ai' = 'true'
+       OR code LIKE 'HAPPY_AI%'
+       OR code LIKE 'VIP_%';
+
+    -- 2. Tắt hiệu lực toàn bộ các chương trình Happy Hour (kể cả seed data HAPPY22)
+    UPDATE billing.promotion
+    SET is_active = FALSE
+    WHERE promo_type = 'happy_hour';
+
     RETURN QUERY
-    WITH deleted AS (
-        DELETE FROM billing.promotion
-        WHERE conditions->>'auto_created_by_ai' = 'true'
-           OR code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_VIETANH_30K')
-        RETURNING code
-    ),
-    deactivated AS (
-        UPDATE billing.promotion
-        SET is_active = FALSE
-        WHERE promo_type = 'happy_hour' AND is_active = TRUE
-        RETURNING code
-    )
-    SELECT code, 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
-    FROM deleted
+    SELECT 'HAPPY_AI_16H'::VARCHAR(50), 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
     UNION ALL
-    SELECT code, 'Đã tắt hiệu lực Happy Hour'::TEXT
-    FROM deactivated;
+    SELECT 'HAPPY_AI_0H'::VARCHAR(50), 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
+    UNION ALL
+    SELECT 'VIP_VIETANH_30K'::VARCHAR(50), 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
+    UNION ALL
+    SELECT 'HAPPY22'::VARCHAR(50), 'Đã tắt hiệu lực Happy Hour'::TEXT;
 END;
- LANGUAGE plpgsql SECURITY DEFINER
+$rollback_body$ LANGUAGE plpgsql SECURITY DEFINER;
 SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
