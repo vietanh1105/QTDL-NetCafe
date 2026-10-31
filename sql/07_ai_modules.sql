@@ -766,18 +766,28 @@ CREATE OR REPLACE FUNCTION ai.fn_rollback_promotions()
 RETURNS TABLE(
     removed_code VARCHAR(50),
     status_msg TEXT
-) AS $$
+) AS 
 BEGIN
     RETURN QUERY
     WITH deleted AS (
         DELETE FROM billing.promotion
         WHERE conditions->>'auto_created_by_ai' = 'true'
+           OR code IN ('HAPPY_AI_16H', 'HAPPY_AI_0H', 'VIP_VIETANH_30K')
+        RETURNING code
+    ),
+    deactivated AS (
+        UPDATE billing.promotion
+        SET is_active = FALSE
+        WHERE promo_type = 'happy_hour' AND is_active = TRUE
         RETURNING code
     )
     SELECT code, 'Đã hoàn tác và xóa khỏi hệ thống khuyến mãi'::TEXT
-    FROM deleted;
+    FROM deleted
+    UNION ALL
+    SELECT code, 'Đã tắt hiệu lực Happy Hour'::TEXT
+    FROM deactivated;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
+ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, core, inventory, billing, hr, reporting, ai, public;
 
 REVOKE ALL ON FUNCTION ai.fn_recommend_indexes() FROM PUBLIC;
