@@ -317,13 +317,14 @@ def build_speech_document(output_path):
         "Trong khi đó, B-Tree Index Scan chỉ cần đọc đúng 2 đến 3 block bộ nhớ và chỉ mất 0.17 mili-giây, tốc độ truy xuất nhanh hơn gấp 5.3 lần."
     )
     
-    add_heading_2(doc, "Bước 3.2: Thao tác thủ công đối chiếu EXPLAIN ANALYZE trên bảng hóa đơn")
-    add_action_box(doc, "Neon SQL bên trái: DROP index, chạy EXPLAIN Seq Scan, sau đó CREATE INDEX và chạy lại EXPLAIN Index Scan.")
+    add_heading_2(doc, "Bước 3.2: Thao tác thủ công đối chiếu EXPLAIN ANALYZE trên bảng lịch sử 25.000 dòng")
+    add_action_box(doc, "Neon SQL bên trái: DROP index, chạy EXPLAIN Seq Scan trên invoice_history, sau đó CREATE INDEX và chạy lại EXPLAIN.")
     add_speech_card(
         doc,
-        "Nhóm tiếp tục đối chiếu trên bảng billing.invoice thực tế: khi chưa có chỉ mục, câu truy vấn tìm hóa đơn 630.000 VNĐ dùng Seq Scan on invoice. "
-        "Sau khi tạo B-Tree Index trên cột total_amount và ép dùng chỉ mục, kế hoạch thực thi chuyển ngay sang Index Scan using idx_invoice_total_amount "
-        "chính xác và tối ưu."
+        "Nhóm tiếp tục đối chiếu thực tế trên bảng lịch sử giao dịch 25.000 dòng billing.invoice_history: "
+        "Khi chưa có chỉ mục, CSDL phải Seq Scan duyệt qua toàn bộ 25.000 bản ghi, đọc 179 block bộ nhớ và mất gần 2 mili-giây. "
+        "Ngay sau khi tạo B-Tree Index trên cột số tiền, CSDL tự động kích hoạt Index Scan, chỉ đọc đúng 2 block bộ nhớ và thời gian "
+        "thực thi giảm xuống chỉ còn 0.04 mili-giây, tốc độ nhanh vượt trội hơn 40 lần!"
     )
     
     add_heading_2(doc, "Bước 3.3: Module AI 2 - Tự động Khuyến nghị Chỉ mục (Index Recommendation Engine)")

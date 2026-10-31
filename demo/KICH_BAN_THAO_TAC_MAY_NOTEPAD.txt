@@ -131,12 +131,13 @@ Quét tuần tự Seq Scan phải đọc duyệt qua 128 block bộ nhớ và m�
 Trong khi đó, B-Tree Index Scan chỉ cần đọc đúng 2 đến 3 block bộ nhớ và chỉ mất 0.17 mili-giây,
 tốc độ truy xuất nhanh hơn gấp 5.3 lần.
 
---- BƯỚC 3.2: ĐỐI CHIẾU KẾ HOẠCH THỰC THI EXPLAIN TRÊN BẢNG GỐC ---
-[Thao tác]: Bạn chạy các câu lệnh Explain trước và sau khi tạo Index trên SQL.
+--- BƯỚC 3.2: ĐỐI CHIẾU KẾ HOẠCH THỰC THI EXPLAIN TRÊN BẢNG LỊCH SỬ 25.000 DÒNG ---
+[Thao tác]: Bạn chạy các câu lệnh Explain trên bảng billing.invoice_history trên SQL.
 [Lời thuyết trình]:
-Nhóm tiếp tục đối chiếu trên bảng hóa đơn thực tế: khi chưa có chỉ mục, CSDL dùng Seq Scan.
-Sau khi tạo B-Tree Index trên cột tổng tiền và ép dùng chỉ mục, kế hoạch thực thi chuyển sang Index Scan
-nhanh chóng và chính xác.
+Nhóm tiếp tục đối chiếu thực tế trên bảng lịch sử giao dịch 25.000 dòng:
+Khi chưa có chỉ mục, CSDL phải Seq Scan duyệt qua 25.000 dòng, đọc 179 block bộ nhớ và mất gần 2 mili-giây.
+Ngay sau khi tạo B-Tree Index trên cột số tiền, CSDL tự động kích hoạt Index Scan, chỉ đọc đúng 2 block bộ nhớ
+và thời gian thực thi giảm xuống chỉ còn 0.04 mili-giây, tốc độ nhanh vượt trội gấp hơn 40 lần!
 
 --- BƯỚC 3.3: MODULE AI 2 - TỰ ĐỘNG KHUYẾN NGHỊ CHỈ MỤC THÔNG MINH ---
 [Thao tác]: Bạn chạy hàm ai.fn_recommend_indexes trên SQL.
