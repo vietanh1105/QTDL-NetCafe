@@ -227,10 +227,10 @@ def build_speech_document(output_path):
         "lộn xộn: tên viết hoa thường tùy tiện, thừa khoảng trắng, số điện thoại dính đầu số quốc tế hoặc dấu chấm, thậm chí có những bản ghi "
         "số dư tiền bị âm. Sau đó, nhóm kích hoạt tiến trình ETL bằng Python để tự động làm sạch.\n\n"
         "Kính mời Thầy Cô quan sát cửa sổ Neon SQL bên trái:\n"
-        "+ Đầu tiên, ở bảng dữ liệu thô Staging, Thầy Cô thấy rõ 10 dòng đầu chứa đầy đủ các lỗi nhập liệu thực tế.\n"
+        "+ Đầu tiên, ở bảng dữ liệu thô Staging, Thầy Cô thấy rõ toàn bộ các dòng chứa đầy đủ các lỗi nhập liệu thực tế.\n"
         "+ Thứ hai, ở bảng cách ly dữ liệu lỗi rejected_rows, hệ thống đã phát hiện và chặn đứng đúng 4 bản ghi rủi ro: "
         "gồm 2 bản ghi tiền âm (-50k và -100k) và 2 bản ghi sai độ dài số điện thoại, kèm nguyên nhân chi tiết.\n"
-        "+ Thứ ba, ở bảng khách hàng chính core.customer, 16 bản ghi hợp lệ đã được chuẩn hóa họ tên chuẩn mực, định dạng số điện thoại, "
+        "+ Thứ ba, ở bảng khách hàng chính core.customer, toàn bộ các khách hàng sạch đã được chuẩn hóa họ tên chuẩn mực, định dạng số điện thoại, "
         "tự động tạo tài khoản, sinh email hợp lệ và số dư dương đạt chuẩn 3NF."
     )
     

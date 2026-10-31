@@ -56,9 +56,9 @@ def add_part_1(doc):
         "mô phỏng thực tế (viết hoa thường lộn xộn, dính khoảng trắng, sai đầu số +84, số dư tiền âm). "
         "Sau đó, nhóm chạy python python/clean_data.py để kích hoạt tiến trình ETL làm sạch. "
         "Bây giờ, nhóm chuyển sang cửa sổ Neon SQL bên trái để đối chiếu 3 bước: "
-        "Thứ nhất: Xem 10 dòng thô ở Staging có đầy đủ các lỗi thực tế; "
+        "Thứ nhất: Xem các dòng dữ liệu thô ở Staging có đầy đủ các lỗi thực tế; "
         "Thứ hai: Xem bảng cách ly staging.rejected_rows đã chặn đúng 4 dòng lỗi; "
-        "Thứ ba: Xem 16 khách hàng sạch đã được chuẩn hóa đạt chuẩn 3NF và nạp thành công vào bảng core.customer."
+        "Thứ ba: Xem toàn bộ khách hàng sạch đã được chuẩn hóa đạt chuẩn 3NF và nạp thành công vào bảng core.customer."
     )
     add_code_table(
         doc,
@@ -71,9 +71,9 @@ def add_part_1(doc):
     add_code_table(
         doc,
         "🖥️ CỬA SỔ THAO TÁC: NEON SQL EDITOR / DBEAVER",
-        "-- 1. Xem 10 dòng dữ liệu thô bị lỗi (+84, dấu chấm, tiền âm, in hoa):\n"
+        "-- 1. Xem các dòng dữ liệu thô bị lỗi (+84, dấu chấm, tiền âm, in hoa):\n"
         "SELECT raw_id, raw_full_name, raw_phone, raw_balance, source_batch \n"
-        "FROM staging.stg_customers ORDER BY raw_id LIMIT 10;\n\n"
+        "FROM staging.stg_customers ORDER BY raw_id;\n\n"
         "-- 2. Xem bảng cách ly dữ liệu bẩn (Rejected Rows):\n"
         "SELECT rejected_id, error_reason, raw_record FROM staging.rejected_rows;\n\n"
         "-- 3. Xem toàn bộ khách hàng sạch đã được chuẩn hóa và nạp thành công vào CSDL chính:\n"

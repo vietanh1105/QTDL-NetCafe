@@ -51,7 +51,7 @@ Kính mời Thầy Cô quan sát cửa sổ SQL:
 - Đầu tiên, nhìn vào bảng dữ liệu thô Staging, Thầy Cô thấy rõ các lỗi nhập liệu thực tế.
 - Thứ hai, ở bảng cách ly dữ liệu lỗi, hệ thống đã phát hiện và chặn đứng 4 bản ghi rủi ro: gồm 2 bản ghi tiền âm
   và 2 bản ghi sai độ dài số điện thoại, kèm lý do kỹ thuật chi tiết.
-- Thứ ba, ở bảng khách hàng chính, 16 bản ghi hợp lệ đã được chuẩn hóa họ tên, định dạng số điện thoại,
+- Thứ ba, ở bảng khách hàng chính, toàn bộ các bản ghi hợp lệ đã được chuẩn hóa họ tên, định dạng số điện thoại,
   tạo tài khoản, email tự động và số dư dương hợp lệ đạt chuẩn 3NF.
 
 --- BƯỚC 1.3: THỬ NGHIỆM FAIL-SAFE CHẶN ĐỨNG RỦI RO Ở TẦNG NHÂN CSDL ---
