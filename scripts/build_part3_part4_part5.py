@@ -298,10 +298,12 @@ def add_part_4(doc):
     add_explanation_box(
         doc,
         "Ý nghĩa kiểm định lõi gửi Hội đồng chấm điểm",
-        "Lệnh trên kết nối trực tiếp vào PostgreSQL engine, kiểm chứng 3 điểm cốt tử: "
-        "1. Bảng dữ liệu lõi billing.promotion đã thực sự lưu trữ mã HAPPY_AI_16H với mức giảm 25% (is_active = True); "
-        "2. An ninh SMS: Chỉ gửi đích danh duy nhất Nguyễn Việt Anh (0327469105), không gửi cho khách hàng khác; "
-        "3. Thuật toán tính cước CSDL thực thi tự động: Đơn giá 10.000đ -> Giảm 2.500đ -> Giá thực thu 7.500đ/giờ!"
+        "Lệnh trên kết nối trực tiếp vào PostgreSQL engine, phân định rành mạch 2 cơ chế khuyến mãi: "
+        "1. Khách VIP đích danh (Nguyễn Việt Anh - 0327469105): Nhận Voucher độc quyền 30.000 VNĐ trừ thẳng vào hóa đơn; "
+        "2. Toàn quán (Mọi khách hàng): Áp dụng giờ vàng Happy Hour giảm 25% tiền giờ (10k còn 7.5k/h); "
+        "3. Lõi tính cước CSDL: Khách thường trả 7.500đ/h, Khách VIP hưởng ưu đãi kép (vừa giảm giờ chơi vừa trừ Voucher 30k); "
+        "4. Cơ chế Hoàn tác (Rollback): Khi chạy rollback, toàn bộ Happy Hour và Voucher VIP bị thu hồi, "
+        "giá giờ chơi lập tức hoàn trả về nguyên bản 10.000 VNĐ/giờ!"
     )
 
 def add_part_5(doc):

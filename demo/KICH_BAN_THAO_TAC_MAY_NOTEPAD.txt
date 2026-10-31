@@ -332,10 +332,11 @@ WHERE p.code = 'HAPPY_AI_16H';
 
 python python/verify_promotion_engine.py
 
-💡 KẾT QUẢ IN RA TRÊN TERMINAL SẼ CHỨNG MINH TUYỆT ĐỐI CHO HỘI ĐỒNG:
-- Bảng lõi billing.promotion đã kích hoạt quy tắc Happy Hour giảm 25% (ID: 4, is_active = True).
-- Cơ chế an ninh SMS: Chỉ gửi đích danh duy nhất Nguyễn Việt Anh (0327469105).
-- Lõi tính cước CSDL thực thi: Đơn giá 10.000đ -> Giảm 25% (-2.500đ) -> Khách chỉ phải trả 7.500đ!
+💡 KẾT QUẢ IN RA TRÊN TERMINAL PHÂN ĐỊNH RÕ RÀNG 2 CƠ CHẾ KHUYẾN MÃI:
+- Mục 1: Đích danh Khách VIP Nguyễn Việt Anh (Voucher VIP 30.000đ + SMS độc quyền).
+- Mục 2: Khuyến mãi toàn quán (Happy Hour giảm 25% tiền giờ cho mọi khách chơi).
+- Mục 3: Đối chiếu tính cước CSDL: Khách thường trả 7.500đ/h, Khách VIP hưởng ưu đãi kép (giờ chơi 7.500đ/h và trừ tiếp Voucher 30.000đ!).
+- Khi chạy Rollback: Toàn bộ Happy Hour và Voucher VIP bị xóa bỏ, giá quay về 10.000đ/h ban đầu!
 
 👉 Bước F (Tùy chọn - Dọn dẹp sau khi trình diễn xong):
 SELECT * FROM ai.fn_rollback_promotions();

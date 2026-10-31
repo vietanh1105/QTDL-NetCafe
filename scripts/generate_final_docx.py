@@ -78,8 +78,13 @@ def build_master_docx(output_path):
     add_part_5(doc)
     
     # 5. Lưu tài liệu
-    doc.save(output_path)
-    print(f"Successfully generated: {output_path}")
+    try:
+        doc.save(output_path)
+        print(f"Successfully generated: {output_path}")
+    except PermissionError:
+        temp_path = output_path.replace(".docx", "_Pending.docx")
+        doc.save(temp_path)
+        print(f"[!] Word file is currently locked by WINWORD. Saved pending update to: {temp_path}")
 
 if __name__ == "__main__":
     out_file = os.path.join("docs", "KichBan_ThuyetTrinh_BaoVe_QTDL_MoiNhat.docx")
