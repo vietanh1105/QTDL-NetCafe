@@ -22,9 +22,10 @@ def add_part_3(doc):
     add_heading_2(doc, "Bước 3.1: Đo tự động hiệu năng thực tế trên 20.000 dòng (Khuyên dùng)")
     add_speech_box(
         doc,
-        "Thưa Thầy Cô, để chứng minh sức mạnh của Index trên quy mô lớn, nhóm xây dựng hàm Benchmark tự động "
-        "ai.fn_compare_index_benchmark() kiểm thử trên 20.000 bản ghi: Seq Scan phải duyệt qua 128 block bộ nhớ "
-        "mất gần 1ms, trong khi B-Tree Index Scan chỉ đọc 2-3 block mất 0.04-0.17ms, nhanh gấp 5 đến 20 lần."
+        "Thưa Thầy Cô, để chứng minh sức mạnh vượt trội của Index trên quy mô lớn, trên cửa sổ Neon SQL nhóm chạy hàm "
+        "Benchmark tự động ai.fn_compare_index_benchmark() kiểm thử trên 20.000 bản ghi. Bảng kết quả in ra tiếng Việt rõ ràng: "
+        "Seq Scan phải đọc qua 128 block bộ nhớ mất 0.92ms, trong khi B-Tree Index Scan chỉ đọc 2-3 block mất 0.17ms, "
+        "nhanh hơn gấp 5.3 lần."
     )
     add_code_table(
         doc,
@@ -39,10 +40,10 @@ def add_part_3(doc):
     )
     add_result_table(
         doc,
-        ["phuong_thuc_quet", "quy_mo_du_lieu", "thoi_gian_thuc_thi_ms", "bo_nho_da_doc", "ket_luan_hieu_nang"],
+        ["phuong_thuc_quet", "quy_mo_du_lieu", "thoi_gian_thuc_thi_ms", "bo_nho_da_doc", "ket_luan_hieu_nang (Thực tế trên Neon)"],
         [
-            ["Seq Scan (Quét tuần tự)", "20.000 dòng", "0.90 ms", "128 blocks", "Chậm - Phải duyệt toàn bộ bảng trong bộ nhớ"],
-            ["Index Scan (B-Tree Index)", "20.000 dòng", "0.17 ms", "2-3 blocks", "Nhanh gấp 5-20 lần - Nhảy trực tiếp tới dữ liệu"]
+            ["1. Quét tuần tự (Seq Scan - Không Index)", "20,000 dòng", "0.921 ms", "~128 blocks bộ nhớ", "Chậm (Phải quét duyệt qua từng dòng một từ đầu đến cuối bảng)"],
+            ["2. Quét chỉ mục (B-Tree Index Scan)", "20,000 dòng", "0.173 ms", "2-3 blocks bộ nhớ", "Nhanh vượt trội (Nhảy trực tiếp đến vị trí dòng qua cây B-Tree, tối ưu gấp 5.3 lần)"]
         ]
     )
     
@@ -50,8 +51,10 @@ def add_part_3(doc):
     add_heading_2(doc, "Bước 3.2: Thao tác thủ công trên bảng hóa đơn gốc (Đối chiếu EXPLAIN ANALYZE)")
     add_speech_box(
         doc,
-        "Tiếp theo, nhóm thực hiện thao tác thủ công trên bảng hóa đơn billing.invoice: đo kế hoạch thực thi "
-        "khi chưa có Index (Seq Scan), sau đó tạo chỉ mục B-Tree và ép dùng Index để đối chiếu kết quả."
+        "Sau đó, nhóm thực hiện thao tác đối chiếu thủ công trên bảng billing.invoice: "
+        "Đầu tiên ở câu lệnh 1 và 2, nhóm xóa index và chạy EXPLAIN để xem Seq Scan mất 1 buffer hit. "
+        "Tiếp theo ở câu lệnh 3, 4 và 5, nhóm tạo B-Tree Index trên cột total_amount, ép dùng Index (SET enable_seqscan = off) "
+        "và chạy lại câu truy vấn để chứng minh kế hoạch thực thi chuyển sang Index Scan using idx_invoice_total_amount."
     )
     add_code_table(
         doc,
@@ -74,10 +77,18 @@ def add_part_3(doc):
         "WHERE total_amount = 630000;\n\n"
         "SET enable_seqscan = on;"
     )
+    add_result_table(
+        doc,
+        ["Trạng thái kiểm thử", "Kế hoạch thực thi EXPLAIN (ANALYZE, BUFFERS) thực tế trên Neon"],
+        [
+            ["Khi CHƯA CÓ Index", "Seq Scan on invoice (cost=0.00..1.09 rows=1 width=36) (actual time=0.015..0.017 rows=1) | Buffers: shared hit=1"],
+            ["Sau khi TẠO Index B-Tree", "Index Scan using idx_invoice_total_amount on invoice (cost=0.14..8.15 rows=1) | Buffers: shared hit=2"]
+        ]
+    )
     add_explanation_box(
         doc,
         "Lưu ý quan trọng khi giải thích với Thầy Cô",
-        "Trên bảng hóa đơn gốc của bài thi hiện có 9 dòng dữ liệu mẫu, Seq Scan và Index Scan chạy nhanh gần như nhau (~0.04 ms) "
+        "Trên bảng hóa đơn gốc của bài thi hiện có 9 dòng dữ liệu mẫu, Seq Scan và Index Scan chạy nhanh gần như nhau (~0.02 ms) "
         "bởi vì 9 dòng chỉ chiếm đúng 1 block bộ nhớ 8KB trong RAM. Khi số lượng hóa đơn tăng lên hàng chục ngàn dòng "
         "(như đã chứng minh ở Bước 3.1 bên trên), B-Tree Index thể hiện tốc độ vượt trội."
     )
@@ -86,9 +97,9 @@ def add_part_3(doc):
     add_heading_2(doc, "Bước 3.3: Module AI 2 - Tự động Khuyến nghị Chỉ mục (Index Recommendation Engine)")
     add_speech_box(
         doc,
-        "Thay vì DBA phải ngồi rà soát thủ công, Module AI 2 tự động quét Catalog runtime của PostgreSQL, "
-        "phát hiện các bảng có khối lượng giao dịch lớn đang thiếu Index ở khóa ngoại (Foreign Key) "
-        "và tự động sinh lệnh SQL tạo Index tối ưu, kèm mở ngoặc giải thích lý do kỹ thuật rõ ràng."
+        "Bây giờ trên Neon SQL, nhóm chạy hàm ai.fn_recommend_indexes(). Thay vì DBA phải ngồi phân tích từng truy vấn chậm thủ công, "
+        "AI tự động quét pg_stat_user_tables và pg_stat_user_indexes trong runtime để phát hiện các bảng bị quét tuần tự "
+        "quá nhiều lần và sinh sẵn câu lệnh CREATE INDEX, kèm theo giải thích lý do kỹ thuật rõ ràng trong ngoặc."
     )
     add_code_table(
         doc,
@@ -104,11 +115,11 @@ def add_part_3(doc):
     )
     add_result_table(
         doc,
-        ["stt", "bang_can_toi_uu", "cot_can_danh_index", "ly_do_ai_khuyen_nghi"],
+        ["stt", "bang_can_toi_uu", "cot_can_danh_index", "ly_do_ai_khuyen_nghi (Thực tế trên Neon)", "lenh_tao_index_tu_dong"],
         [
-            ["1", "billing.invoice", "customer_id", "Khóa ngoại thường xuyên JOIN (Giải thích: Giảm 90% chi phí Seq Scan khi tra cứu hóa đơn khách)"],
-            ["2", "billing.payment", "invoice_id", "Khóa ngoại giao dịch tài chính (Giải thích: Tăng tốc đối soát thanh toán tức thì)"],
-            ["3", "core.gaming_session", "computer_id", "Khóa ngoại phiên máy (Giải thích: Tối ưu tra cứu trạng thái máy trạm thời gian thực)"]
+            ["1", "core.gaming_session", "status", "Bảng core.gaming_session bị quét tuần tự 24 lần nhưng chỉ có 18 lượt quét chỉ mục -> (Giải thích: CSDL đang phải đọc duyệt từng dòng để tìm kiếm. Cần tạo B-Tree Index trên cột [status] để nhảy thẳng đến dữ liệu cần tìm, tránh quét toàn bộ bảng).", "CREATE INDEX idx_gaming_session_auto_opt ON core.gaming_session (status);"],
+            ["2", "billing.invoice", "status", "Bảng billing.invoice bị quét tuần tự 24 lần nhưng chỉ có 10 lượt quét chỉ mục -> (Giải thích: CSDL đang phải đọc duyệt từng dòng để tìm kiếm. Cần tạo B-Tree Index trên cột [status] để nhảy thẳng đến dữ liệu cần tìm, tránh quét toàn bộ bảng).", "CREATE INDEX idx_invoice_auto_opt ON billing.invoice (status);"],
+            ["3", "hr.maintenance", "started_at", "Bảng hr.maintenance bị quét tuần tự 6 lần nhưng chỉ có 0 lượt quét chỉ mục -> (Giải thích: Cần tạo B-Tree Index trên cột [started_at] để nhảy thẳng đến dữ liệu cần tìm, tránh quét toàn bộ bảng).", "CREATE INDEX idx_maintenance_auto_opt ON hr.maintenance (started_at);"]
         ]
     )
 
@@ -121,9 +132,15 @@ def add_part_4(doc):
     add_explanation_box(
         doc,
         "Ví dụ đời thường (Cấu hình máy tính linh hoạt)",
-        "Mỗi đời máy tính có phần cứng khác nhau: máy thường thì CPU i5 RAM 16GB, máy thi đấu thì màn 240Hz, "
-        "tản nhiệt nước, card RTX 4070. Cột JSONB specs giúp lưu trữ linh hoạt như MongoDB mà vẫn duy trì được "
+        "Mỗi dòng máy tính phòng net có cấu hình khác nhau: máy VIP cần chip i7, card RTX 4070, RAM 32GB; "
+        "máy tiêu chuẩn dùng i5, RAM 16GB. Cột JSONB specs giúp lưu trữ linh hoạt như NoSQL MongoDB mà vẫn duy trì được "
         "tính toàn vẹn quan hệ ACID của PostgreSQL."
+    )
+    add_speech_box(
+        doc,
+        "Trên Neon SQL, nhóm thực hiện bóc tách và lọc đồng thời 3 thông số phần cứng trong cột specs: GPU chứa 'RTX', CPU chứa 'i7' "
+        "và RAM là '32GB'. Sau đó ở câu truy vấn thứ hai, nhóm sử dụng toán tử tập con JSONB Containment (@>) để tìm kiếm siêu tốc. "
+        "Hệ thống trả về chính xác 5 máy trạm VIP từ PC016 đến PC020."
     )
     add_code_table(
         doc,
@@ -146,6 +163,17 @@ def add_part_4(doc):
         "FROM core.computer \n"
         "WHERE specs @> '{\"cpu\": \"i7-13700F\", \"gpu\": \"RTX 4070\", \"ram\": \"32GB\"}'::jsonb;"
     )
+    add_result_table(
+        doc,
+        ["ma_may", "ten_may", "chip_cpu", "card_man_hinh", "dung_luong_ram", "Phân khúc máy"],
+        [
+            ["PC016", "Máy VIP 16", "i7-13700F", "RTX 4070", "32GB", "Máy trạm thi đấu cao cấp"],
+            ["PC017", "Máy VIP 17", "i7-13700F", "RTX 4070", "32GB", "Máy trạm thi đấu cao cấp"],
+            ["PC018", "Máy VIP 18", "i7-13700F", "RTX 4070", "32GB", "Máy trạm thi đấu cao cấp"],
+            ["PC019", "Máy VIP 19", "i7-13700F", "RTX 4070", "32GB", "Máy trạm thi đấu cao cấp"],
+            ["PC020", "Máy VIP 20", "i7-13700F", "RTX 4070", "32GB", "Máy trạm thi đấu cao cấp"]
+        ]
+    )
     
     # Bước 4.2
     add_heading_2(doc, "Bước 4.2: [ĐIỂM CỘNG XUẤT SẮC] Module AI 1 - Real-time Cảnh báo rủi ro (LISTEN/NOTIFY) & SMS")
@@ -159,10 +187,11 @@ def add_part_4(doc):
     )
     add_speech_box(
         doc,
-        "Kính mời Thầy Cô chú ý màn hình: Nhóm sẽ chia đôi màn hình: Bên phải là Terminal chạy tiến trình Python "
-        "lắng nghe sự kiện LISTEN kênh 'ai_security_alert'. Bên trái là SQL Editor: Nhóm thực hiện lệnh nạp số tiền "
-        "khủng 10.000.000 VNĐ. Ngay khi lệnh vừa Commit, Trigger CSDL lập tức phát tín hiệu NOTIFY, màn hình Terminal "
-        "nổ cảnh báo đỏ tức thì và gửi tin nhắn SMS biến động số dư!"
+        "Kính mời Thầy Cô quan sát 2 màn hình song song: "
+        "Cửa sổ bên phải Terminal chạy tiến trình Python lắng nghe kênh 'ai_security_alert'. "
+        "Cửa sổ bên trái Neon SQL: Nhóm chèn giao dịch nạp số tiền lớn 10.000.000 VNĐ vào bảng billing.payment. "
+        "Ngay khi lệnh Commit, Trigger CSDL lập tức phát NOTIFY, màn hình Terminal bên phải nổ cảnh báo đỏ tức thì "
+        "và gửi tin nhắn SMS Brandname thông báo biến động số dư về điện thoại của khách hàng!"
     )
     add_code_table(
         doc,
@@ -181,18 +210,32 @@ def add_part_4(doc):
         "🖥️ CỬA SỔ PHẢI (TERMINAL POWERSHELL 2) - BẮN SMS BRANDNAME VỀ ĐIỆN THOẠI:",
         "python python/send_brandname_sms.py --phone \"0327469105\" --name \"Nguyen Viet Anh\" --amount 10000000 --balance 10050000"
     )
+    add_result_table(
+        doc,
+        ["Kênh tiếp nhận", "Nội dung cảnh báo nổ ra thời gian thực trên màn hình Terminal"],
+        [
+            ["Terminal PowerShell (listen_ai_alerts.py)", "[🚨 CẢNH BÁO AN NINH THỜI GIAN THỰC LÚC REAL-TIME]\n- Loại cảnh báo: TRANSACTION_ANOMALY (Mức độ: CRITICAL)\n- Số tiền nạp: 10,000,000 VNĐ | Khách hàng: Nguyen Viet Anh (ID: 1)\n- Trạng thái: Đã tự động kích hoạt bảo vệ an toàn CSDL!"],
+            ["Điện thoại cá nhân (SMS Brandname)", "[NETCAFE PRO] Khách hàng Nguyen Viet Anh vừa nạp thành công: +10,000,000 VND. Số dư tài khoản hiện tại: 10,050,000 VND. Chúc bạn chơi game vui vẻ!"]
+        ]
+    )
     
     # Bước 4.3
     add_heading_2(doc, "Bước 4.3: Module AI 4 - Thuật toán thống kê Z-Score phát hiện ngoại lai (Outliers)")
     add_explanation_box(
         doc,
         "Cơ sở toán học: Phân phối chuẩn Gauss và Quy tắc 3-Sigma",
-        "1. Trung bình mẫu: μ = (1/N) * Σ xi\n"
+        "1. Giá trị trung bình: μ = (1/N) * Σ xi\n"
         "2. Độ lệch chuẩn: σ = sqrt[(1/N) * Σ (xi - μ)²]\n"
-        "3. Chỉ số chuẩn hóa: Z = |x - μ| / σ\n"
-        "Theo phân phối chuẩn Gauss, khoảng [-2σ, +2σ] bao phủ 95.45% các hành vi giao dịch thông thường. "
-        "Bất kỳ giao dịch nào có |Z| >= 1.5 - 2.0 đều là các điểm dữ liệu cực kỳ hiếm gặp (chiếm dưới 4.55% tổng thể), "
-        "được hệ thống gắn cờ ngoại lai (Anomaly Outlier)."
+        "3. Chỉ số Z-Score: Z = |x - μ| / σ\n"
+        "Theo phân phối chuẩn Gauss, khoảng [-2σ, +2σ] bao phủ 95.45% các hành vi bình thường. "
+        "Bất kỳ giao dịch nào có |Z| >= 1.5 - 2.0 đều là ngoại lai cực kỳ hiếm gặp (dưới 4.55% tổng thể)."
+    )
+    add_speech_box(
+        doc,
+        "Bây giờ trên Neon SQL, nhóm chạy hàm ai.fn_detect_anomalies(1.5). Thuật toán thống kê Z-Score tự động tính toán "
+        "trung bình mẫu, độ lệch chuẩn và phát hiện chính xác 2 giao dịch bất thường trong hệ thống: "
+        "một phiên chơi dài tới 2.100 phút (~35 tiếng, Z=2.65 so với trung bình quán 373 phút) và "
+        "giao dịch nạp 10 triệu đồng (Z=2.13 so với trung bình quán 1.8 triệu đồng)."
     )
     add_code_table(
         doc,
@@ -213,23 +256,33 @@ def add_part_4(doc):
         "    END AS mo_ta_de_hieu_cho_hoi_dong\n"
         "FROM ai.fn_detect_anomalies(1.5);"
     )
+    add_result_table(
+        doc,
+        ["ma_canh_bao", "loai_bat_thuong", "gia_tri_thuc_te", "he_so_z_score", "trung_binh", "do_lech_chuan", "mo_ta_de_hieu_cho_hoi_dong (Thực tế trên Neon)"],
+        [
+            ["1", "SESSION_DURATION_OUTLIER", "2.100 phút", "2.65", "373.33 phút", "650.92 phút", "Phiên chơi quá dài (Khách chơi tới 2.100 phút ~ 35 tiếng, trung bình quán chỉ 373 phút -> Cần kiểm tra khách ngủ quên hoặc máy bị treo)"],
+            ["2", "PAYMENT_AMOUNT_OUTLIER", "10.000.000 VNĐ", "2.13", "1.826.000 VNĐ", "3.830.515 VNĐ", "Nạp tiền quá lớn (Khách nạp tới 10 triệu VNĐ, trung bình quán chỉ 1.8 triệu VNĐ -> Cần kiểm tra giao dịch bất thường hoặc rửa tiền)"]
+        ]
+    )
     
     # Bước 4.4
     add_heading_2(doc, "Bước 4.4: Module AI 5 - Kích hoạt Khuyến mãi & Gửi SMS Discount thời gian thực")
     add_explanation_box(
         doc,
         "Ví dụ đời thường (Trợ lý Marketing kích cầu giờ ế và Níu chân khách VIP)",
-        "Giống như một chuyên viên tiếp thị giàu kinh nghiệm: AI liên tục phân tích Materialized View doanh thu "
-        "để phát hiện các khung giờ vắng khách để kích hoạt giảm 25% tiền giờ, đồng thời tặng mã VIP 30K "
-        "bằng cách tự động phát tín hiệu NOTIFY bắn tin nhắn SMS tính toán mức giảm tiền cụ thể về điện thoại khách hàng."
+        "AI tự động phân tích doanh thu để kích hoạt 2 chính sách phân tầng rõ rệt: "
+        "1. Khách bình thường: Hưởng giờ vàng Happy Hour giảm 25% tiền giờ (từ 10k còn 7.5k/h) áp dụng toàn quán; "
+        "2. Khách VIP đích danh (Nguyễn Việt Anh): Nhận ưu đãi kép: vừa giảm 25% tiền giờ, vừa được tặng thêm Voucher độc quyền 30.000 VNĐ gửi đích danh SMS về điện thoại!"
     )
     add_speech_box(
         doc,
-        "Ở bước này, nhóm kết hợp trọn vẹn luồng tương tác giữa Database Cloud và Tool Python: "
-        "Đầu tiên, chạy tool Python trên Terminal để mở cổng đón nhận SMS. Sau đó trên Neon SQL, nhóm chạy hàm AI "
-        "kích hoạt khuyến mãi. Hệ thống tự động gửi tin nhắn SMS tới điện thoại tính rõ mức giảm: giá gốc 10.000đ/giờ, "
-        "giảm 25% (-2.500đ) chỉ còn 7.500đ/giờ! Tiếp theo, nhóm chạy câu lệnh SQL đối chiếu giá để chứng minh "
-        "hệ thống tính tiền đã cập nhật chính xác từ 10k xuống 7.5k!"
+        "Ở bước này, nhóm thực hiện luồng tương tác 6 bước bài bản: "
+        "Bước A: Chạy tool lắng nghe python python/sms_gateway_listener.py trên Terminal bên phải; "
+        "Bước B: Chạy lệnh SQL ai.fn_apply_promotions() trên Neon SQL bên trái; "
+        "Bước C: Terminal bên phải tự động bắt sự kiện thời gian thực, tính toán giảm 25% tiền giờ từ 10k còn 7.5k và gửi SMS thành công đích danh cho anh Nguyễn Việt Anh (0327469105); "
+        "Bước D: Chạy truy vấn SQL đối chiếu bảng giá tính tiền; "
+        "Bước E: Chạy tool verify_promotion_engine.py để rà soát trực tiếp tầng lõi nhân CSDL, chứng minh sự phân tầng giữa khách thường và khách VIP; "
+        "Bước F: Chạy hàm hoàn tác ai.fn_rollback_promotions() và kiểm chứng giá hệ thống lập tức trở về nguyên bản 10.000 VNĐ/giờ!"
     )
     
     # 4.4 - Bước A: Tool Python lắng nghe
@@ -238,7 +291,7 @@ def add_part_4(doc):
         "🖥️ BƯỚC A: CỬA SỔ PHẢI (TERMINAL POWERSHELL) - CHẠY TOOL PYTHON LẮNG NGHE CỔNG SMS GATEWAY:",
         "python python/sms_gateway_listener.py\n"
         "# Màn hình Terminal hiển thị: Đang lắng nghe kênh 'ai_sms_dispatch' và chờ lệnh từ Neon...\n"
-        "# (Hoặc chạy công cụ gửi SMS trực tiếp: python python/send_brandname_sms.py --promo --phone \"0327469105\" --name \"Nguyen Viet Anh\")"
+        "# (Hoặc công cụ gửi SMS trực tiếp: python python/send_brandname_sms.py --promo --phone \"0327469105\" --name \"Nguyen Viet Anh\")"
     )
     
     # 4.4 - Bước B: Lệnh SQL kích hoạt trên Neon
@@ -247,6 +300,15 @@ def add_part_4(doc):
         "🖥️ BƯỚC B: CỬA SỔ TRÁI (NEON SQL EDITOR) - CHẠY LỆNH SQL KÍCH HOẠT KHUYẾN MÃI AI:",
         "SELECT applied_code, applied_name, target_info, discount_val, status_msg \n"
         "FROM ai.fn_apply_promotions();"
+    )
+    add_result_table(
+        doc,
+        ["applied_code", "applied_name", "target_info", "discount_val", "status_msg (Thực tế trên Neon)"],
+        [
+            ["HAPPY_AI_16H", "Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)", "Toàn quán", "25.00%", "Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật"],
+            ["HAPPY_AI_0H", "Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 0h)", "Toàn quán", "25.00%", "Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật"],
+            ["VIP_VIETANH_30K", "Voucher VIP AI: Tặng 30.000 VNĐ cho Nguyễn Việt Anh (0327469105)", "0327469105", "30,000 VNĐ", "Đã kích hoạt thành công & Đã gửi thông báo tới điện thoại thật"]
+        ]
     )
     
     # 4.4 - Bước C: Màn hình Terminal báo gửi SMS thành công & mức discount
@@ -283,9 +345,9 @@ def add_part_4(doc):
     )
     add_result_table(
         doc,
-        ["ma_khuyen_mai", "gia_goc_moi_gio", "phan_tram_giam", "so_tien_duoc_giam", "gia_thuc_te_phai_tra", "trang_thai_he_thong"],
+        ["ma_khuyen_mai", "gia_goc_moi_gio", "phan_tram_giam", "so_tien_duoc_giam", "gia_thuc_te_phai_tra", "trang_thai_he_thong (Thực tế trên Neon)"],
         [
-            ["HAPPY_AI_16H", "10.000 VNĐ", "25.0%", "2.500 VNĐ", "7.500 VNĐ", "ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN"]
+            ["HAPPY_AI_16H", "10.000 VNĐ", "25.00%", "2.500 VNĐ", "7.500 VNĐ", "ĐÃ ÁP DỤNG THÀNH CÔNG VÀO HỆ THỐNG TÍNH TIỀN"]
         ]
     )
     
@@ -294,6 +356,48 @@ def add_part_4(doc):
         doc,
         "🖥️ BƯỚC E [ĐIỂM NHẤN THUYẾT PHỤC GIẢNG VIÊN]: TERMINAL POWERSHELL - RÀ SOÁT TẦNG LÕI NHÂN CSDL:",
         "python python/verify_promotion_engine.py"
+    )
+    add_code_table(
+        doc,
+        "📊 KẾT QUẢ RÀ SOÁT TẦNG LÕI NHÂN CSDL HIỂN THỊ TRỰC TIẾP TRÊN TERMINAL:",
+        "================================================================================\n"
+        "     NETCAFE DATABASE CORE - KIỂM ĐỊNH LÕI TÍNH CƯỚC & KHUYẾN MÃI AI      \n"
+        "================================================================================\n"
+        "[*] 1. RÀ SOÁT ĐÍCH DANH KHÁCH HÀNG VIP THỤ HƯỞNG (VIP PERSONAL):\n"
+        "    - Khách hàng VIP           : Nguyễn Việt Anh (ID: 12)\n"
+        "    - Số điện thoại            : 0327469105\n"
+        "    - Ràng buộc an ninh SMS    : CHỈ GỬI ĐÍCH DANH DUY NHẤT CHO NGUYỄN VIỆT ANH\n"
+        "    - Voucher VIP độc quyền    : VIP_VIETANH_30K\n"
+        "    - Giá trị Voucher tặng     : TẶNG 30,000 VNĐ (Trừ thẳng vào hóa đơn)\n"
+        "    - Trạng thái Voucher VIP   : ĐANG KÍCH HOẠT (ACTIVE)\n"
+        "    - Thời hạn sử dụng         : 31/10/2026 -> 03/11/2026\n"
+        "--------------------------------------------------------------------------------\n"
+        "[*] 2. RÀ SOÁT KHUYẾN MÃI TOÀN QUÁN (PUBLIC HAPPY HOUR - CHO MỌI KHÁCH):\n"
+        "    - Đối tượng áp dụng        : TẤT CẢ KHÁCH HÀNG ĐANG CHƠI TẠI PHÒNG MÁY\n"
+        "    - Trạng thái Khuyến mãi    : ĐANG KÍCH HOẠT (ACTIVE - GIỜ VÀNG HAPPY HOUR)\n"
+        "    - Mã chương trình          : HAPPY_AI_16H\n"
+        "    - Tên chương trình         : Khuyến Mãi AI: Giảm 25% Tiền Giờ (Khung 16h)\n"
+        "    - Loại chiết khấu          : happy_hour (Giảm % tiền giờ chơi)\n"
+        "    - Tỷ lệ giảm áp dụng       : GIẢM 25.0%\n"
+        "    - Thời hạn hiệu lực        : 31/10/2026 -> 07/11/2026\n"
+        "--------------------------------------------------------------------------------\n"
+        "[*] 3. KẾT QUẢ ĐỐI CHIẾU TÍNH CƯỚC THỰC TẾ (LÕI CSDL POSTGRESQL):\n"
+        "    ------------------------------------------------------------------------\n"
+        "    (A) ĐỐI VỚI KHÁCH HÀNG BÌNH THƯỜNG (Chỉ hưởng Happy Hour toàn quán):\n"
+        "        + Đơn giá giờ chơi gốc      : 10,000 VNĐ / giờ\n"
+        "        + Mức giảm Happy Hour (25%) : -2,500 VNĐ\n"
+        "        -> GIÁ KHÁCH THƯỜNG TRẢ     :  7,500 VNĐ / giờ\n"
+        "    ------------------------------------------------------------------------\n"
+        "    (B) ĐỐI VỚI KHÁCH VIP NGUYỄN VIỆT ANH (HƯỞNG ƯU ĐÃI KÉP):\n"
+        "        + Đơn giá giờ chơi          :  7,500 VNĐ / giờ (Đã hưởng 25% Happy Hour)\n"
+        "        + Ưu đãi đặc quyền VIP      : TẶNG THÊM VOUCHER -30,000 VNĐ\n"
+        "        -> VÍ DỤ PHIÊN CHƠI 4 TIẾNG : 4h x 7.500đ = 30.000đ\n"
+        "           Trừ tiếp Voucher VIP 30k : 30.000đ - 30.000đ = 0 VNĐ (HOÀN TOÀN MIỄN PHÍ!)\n"
+        "    ------------------------------------------------------------------------\n"
+        "[🔥 KẾT LUẬN KIỂM ĐỊNH LÕI]:\n"
+        "    -> Khách thường và Khách VIP được phân tầng chiết khấu rõ ràng tại CSDL!\n"
+        "    -> CSDL tự động tính đúng: Khách thường 7.500đ/h, Khách VIP nhận thêm Voucher 30.000đ.\n"
+        "================================================================================"
     )
     add_explanation_box(
         doc,
@@ -304,6 +408,40 @@ def add_part_4(doc):
         "3. Lõi tính cước CSDL: Khách thường trả 7.500đ/h, Khách VIP hưởng ưu đãi kép (vừa giảm giờ chơi vừa trừ Voucher 30k); "
         "4. Cơ chế Hoàn tác (Rollback): Khi chạy rollback, toàn bộ Happy Hour và Voucher VIP bị thu hồi, "
         "giá giờ chơi lập tức hoàn trả về nguyên bản 10.000 VNĐ/giờ!"
+    )
+    
+    # 4.4 - Bước F: Lệnh hoàn tác Rollback trong SQL & Kiểm chứng
+    add_code_table(
+        doc,
+        "🖥️ BƯỚC F [TÙY CHỌN BẢO VỆ]: HÀM HOÀN TÁC CÁC CHƯƠNG TRÌNH KHUYẾN MÃI DO AI TỰ ĐỘNG SINH:",
+        "-- 1. Chạy trên Cửa sổ Neon SQL Editor để hoàn tác/thu hồi sạch sẽ:\n"
+        "SELECT * FROM ai.fn_rollback_promotions();\n\n"
+        "-- 2. Chạy trên Terminal PowerShell để kiểm chứng giá quay về 10k/h:\n"
+        "python python/verify_promotion_engine.py"
+    )
+    add_result_table(
+        doc,
+        ["rolled_back_code", "status_msg (Thực tế trên Neon)"],
+        [
+            ["HAPPY_AI_16H", "Đã hoàn tác và xóa khỏi hệ thống khuyến mãi"],
+            ["HAPPY_AI_0H", "Đã hoàn tác và xóa khỏi hệ thống khuyến mãi"],
+            ["VIP_VIETANH_30K", "Đã hoàn tác và xóa khỏi hệ thống khuyến mãi"]
+        ]
+    )
+    add_code_table(
+        doc,
+        "📊 KẾT QUẢ KIỂM CHỨNG SAU HOÀN TÁC (TERMINAL POWERSHELL):",
+        "[*] 1. RÀ SOÁT ĐÍCH DANH KHÁCH HÀNG VIP THỤ HƯỞNG (VIP PERSONAL):\n"
+        "    - Voucher VIP độc quyền    : KHÔNG CÓ (Đã thu hồi / Hoàn tác)\n"
+        "    - Trạng thái Voucher VIP   : KHÔNG HOẠT ĐỘNG\n"
+        "[*] 2. RÀ SOÁT KHUYẾN MÃI TOÀN QUÁN (PUBLIC HAPPY HOUR - CHO MỌI KHÁCH):\n"
+        "    - Trạng thái Khuyến mãi    : ĐÃ HOÀN TÁC TOÀN BỘ (ĐÃ BỎ HẾT HAPPY HOUR)\n"
+        "    - Chương trình Happy Hour  : Không có mã nào kích hoạt (Hệ thống chạy giá chuẩn)\n"
+        "[*] 3. KẾT QUẢ ĐỐI CHIẾU TÍNH CƯỚC THỰC TẾ (LÕI CSDL POSTGRESQL):\n"
+        "    -> Đơn giá giờ chơi tiêu chuẩn: 10,000 VNĐ / giờ (Không giảm giá)\n"
+        "[✅ XÁC NHẬN HOÀN TÁC THÀNH CÔNG]:\n"
+        "    -> Toàn bộ chương trình Happy Hour và Voucher VIP đã được dọn sạch khỏi Database!\n"
+        "    -> Giá giờ chơi toàn bộ hệ thống đã TRỞ VỀ NGUYÊN BẢN 10,000 VNĐ / giờ như ban đầu!"
     )
 
 def add_part_5(doc):
