@@ -76,12 +76,11 @@ def add_part_1(doc):
         "FROM staging.stg_customers ORDER BY raw_id LIMIT 10;\n\n"
         "-- 2. Xem bảng cách ly dữ liệu bẩn (Rejected Rows):\n"
         "SELECT rejected_id, error_reason, raw_record FROM staging.rejected_rows;\n\n"
-        "-- 3. Xem 16 khách hàng sạch đã được chuẩn hóa và nạp thành công vào CSDL chính:\n"
+        "-- 3. Xem toàn bộ khách hàng sạch đã được chuẩn hóa và nạp thành công vào CSDL chính:\n"
         "SELECT customer_id, full_name, phone, email, username, balance\n"
         "FROM core.customer\n"
         "WHERE username LIKE 'user_%'\n"
-        "ORDER BY customer_id\n"
-        "LIMIT 16;"
+        "ORDER BY customer_id;"
     )
     add_result_table(
         doc,
