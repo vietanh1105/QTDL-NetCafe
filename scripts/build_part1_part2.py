@@ -331,13 +331,20 @@ def add_part_2(doc):
     )
     add_result_table(
         doc,
-        ["employee_id", "full_name", "phone", "username", "db_username", "emp_role", "default_shift", "is_active", "Trạng thái cột salary"],
+        ["employee_id", "full_name", "phone", "username", "db_username", "emp_role", "default_shift", "hired_date", "is_active"],
         [
-            ["1", "Nguyễn Văn An", "0981234567", "an_nguyen", "nv_admin", "admin", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
-            ["2", "Lê Quang Minh", "0972345678", "minh_le", "nv_manager", "manager", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
-            ["3", "Phạm Thu Thảo", "0913456789", "thao_pham", "nv_thao", "cashier", "morning", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"],
-            ["4", "Trần Đức Nam", "0934567890", "nam_tran", "nv_nam", "cashier", "afternoon", "t (Đang làm việc)", "ĐÃ ẨN HOÀN TOÀN (Bảo mật CLS)"]
+            ["1", "Nguyễn Văn An", "0981234567", "an_nguyen", "nv_admin", "admin", "morning", "2024-01-15", "t"],
+            ["2", "Lê Quang Minh", "0972345678", "minh_le", "nv_manager", "manager", "morning", "2024-03-01", "t"],
+            ["3", "Phạm Thu Thảo", "0913456789", "thao_pham", "nv_thao", "cashier", "morning", "2024-06-10", "t"],
+            ["4", "Trần Đức Nam", "0934567890", "nam_tran", "nv_nam", "cashier", "afternoon", "2024-06-15", "t"]
         ]
+    )
+    add_explanation_box(
+        doc,
+        "Chứng minh Bảo mật cấp cột (CLS) với Hội đồng",
+        "Trong kết quả SELECT * ở trên từ View hr.vw_employee_public, Thầy Cô quan sát thấy hoàn toàn KHÔNG có cột salary. "
+        "Mặc dù bảng gốc hr.employee chứa cột tiền lương, View an toàn đã loại bỏ hoàn toàn cột này ở tầng CSDL. "
+        "Thu ngân Thảo chỉ nhìn thấy các thông tin công khai cần thiết để phục vụ công việc và trạng thái đang làm việc (is_active = t)."
     )
     
     # Bước 2.6
